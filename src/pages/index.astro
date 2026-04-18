@@ -1,17 +1,174 @@
 ---
-
+import Base from "../layouts/Base.astro";
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Base
+  title="会員サイトテンプレート"
+  description="Astro + Vue + Supabase + Cloudflare Workers で構築された会員サイトテンプレート"
+>
+  <!-- Hero Section -->
+  <section class="relative bg-gradient-to-br from-brand-500 to-brand-700 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
+      <div class="text-center">
+        <h1 class="text-4xl md:text-6xl font-bold mb-6">
+          会員サイトテンプレート
+        </h1>
+        <p class="text-xl md:text-2xl text-brand-100 mb-8 max-w-3xl mx-auto">
+          Astro + Vue + Supabase + Cloudflare Workers<br />
+          型安全で高速な会員サイトを素早く構築
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a
+            href="/auth/signup"
+            class="px-8 py-4 bg-white text-brand-700 rounded-lg font-semibold text-lg hover:bg-brand-50 transition shadow-lg"
+          >
+            今すぐ始める
+          </a>
+          <a
+            href="/auth/signin"
+            class="px-8 py-4 bg-brand-600 text-white rounded-lg font-semibold text-lg hover:bg-brand-800 transition border-2 border-white"
+          >
+            サインイン
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">主な機能</h2>
+        <p class="text-lg text-gray-600">モダンな技術スタックで構築された高品質なテンプレート</p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <!-- Feature 1 -->
+        <div class="p-6 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition">
+          <div class="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">認証機能</h3>
+          <p class="text-gray-600">
+            Supabase Authによるメール認証、パスワードリセット、ソーシャルログイン対応
+          </p>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="p-6 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition">
+          <div class="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">データベース</h3>
+          <p class="text-gray-600">
+            PostgreSQL + RLSによる安全なデータアクセス、リアルタイム更新対応
+          </p>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="p-6 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition">
+          <div class="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">高速デプロイ</h3>
+          <p class="text-gray-600">
+            Cloudflare Workersでエッジ配信、世界中どこでも高速アクセス
+          </p>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="p-6 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition">
+          <div class="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">ファイル管理</h3>
+          <p class="text-gray-600">
+            Supabase Storageでアバター画像などのファイルを安全に管理
+          </p>
+        </div>
+
+        <!-- Feature 5 -->
+        <div class="p-6 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition">
+          <div class="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">型安全</h3>
+          <p class="text-gray-600">
+            TypeScript完全対応、エディタ補完で開発効率アップ
+          </p>
+        </div>
+
+        <!-- Feature 6 -->
+        <div class="p-6 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition">
+          <div class="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">管理者機能</h3>
+          <p class="text-gray-600">
+            ユーザー管理、招待機能など管理者向け機能を標準搭載
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech Stack Section -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">技術スタック</h2>
+        <p class="text-lg text-gray-600">最新のモダンな技術で構築</p>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="bg-white p-6 rounded-lg border border-gray-200 text-center">
+          <div class="text-4xl mb-3">🚀</div>
+          <h4 class="font-semibold text-gray-900">Astro 6</h4>
+        </div>
+        <div class="bg-white p-6 rounded-lg border border-gray-200 text-center">
+          <div class="text-4xl mb-3">💚</div>
+          <h4 class="font-semibold text-gray-900">Vue 3</h4>
+        </div>
+        <div class="bg-white p-6 rounded-lg border border-gray-200 text-center">
+          <div class="text-4xl mb-3">⚡</div>
+          <h4 class="font-semibold text-gray-900">Supabase</h4>
+        </div>
+        <div class="bg-white p-6 rounded-lg border border-gray-200 text-center">
+          <div class="text-4xl mb-3">☁️</div>
+          <h4 class="font-semibold text-gray-900">Cloudflare</h4>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="py-20 bg-brand-600">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">
+        今すぐ始めましょう
+      </h2>
+      <p class="text-xl text-brand-100 mb-8">
+        無料でアカウントを作成して、すべての機能を試すことができます
+      </p>
+      <a
+        href="/auth/signup"
+        class="inline-block px-8 py-4 bg-white text-brand-700 rounded-lg font-semibold text-lg hover:bg-brand-50 transition shadow-lg"
+      >
+        無料で始める
+      </a>
+    </div>
+  </section>
+</Base>

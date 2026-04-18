@@ -1,0 +1,133 @@
+---
+import Base from "./Base.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const user = Astro.locals.user;
+const currentPath = Astro.url.pathname;
+---
+
+<Base title={title} description={description}>
+  <div class="min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+          <!-- Logo / Brand -->
+          <div class="flex items-center">
+            <a href="/member/dashboard" class="text-xl font-bold text-brand-600">
+              会員サイト
+            </a>
+          </div>
+
+          <!-- Navigation -->
+          <nav class="hidden md:flex space-x-8">
+            <a
+              href="/member/dashboard"
+              class:list={[
+                "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                currentPath === "/member/dashboard"
+                  ? "bg-brand-100 text-brand-700"
+                  : "text-gray-700 hover:bg-gray-100"
+              ]}
+            >
+              ダッシュボード
+            </a>
+            <a
+              href="/member/profile"
+              class:list={[
+                "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                currentPath === "/member/profile"
+                  ? "bg-brand-100 text-brand-700"
+                  : "text-gray-700 hover:bg-gray-100"
+              ]}
+            >
+              プロフィール
+            </a>
+            <a
+              href="/member/data"
+              class:list={[
+                "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                currentPath === "/member/data"
+                  ? "bg-brand-100 text-brand-700"
+                  : "text-gray-700 hover:bg-gray-100"
+              ]}
+            >
+              データ
+            </a>
+          </nav>
+
+          <!-- User Menu -->
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-700">
+              {user?.email || "ゲスト"}
+            </span>
+            <form action="/auth/signout" method="GET">
+              <button
+                type="submit"
+                class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-md hover:bg-brand-700 transition-colors"
+              >
+                サインアウト
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Mobile Navigation -->
+        <nav class="md:hidden pb-4 space-y-1">
+          <a
+            href="/member/dashboard"
+            class:list={[
+              "block px-3 py-2 rounded-md text-base font-medium transition-colors",
+              currentPath === "/member/dashboard"
+                ? "bg-brand-100 text-brand-700"
+                : "text-gray-700 hover:bg-gray-100"
+            ]}
+          >
+            ダッシュボード
+          </a>
+          <a
+            href="/member/profile"
+            class:list={[
+              "block px-3 py-2 rounded-md text-base font-medium transition-colors",
+              currentPath === "/member/profile"
+                ? "bg-brand-100 text-brand-700"
+                : "text-gray-700 hover:bg-gray-100"
+            ]}
+          >
+            プロフィール
+          </a>
+          <a
+            href="/member/data"
+            class:list={[
+              "block px-3 py-2 rounded-md text-base font-medium transition-colors",
+              currentPath === "/member/data"
+                ? "bg-brand-100 text-brand-700"
+                : "text-gray-700 hover:bg-gray-100"
+            ]}
+          >
+            データ
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 bg-gray-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <slot />
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-6">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-600">
+        &copy; 2026 会員サイトテンプレート. All rights reserved.
+      </div>
+    </footer>
+  </div>
+</Base>

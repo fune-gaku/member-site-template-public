@@ -1,0 +1,8 @@
+---
+import Auth from "../../layouts/Auth.astro";
+import LoginForm from "../../components/LoginForm.vue";
+---
+
+<Auth title="サインイン" description="アカウントにログインしてください">
+  <LoginForm client:load />
+</Auth>
