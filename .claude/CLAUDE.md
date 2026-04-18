@@ -7,7 +7,7 @@ Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプ
 **使用者**: テンプレート利用者（開発者および利用企業）
 **方針**: 型安全で公式推奨の実装パターンを厳守し、セキュリティとメンテナンス性を最優先
 
-**現在のフェーズ**: Phase 1（会員サイト本体実装） - Step 1完了 → [詳細](phases/current.md)
+**現在のフェーズ**: Phase 1（会員サイト本体実装） - ✅ 完了 → [詳細](phases/current.md)
 
 ---
 
@@ -114,7 +114,7 @@ npm run dev
 | Phase | 内容 | ステータス |
 |-------|------|----------|
 | Phase 0 | プロジェクト基盤構築 | ✅ 完了 |
-| Phase 1 | 会員サイト本体実装（Step 1完了、Step 2-3進行中） | 🔄 進行中 |
+| Phase 1 | 会員サイト本体実装（認証・Storage・RLS・UI） | ✅ 完了 |
 | Phase 2 | 品質保証（ESLint, Prettier, Vitest） | 📋 予定 |
 | Phase 3 | 本番デプロイ | 📋 予定 |
 
