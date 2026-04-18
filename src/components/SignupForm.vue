@@ -25,10 +25,14 @@ async function handleSubmit() {
   isLoading.value = true;
 
   try {
-    const { data: _data, error: actionError } = await actions.auth.signUp({
-      email: email.value,
-      password: password.value,
-    });
+    // FormDataを作成
+    const formData = new FormData();
+    formData.append("email", email.value);
+    formData.append("password", password.value);
+
+    const { data: _data, error: actionError } = await actions.auth.signUp(
+      formData,
+    );
 
     if (actionError) {
       error.value = actionError.message;

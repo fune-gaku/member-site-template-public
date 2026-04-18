@@ -2,7 +2,12 @@
 import { actions } from "astro:actions";
 
 if (Astro.request.method === "POST" || Astro.request.method === "GET") {
-  await actions.auth.signOut();
+  const { data, error } = await Astro.callAction(actions.auth.signOut);
+
+  if (error) {
+    console.error('Logout failed:', error);
+  }
+
   return Astro.redirect("/");
 }
 ---
