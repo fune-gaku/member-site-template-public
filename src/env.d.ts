@@ -9,17 +9,9 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-import type { User } from "@supabase/supabase-js";
-
 declare namespace App {
   interface Locals {
-    user: User | null;
+    user: import("@supabase/supabase-js").User | null;
   }
 }
-
-// Cloudflare Workers環境変数の型定義を拡張
-declare namespace Cloudflare {
-  interface Env {
-    SUPABASE_SERVICE_ROLE_KEY: string;
-  }
-}
+// Cloudflare.Env は worker-configuration.d.ts で自動生成
