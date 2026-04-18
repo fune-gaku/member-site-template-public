@@ -18,13 +18,14 @@
 
 **重要**: 以下の技術については、実装前に必ず公式ドキュメントまたはスキルで最新情報を確認してください。
 
-| 技術 | 確認方法 |
-|------|---------|
-| **Astro 6** | `mcp__astro-docs__search_astro_docs` スキル使用 |
+| 技術                | 確認方法                                         |
+| ------------------- | ------------------------------------------------ |
+| **Astro 6**         | `mcp__astro-docs__search_astro_docs` スキル使用  |
 | **Tailwind CSS v4** | [公式ドキュメント](https://tailwindcss.com/docs) |
-| **Supabase** | [公式ドキュメント](https://supabase.com/docs) |
+| **Supabase**        | [公式ドキュメント](https://supabase.com/docs)    |
 
 **確認手順**:
+
 ```
 1. 実装前に技術仕様を確認
 2. 不明・不確実な点がある場合 → 公式ドキュメント検索
@@ -41,6 +42,7 @@
 **方針**: シンプルで使いやすいUIを優先
 
 **技術スタック**:
+
 - Astro 6（SSR）
 - Vue 3（Composition API + `<script setup>`）
 - Tailwind CSS v4
@@ -52,22 +54,26 @@
 ## 📋 開発ルール（重要）
 
 ### TypeScript
+
 - 厳格モード使用
 - すべての関数・変数に型を明示
 - `any`型禁止（`unknown`を使用）
 
 ### Vue
+
 - `<script setup lang="ts">`必須
 - Composition API使用（Options API禁止）
 - Props/Emitsの型定義を明示
 
 ### 命名規則
+
 - ファイル: Vueコンポーネントは`PascalCase.vue`、他は`kebab-case`
 - 変数・関数: `camelCase`
 - 定数: `UPPER_SNAKE_CASE`
 - データベース: `snake_case`
 
 ### エラーハンドリング
+
 - すべての非同期処理を`try-catch`でラップ
 - エラーログは`console.error`
 - ユーザーにはフレンドリーなメッセージ表示
@@ -77,12 +83,14 @@
 ## 🔒 セキュリティ方針
 
 **必須事項**:
+
 - 環境変数は`.env`ファイルのみ（ハードコード禁止）
 - XSS対策: Vue自動エスケープ、`v-html`禁止
 - ファイルアップロード: 拡張子・MIME・サイズ制限（30MB）
 - バリデーション: フロント・バック両方で実施
 
 **コミット前チェック**:
+
 - `.env`がコミット対象に含まれていないか確認
 - [security.md](../.claude/security.md)のチェックリスト確認
 
@@ -101,6 +109,7 @@ git checkout -b phase-1
 ```
 
 **ブランチ運用のメリット**:
+
 - ✅ `main`ブランチを常にデプロイ可能な状態に保つ
 - ✅ 問題発生時に簡単にロールバック可能
 - ✅ Phase単位での作業履歴が明確

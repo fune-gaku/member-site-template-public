@@ -58,11 +58,11 @@ Astro + Cloudflare Workers では、**変数の用途ごとに取得方法を使
 
 ### 3種類の変数と取得方法
 
-| 用途 | 変数名 | 取得方法 | 設定場所 |
-|---|---|---|---|
-| ブラウザ＋サーバー両方で使う公開値 | `PUBLIC_SUPABASE_URL` | `import.meta.env.PUBLIC_SUPABASE_URL` | ビルド時（`.env` or Workers Builds 変数） |
-| ブラウザ＋サーバー両方で使う公開値 | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ビルド時（`.env` or Workers Builds 変数） |
-| サーバーのみで使う秘密値 | `SUPABASE_SERVICE_ROLE_KEY` | `import { env } from 'cloudflare:workers'` → `env.SUPABASE_SERVICE_ROLE_KEY` | ランタイム（`wrangler secret` or `.dev.vars`） |
+| 用途                               | 変数名                            | 取得方法                                                                     | 設定場所                                       |
+| ---------------------------------- | --------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------- |
+| ブラウザ＋サーバー両方で使う公開値 | `PUBLIC_SUPABASE_URL`             | `import.meta.env.PUBLIC_SUPABASE_URL`                                        | ビルド時（`.env` or Workers Builds 変数）      |
+| ブラウザ＋サーバー両方で使う公開値 | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY`                            | ビルド時（`.env` or Workers Builds 変数）      |
+| サーバーのみで使う秘密値           | `SUPABASE_SERVICE_ROLE_KEY`       | `import { env } from 'cloudflare:workers'` → `env.SUPABASE_SERVICE_ROLE_KEY` | ランタイム（`wrangler secret` or `.dev.vars`） |
 
 ### Astro 6 で削除された API（絶対に使わない）
 
@@ -104,21 +104,19 @@ Astro + Cloudflare Workers では、**変数の用途ごとに取得方法を使
   "name": "funegaku-members",
   "main": "dist/_worker.js/index.js",
   "compatibility_date": "2026-04-17",
-  "compatibility_flags": [
-    "nodejs_compat",
-    "global_fetch_strictly_public"
-  ],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
     "binding": "ASSETS",
-    "directory": "./dist"
+    "directory": "./dist",
   },
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
 }
 ```
 
 **注意**:
+
 - `name` が違う場合は既存のものを維持する
 - `compatibility_date` は既存値を維持（新規なら今日の日付）
 - `vars` セクションは**追加しない**（`PUBLIC_*` は Workers Builds の Build variables で管理、
@@ -340,16 +338,12 @@ export function createAdminClient() {
     );
   }
 
-  return createClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    serviceRoleKey,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+  return createClient(import.meta.env.PUBLIC_SUPABASE_URL, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-  );
+  });
 }
 ```
 
@@ -624,7 +618,7 @@ const { title, description = "" } = Astro.props;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>
-  <body class="min-h-screen bg-white text-gray-900 font-sans antialiased">
+  <body class="min-h-screen bg-white font-sans text-gray-900 antialiased">
     <slot />
   </body>
 </html>
@@ -877,7 +871,7 @@ using (
 
 ### Step 3: Pages と SQL マイグレーション
 
-- `src/pages/index.astro` と auth/* 、member/* の全ページ
+- `src/pages/index.astro` と auth/_ 、member/_ の全ページ
 - `supabase/migrations/001_init.sql`
 
 ---
@@ -892,6 +886,7 @@ Step 3 の出力後、以下のセクションを Claude Code が表示するこ
 1. `.env` と `.dev.vars` をローカルに用意:
    cp .env.example .env
    cp .dev.vars.example .dev.vars
+
    # それぞれ実値を記入
 
 2. Supabase でマイグレーションを適用:
@@ -916,21 +911,21 @@ phase2-quality-assurance.md プロンプトを実行してください。
 
 ## 引き継ぎメモ（絶対に守ってほしい）
 
-| 項目 | 誤り（書いてはいけない） | 正しい実装 |
-|---|---|---|
-| 環境変数（Astro 6） | `Astro.locals.runtime.env`（削除済み） | `import { env } from 'cloudflare:workers'` |
-| `cf` オブジェクト | `Astro.locals.runtime.cf` | `Astro.request.cf` |
-| ExecutionContext | `Astro.locals.runtime.ctx` | `Astro.locals.cfContext` |
-| caches API | `Astro.locals.runtime.caches` | グローバルの `caches` |
-| Tailwind | `@astrojs/tailwind` + `tailwind.config.mjs` | `@tailwindcss/vite`（既に設定済み）+ `@theme` |
-| SSR クライアント | 手動 `cookies.set('sb-access-token', ...)` | `@supabase/ssr` の `createServerClient` |
-| admin クライアント | モジュールスコープで初期化 | ファクトリ関数で毎リクエスト生成 |
-| admin クライアント | `env.SUPABASE_SERVICE_ROLE_KEY as string` | undefined ガード → 型推論で自動 `string` |
-| Zod インポート | `from 'zod'` | `from 'astro/zod'` |
-| 認可チェック | `supabase.auth.getSession()` | `supabase.auth.getUser()` |
-| 認可チェック（位置） | `/member` 配下だけで `getUser()` | **全ページで `getUser()`**（トークン自動リフレッシュ） |
-| middleware の Cookie | `next()` の Response を手動で加工 | `context.cookies.set()` が自動反映。加工不要 |
-| 認証コールバック | `exchangeCodeForSession` のみ | `verifyOtp` + `exchangeCodeForSession` の両対応 |
-| `parseCookieHeader` の戻り値 | そのまま渡す | `.map(({ name, value }) => ({ name, value: value ?? "" }))` |
-| ブラウザクライアント | `createClient`（`@supabase/supabase-js`） | `createBrowserClient`（`@supabase/ssr`） |
-| role 列の防御 | RLS の `with check` でサブクエリ | `revoke update (role) on public.profiles from authenticated`（カラムレベル権限） |
+| 項目                         | 誤り（書いてはいけない）                    | 正しい実装                                                                       |
+| ---------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------- |
+| 環境変数（Astro 6）          | `Astro.locals.runtime.env`（削除済み）      | `import { env } from 'cloudflare:workers'`                                       |
+| `cf` オブジェクト            | `Astro.locals.runtime.cf`                   | `Astro.request.cf`                                                               |
+| ExecutionContext             | `Astro.locals.runtime.ctx`                  | `Astro.locals.cfContext`                                                         |
+| caches API                   | `Astro.locals.runtime.caches`               | グローバルの `caches`                                                            |
+| Tailwind                     | `@astrojs/tailwind` + `tailwind.config.mjs` | `@tailwindcss/vite`（既に設定済み）+ `@theme`                                    |
+| SSR クライアント             | 手動 `cookies.set('sb-access-token', ...)`  | `@supabase/ssr` の `createServerClient`                                          |
+| admin クライアント           | モジュールスコープで初期化                  | ファクトリ関数で毎リクエスト生成                                                 |
+| admin クライアント           | `env.SUPABASE_SERVICE_ROLE_KEY as string`   | undefined ガード → 型推論で自動 `string`                                         |
+| Zod インポート               | `from 'zod'`                                | `from 'astro/zod'`                                                               |
+| 認可チェック                 | `supabase.auth.getSession()`                | `supabase.auth.getUser()`                                                        |
+| 認可チェック（位置）         | `/member` 配下だけで `getUser()`            | **全ページで `getUser()`**（トークン自動リフレッシュ）                           |
+| middleware の Cookie         | `next()` の Response を手動で加工           | `context.cookies.set()` が自動反映。加工不要                                     |
+| 認証コールバック             | `exchangeCodeForSession` のみ               | `verifyOtp` + `exchangeCodeForSession` の両対応                                  |
+| `parseCookieHeader` の戻り値 | そのまま渡す                                | `.map(({ name, value }) => ({ name, value: value ?? "" }))`                      |
+| ブラウザクライアント         | `createClient`（`@supabase/supabase-js`）   | `createBrowserClient`（`@supabase/ssr`）                                         |
+| role 列の防御                | RLS の `with check` でサブクエリ            | `revoke update (role) on public.profiles from authenticated`（カラムレベル権限） |

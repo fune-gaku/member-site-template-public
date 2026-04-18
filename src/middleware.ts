@@ -1,4 +1,5 @@
 import { defineMiddleware } from "astro:middleware";
+
 import { createClient } from "./lib/supabase";
 
 export const onRequest = defineMiddleware(async (context, next) => {

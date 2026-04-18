@@ -10,10 +10,10 @@
 
 ## テーブル一覧
 
-| テーブル名 | 説明 | 主要カラム |
-|-----------|------|----------|
-| `profiles` | ユーザープロフィール | `user_id`, `display_name`, `role` |
-| `member_posts` | 会員投稿（サンプル） | `id`, `user_id`, `title`, `body` |
+| テーブル名     | 説明                 | 主要カラム                        |
+| -------------- | -------------------- | --------------------------------- |
+| `profiles`     | ユーザープロフィール | `user_id`, `display_name`, `role` |
+| `member_posts` | 会員投稿（サンプル） | `id`, `user_id`, `title`, `body`  |
 
 ---
 
@@ -23,28 +23,33 @@
 
 ユーザーのプロフィール情報を管理するテーブル。
 
-| カラム名 | 型 | 制約 | 説明 |
-|---------|---|------|------|
-| `user_id` | `uuid` | PRIMARY KEY, REFERENCES `auth.users(id)` ON DELETE CASCADE | Supabase Auth のユーザーID |
-| `display_name` | `text` | NULL可 | 表示名 |
-| `role` | `text` | NOT NULL, DEFAULT `'member'`, CHECK (`role` IN (`'member'`, `'admin'`)) | ユーザーロール |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | 作成日時 |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | 更新日時 |
+| カラム名       | 型            | 制約                                                                    | 説明                       |
+| -------------- | ------------- | ----------------------------------------------------------------------- | -------------------------- |
+| `user_id`      | `uuid`        | PRIMARY KEY, REFERENCES `auth.users(id)` ON DELETE CASCADE              | Supabase Auth のユーザーID |
+| `display_name` | `text`        | NULL可                                                                  | 表示名                     |
+| `role`         | `text`        | NOT NULL, DEFAULT `'member'`, CHECK (`role` IN (`'member'`, `'admin'`)) | ユーザーロール             |
+| `created_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                               | 作成日時                   |
+| `updated_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                               | 更新日時                   |
 
 **インデックス**:
+
 - PRIMARY KEY: `user_id`
 
 **RLS ポリシー**:
+
 - `"Users can view own profile"`: 自分のプロフィールのみ閲覧可能
 - `"Users can update own profile"`: 自分のプロフィールのみ更新可能
 
 **権限昇格攻撃（Privilege Escalation）防止**:
+
 ```sql
 revoke update (role) on public.profiles from authenticated;
 ```
+
 一般ユーザーからは `role` 列の UPDATE 権限を剥奪。カラムレベル権限は RLS より先に評価されるため、シンプルで堅牢な防御策。
 
 **トリガー**:
+
 - `on_auth_user_created`: 新規ユーザー作成時に自動的に profiles レコードを作成
 
 ---
@@ -53,18 +58,20 @@ revoke update (role) on public.profiles from authenticated;
 
 会員の投稿データ（サンプル用テーブル）。
 
-| カラム名 | 型 | 制約 | 説明 |
-|---------|---|------|------|
-| `id` | `uuid` | PRIMARY KEY, DEFAULT `gen_random_uuid()` | 投稿ID |
-| `user_id` | `uuid` | NOT NULL, REFERENCES `auth.users(id)` ON DELETE CASCADE | 投稿者のユーザーID |
-| `title` | `text` | NOT NULL | 投稿タイトル |
-| `body` | `text` | NULL可 | 投稿本文 |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | 作成日時 |
+| カラム名     | 型            | 制約                                                    | 説明               |
+| ------------ | ------------- | ------------------------------------------------------- | ------------------ |
+| `id`         | `uuid`        | PRIMARY KEY, DEFAULT `gen_random_uuid()`                | 投稿ID             |
+| `user_id`    | `uuid`        | NOT NULL, REFERENCES `auth.users(id)` ON DELETE CASCADE | 投稿者のユーザーID |
+| `title`      | `text`        | NOT NULL                                                | 投稿タイトル       |
+| `body`       | `text`        | NULL可                                                  | 投稿本文           |
+| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()`                               | 作成日時           |
 
 **インデックス**:
+
 - PRIMARY KEY: `id`
 
 **RLS ポリシー**:
+
 - `"Users can view own posts"`: 自分の投稿のみ閲覧可能
 - `"Users can insert own posts"`: 自分の投稿のみ作成可能
 - `"Users can update own posts"`: 自分の投稿のみ更新可能
@@ -98,6 +105,7 @@ for each row execute function public.handle_new_user();
 ```
 
 **動作**:
+
 1. `auth.users` にレコードが INSERT される
 2. トリガーが発動し `handle_new_user()` が実行される
 3. `profiles` テーブルに自動的にレコードが作成される
@@ -151,7 +159,9 @@ const { data: profile } = await supabase
 import { createBrowserSupabase } from "../lib/supabase-browser";
 
 const supabase = createBrowserSupabase();
-const { data: { user } } = await supabase.auth.getUser();
+const {
+  data: { user },
+} = await supabase.auth.getUser();
 
 const { error } = await supabase
   .from("profiles")
@@ -174,17 +184,19 @@ const { data: posts } = await supabase
 
 ### Buckets
 
-| バケット名 | 公開設定 | 用途 |
-|-----------|---------|------|
-| `avatars` | Private（非公開） | ユーザーのアバター画像保存 |
+| バケット名 | 公開設定          | 用途                       |
+| ---------- | ----------------- | -------------------------- |
+| `avatars`  | Private（非公開） | ユーザーのアバター画像保存 |
 
 **RLS ポリシー**:
+
 - `"Users can view own avatars"`: 自分のフォルダ内のファイルのみ閲覧可能
 - `"Users can upload own avatars"`: 自分のフォルダにのみアップロード可能
 - `"Users can update own avatars"`: 自分のフォルダ内のファイルのみ更新可能
 - `"Users can delete own avatars"`: 自分のフォルダ内のファイルのみ削除可能
 
 **フォルダ構造**:
+
 ```
 avatars/
   └── {user_id}/
@@ -193,6 +205,7 @@ avatars/
 ```
 
 **アクセス制御**:
+
 ```sql
 -- 自分の user_id フォルダのみアクセス可能
 (storage.foldername(name))[1] = (select auth.jwt()->>'sub')

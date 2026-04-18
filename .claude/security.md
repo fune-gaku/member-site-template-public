@@ -66,16 +66,16 @@
 
 ### 想定する脅威
 
-| 脅威 | リスクレベル | 対策 |
-|------|------------|------|
-| 環境変数の漏洩 | 高 | `.gitignore`、コードレビュー |
-| 権限昇格攻撃 | 高 | `revoke update (role)` でカラムレベル権限制御 |
-| XSS攻撃 | 中 | Vue自動エスケープ、`v-html`禁止 |
-| SQLインジェクション | 中 | Supabaseクライアント使用（パラメータ化クエリ） |
-| 不正ファイルアップロード | 中 | 拡張子・MIME・サイズ制限（5MB） |
-| セッションハイジャック | 中 | Secure Cookie、HTTPS、トークン自動リフレッシュ |
-| CSRF攻撃 | 低 | SameSite Cookie（`@supabase/ssr` が自動管理） |
-| RLS バイパス | 高 | RLS を全テーブルで有効化、service_role キーはサーバーのみ |
+| 脅威                     | リスクレベル | 対策                                                      |
+| ------------------------ | ------------ | --------------------------------------------------------- |
+| 環境変数の漏洩           | 高           | `.gitignore`、コードレビュー                              |
+| 権限昇格攻撃             | 高           | `revoke update (role)` でカラムレベル権限制御             |
+| XSS攻撃                  | 中           | Vue自動エスケープ、`v-html`禁止                           |
+| SQLインジェクション      | 中           | Supabaseクライアント使用（パラメータ化クエリ）            |
+| 不正ファイルアップロード | 中           | 拡張子・MIME・サイズ制限（5MB）                           |
+| セッションハイジャック   | 中           | Secure Cookie、HTTPS、トークン自動リフレッシュ            |
+| CSRF攻撃                 | 低           | SameSite Cookie（`@supabase/ssr` が自動管理）             |
+| RLS バイパス             | 高           | RLS を全テーブルで有効化、service_role キーはサーバーのみ |
 
 ---
 
@@ -84,6 +84,7 @@
 ### 1. RLS（Row Level Security）の完全実装
 
 **全テーブルで RLS を有効化**:
+
 - `profiles`: 自分のプロフィールのみ閲覧・更新可能
 - `member_posts`: 自分の投稿のみ CRUD 可能
 - Storage `avatars`: 自分のフォルダのみアクセス可能
@@ -96,6 +97,7 @@ alter table public.member_posts enable row level security;
 ### 2. 権限昇格攻撃（Privilege Escalation）の防止
 
 **カラムレベル権限で `role` 列を保護**:
+
 ```sql
 revoke update (role) on public.profiles from authenticated;
 ```
@@ -105,22 +107,19 @@ revoke update (role) on public.profiles from authenticated;
 ### 3. Admin クライアントのセキュアな実装
 
 **毎リクエスト新規生成**:
+
 ```typescript
 export function createAdminClient() {
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set...");
   }
-  return createClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    serviceRoleKey,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+  return createClient(import.meta.env.PUBLIC_SUPABASE_URL, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-  );
+  });
 }
 ```
 
@@ -129,18 +128,23 @@ export function createAdminClient() {
 ### 4. 認証ミドルウェアによる全体保護
 
 **全ページでトークン自動リフレッシュ**:
+
 ```typescript
 export const onRequest = defineMiddleware(async (context, next) => {
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
   });
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   context.locals.user = user;
 
   if (context.url.pathname.startsWith("/member") && !user) {
-    return context.redirect(`/auth/signin?next=${encodeURIComponent(context.url.pathname)}`);
+    return context.redirect(
+      `/auth/signin?next=${encodeURIComponent(context.url.pathname)}`,
+    );
   }
 
   return next();
@@ -150,6 +154,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 ### 5. トリガーのセキュリティ
 
 **`security definer` と `set search_path`**:
+
 ```sql
 create or replace function public.handle_new_user()
 returns trigger
@@ -172,22 +177,25 @@ $$;
 ### 環境変数の扱い
 
 **❌ 悪い例**:
+
 ```typescript
-const supabaseUrl = 'https://xxx.supabase.co';  // ハードコード
-const apiKey = 'eyJ...';  // ハードコード
+const supabaseUrl = "https://xxx.supabase.co"; // ハードコード
+const apiKey = "eyJ..."; // ハードコード
 ```
 
 **✅ 良い例（公開値）**:
+
 ```typescript
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const apiKey = import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 if (!supabaseUrl || !apiKey) {
-  throw new Error('環境変数が設定されていません');
+  throw new Error("環境変数が設定されていません");
 }
 ```
 
 **✅ 良い例（秘密値・サーバーのみ）**:
+
 ```typescript
 import { env } from "cloudflare:workers";
 
@@ -202,13 +210,17 @@ if (!serviceRoleKey) {
 ### ユーザー入力のエスケープ
 
 **❌ 悪い例**:
+
 ```vue
-<div v-html="userInput"></div>  <!-- XSSリスク -->
+<div v-html="userInput"></div>
+<!-- XSSリスク -->
 ```
 
 **✅ 良い例**:
+
 ```vue
-<div>{{ userInput }}</div>  <!-- Vue自動エスケープ -->
+<div>{{ userInput }}</div>
+<!-- Vue自動エスケープ -->
 ```
 
 ---
@@ -216,18 +228,20 @@ if (!serviceRoleKey) {
 ### SQLクエリ
 
 **❌ 悪い例**:
+
 ```typescript
 // 生SQLで直接入力を連結（Supabaseでは不可能だが、念のため）
 const query = `SELECT * FROM profiles WHERE user_id = '${userInput}'`;
 ```
 
 **✅ 良い例**:
+
 ```typescript
 // Supabaseクライアントを使用（パラメータ化クエリ）
 const { data } = await supabase
-  .from('profiles')
-  .select('*')
-  .eq('user_id', userId);
+  .from("profiles")
+  .select("*")
+  .eq("user_id", userId);
 ```
 
 ---
@@ -235,6 +249,7 @@ const { data } = await supabase
 ### ファイルアップロード
 
 **✅ 実装例（ProfileForm.vue）**:
+
 ```typescript
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -263,21 +278,23 @@ async function handleAvatarChange(event: Event) {
 ### エラーハンドリング
 
 **❌ 悪い例**:
+
 ```typescript
 try {
-  await supabase.from('profiles').insert(data);
+  await supabase.from("profiles").insert(data);
 } catch (error) {
-  alert(error.message);  // 内部エラーがユーザーに表示される
+  alert(error.message); // 内部エラーがユーザーに表示される
 }
 ```
 
 **✅ 良い例**:
+
 ```typescript
 try {
-  await supabase.from('profiles').insert(data);
+  await supabase.from("profiles").insert(data);
 } catch (error) {
-  console.error('プロフィール登録エラー:', error);
-  alert('プロフィールの登録に失敗しました。もう一度お試しください。');
+  console.error("プロフィール登録エラー:", error);
+  alert("プロフィールの登録に失敗しました。もう一度お試しください。");
 }
 ```
 
@@ -419,15 +436,17 @@ Astro の `context.cookies.set()` が自動的に `Set-Cookie` ヘッダーに�
 ### セキュアな環境変数アクセス
 
 **公開値（ブラウザ + サーバー）**:
+
 ```typescript
-import.meta.env.PUBLIC_SUPABASE_URL
-import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY
+import.meta.env.PUBLIC_SUPABASE_URL;
+import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 ```
 
 **秘密値（サーバーのみ）**:
+
 ```typescript
 import { env } from "cloudflare:workers";
-env.SUPABASE_SERVICE_ROLE_KEY
+env.SUPABASE_SERVICE_ROLE_KEY;
 ```
 
 ---

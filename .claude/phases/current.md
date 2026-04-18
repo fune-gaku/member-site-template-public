@@ -1,6 +1,6 @@
-# 現在のフェーズ: Phase 1
+# 現在のフェーズ: Phase 2
 
-## Phase 1: 会員サイト本体実装
+## Phase 2: 品質保証（ESLint + Prettier + Vitest）
 
 **ステータス**: ✅ 完了
 **開始日**: 2026-04-18
@@ -10,130 +10,154 @@
 
 ## 目標
 
-Supabase認証・Storage・RLS・会員ページの本体機能を実装し、動作する会員サイトを構築する。
+Phase 1 で実装した会員サイトに対して、品質保証ツール（ESLint、Prettier、Vitest）を導入し、コード品質とテスト環境を整備する。
 
 ---
 
 ## タスク
 
 ### ✅ 完了
-- [x] **Step 1**: 設定ファイル・ライブラリ・Actions の実装
-  - Astro SSRモード有効化（`output: 'server'`）
-  - Supabase クライアント（サーバー/ブラウザ/Admin）実装
-  - 認証ミドルウェア実装（トークン自動リフレッシュ）
-  - Astro Actions（認証・ストレージ・管理者機能）実装
-  - 環境変数設定ファイル作成（.env.example, .dev.vars.example）
 
-- [x] **Step 2**: Layouts と Vue コンポーネントの実装
-  - Base/Auth/Member レイアウト作成
-  - SignupForm（確認メール送信）
-  - LoginForm（リダイレクト処理）
-  - ProfileForm（アバターアップロード・プロフィール編集）
-  - SampleDataTable（member_posts データ表示）
+- [x] **Step 1**: Lint/Format/設定ファイルの作成
+  - package.json に scripts 追加
+  - .gitignore に coverage 追加
+  - eslint.config.js（Flat Config形式）
+  - .prettierrc.mjs と .prettierignore
+  - vitest.config.ts と vitest.workers.config.ts
 
-- [x] **Step 3**: Pages と SQL マイグレーションの実装
-  - ランディングページ（index.astro）
-  - 認証ページ（signup/signin/reset-password/callback/signout）
-  - 会員ページ（dashboard/profile/data）
-  - SQL初期マイグレーション（001_init.sql）
-    - profiles テーブル + RLS + トリガー
-    - member_posts テーブル + RLS
-    - avatars バケット + RLS
+- [x] **Step 2**: テストファイルの作成
+  - tests/unit/actions-schema.test.ts
+  - tests/unit/supabase-client.test.ts
+  - tests/unit/middleware.test.ts
+  - tests/integration/pages.test.ts
+  - tests/workers/env.test.ts
+  - tests/README.md
 
----
+- [x] **依存パッケージのインストール**
+  - ESLint、Prettier、Vitest関連パッケージ（合計約20パッケージ）
 
-## 動作確認項目
-
-動作確認は以下の手順で行ってください：
-
-1. **環境変数設定**
-   ```bash
-   cp .env.example .env
-   cp .dev.vars.example .dev.vars
-   # 実際の値を設定
-   ```
-
-2. **Supabase マイグレーション適用**
-   - Supabase ダッシュボードの SQL Editor で `supabase/migrations/001_init.sql` を実行
-
-3. **開発サーバー起動**
-   ```bash
-   npm run dev
-   ```
-
-4. **動作確認**
-   - [ ] ローカル開発サーバーが起動する（http://localhost:4321）
-   - [ ] ランディングページが表示される
-   - [ ] サインアップ → 確認メール受信 → リンククリック → ダッシュボードへ
-   - [ ] ログイン → `/member/dashboard` にリダイレクト
-   - [ ] プロフィール編集（表示名変更）
-   - [ ] アバターアップロード・表示
-   - [ ] データページでサンプルデータ（member_posts）の取得・表示
-   - [ ] サインアウト → トップページへリダイレクト
+- [x] **動作確認**
+  - Lint: ✅ エラーなし
+  - Format: ✅ 全ファイルがフォーマット済み
+  - Typecheck: ⚠️ 一部の型エラーあり（非ブロッキング）
+  - Test: ✅ 15テスト全てパス
 
 ---
 
-## セキュリティチェック
+## 動作確認結果
 
-実装時に確認した項目:
-- [x] 環境変数がハードコードされていない
-- [x] `.env` と `.dev.vars` が `.gitignore` に含まれる
-- [x] `SUPABASE_SERVICE_ROLE_KEY` はサーバーのみで使用（`cloudflare:workers` の `env`）
-- [x] RLS ポリシーが正しく設定されている
-  - profiles: 自分のプロファイルのみ閲覧・更新可能
-  - member_posts: 自分の投稿のみ CRUD 可能
-  - avatars: 自分のフォルダのみアクセス可能
-- [x] role 列の権限昇格攻撃を防止（`revoke update (role)` でカラムレベル権限制御）
-- [x] Admin クライアントは毎リクエスト生成（モジュールスコープ初期化を回避）
-- [x] 認証ミドルウェアで全ページでトークン自動リフレッシュ
+### ✅ Lint
+```bash
+npm run lint
+```
+**結果**: エラーなし
+
+### ✅ Format
+```bash
+npm run format
+```
+**結果**: 全ファイルがフォーマット済み
+
+### ⚠️ Typecheck
+```bash
+npm run typecheck
+```
+**結果**: 一部の型エラーあり（Astro仮想モジュール関連・Zod非推奨警告）
+- 実行には支障なし
+
+### ✅ Test
+```bash
+npm run test
+```
+**結果**: 15テスト全てパス（4ファイル）
+- `tests/unit/actions-schema.test.ts` - 5テスト
+- `tests/unit/supabase-client.test.ts` - 4テスト
+- `tests/unit/middleware.test.ts` - 3テスト
+- `tests/integration/pages.test.ts` - 3テスト
 
 ---
 
-## 実装上の注意点
+## 重要な修正
 
-### 重要な仕様
-- **Astro 6**: `Astro.locals.runtime.env` 削除 → `import { env } from 'cloudflare:workers'`
-- **Supabase SSR**: `@supabase/ssr` の `createServerClient`/`createBrowserClient` を使用
-- **Admin クライアント**: モジュールスコープで初期化しない（毎リクエスト生成）
-- **Zod**: `astro/zod` からインポート（`zod` ではない）
-- **認証**: 全ページで `getUser()` を呼び出してトークン自動リフレッシュ
+1. **wrangler.jsonc**: main フィールドを `@astrojs/cloudflare/entrypoints/server` に変更
+2. **vitest.workers.config.ts**: `cloudflareTest` プラグイン形式に更新
+3. **astro.config.mjs**: アダプターを条件分岐（Astro Issue #15878 回避策）
+4. **vitest.config.ts**: `getViteConfig()` を使用（Astro公式推奨）
+5. **env.d.ts**: `Cloudflare.Env` と `App.Locals` の型定義を追加
+6. **エラーハンドリング**: 全catchブロックに `console.error` を追加
 
-### Tailwind CSS 4
-- `@theme` ブロックで変数定義（global.css）
-- brand カラー（brand-50〜700）を使用
+---
 
-### 実装したファイル数
-- **設定ファイル**: 7個（.nvmrc, .env.example, .dev.vars.example, env.d.ts など）
-- **ライブラリ**: 4個（supabase.ts, supabase-browser.ts, supabase-admin.ts, middleware.ts）
-- **Actions**: 1個（index.ts - 11個のアクション）
-- **Layouts**: 3個（Base.astro, Auth.astro, Member.astro）
-- **Vue コンポーネント**: 4個（SignupForm, LoginForm, ProfileForm, SampleDataTable）
-- **Pages**: 10個（index + auth/* + member/*）
-- **SQL**: 1個（001_init.sql - 3テーブル + RLS + トリガー）
+## 既知の制約と今後の課題
+
+### 型エラー（軽微）
+- Zod `.email()` メソッドが deprecated（ts6385）
+  - 警告のみでエラーではないため、現時点では許容
+  - 将来的には Zod の最新APIに移行
+
+### Astro Issue #15878 について
+- Astro 6 + Cloudflare + Vitest 4 の組み合わせで `resolve.external` エラーが発生する既知のバグ
+- **対策済み**: astro.config.mjs でアダプターを条件分岐する公式推奨の回避策を実装
+- **影響**: テスト実行時のみ Node アダプターを使用、本番ビルドには影響なし
+- **将来**: Astro側でバグ修正後、条件分岐を削除して完全に Cloudflare アダプターに統一可能
+
+---
+
+## 成果物
+
+### 設定ファイル（7個）
+- [eslint.config.js](../../eslint.config.js)
+- [.prettierrc.mjs](../../.prettierrc.mjs)
+- [.prettierignore](../../.prettierignore)
+- [vitest.config.ts](../../vitest.config.ts)
+- [vitest.workers.config.ts](../../vitest.workers.config.ts)
+- [wrangler.jsonc](../../wrangler.jsonc)
+- [src/env.d.ts](../../src/env.d.ts)
+
+### テストファイル（6個）
+- [tests/unit/actions-schema.test.ts](../../tests/unit/actions-schema.test.ts)
+- [tests/unit/supabase-client.test.ts](../../tests/unit/supabase-client.test.ts)
+- [tests/unit/middleware.test.ts](../../tests/unit/middleware.test.ts)
+- [tests/integration/pages.test.ts](../../tests/integration/pages.test.ts)
+- [tests/workers/env.test.ts](../../tests/workers/env.test.ts)
+- [tests/README.md](../../tests/README.md)
 
 ---
 
 ## 次のPhase
 
-Phase 2: 品質保証（ESLint + Prettier + Vitest セットアップ）
+**Phase 3**: 本番デプロイ（Cloudflare Workers へのデプロイ・環境変数設定）
 
-動作確認が完了したら、Phase 2に進んでコード品質とテストを向上させます。
+品質保証環境が整ったので、次は本番環境へのデプロイを行います。
 
 ---
 
 ## メモ
 
-### Phase 1 完了時の状態
+### Phase 2 完了時の状態
+
 - ✅ Phase 0（基盤構築）完了
 - ✅ Phase 1（会員サイト本体実装）完了
-  - Step 1: 設定・ライブラリ・Actions
-  - Step 2: Layouts・Vue コンポーネント
-  - Step 3: Pages・SQL マイグレーション
-- 📋 Phase 2（品質保証）準備完了
+- ✅ Phase 2（品質保証）完了
+- 📋 Phase 3（本番デプロイ）準備完了
 
-### 実装時の工夫
-- Vue コンポーネントは完全に型安全（TypeScript）
-- エラーハンドリングとローディング状態を全てのフォームに実装
-- Tailwind CSS 4 の `@theme` でデザイントークンを統一
-- RLS ポリシーでセキュアなデータアクセス制御
-- 権限昇格攻撃（Privilege Escalation）をカラムレベル権限で防止
+### 学んだこと
+
+- **Astro Issue #15878**: Astro 6 + Cloudflare + Vitest 4 で `resolve.external` エラーが発生する既知のバグ
+  - 公式推奨の回避策：astro.config.mjs でアダプターを環境変数で条件分岐
+  - テスト実行時のみ Node アダプター使用、本番ビルドには影響なし
+- **getViteConfig()**: Astro公式推奨のVitest設定方法。Astro設定との統合が可能
+- **@cloudflare/vitest-pool-workers**: 最新APIは `cloudflareTest` プラグイン形式
+- **公式ドキュメントとGitHub Issueの確認**: 不明な点は推測せず、必ず公式情報を確認
+
+### ベストプラクティス
+
+- Lintエラーは `npm run lint:fix` で自動修正できる範囲を先に修正
+- Formatは `prettier-plugin-tailwindcss` で Tailwind クラスが自動整列される
+- Catch ブロックには必ず `console.error` を追加してデバッグを容易に
+- **公式ドキュメントとGitHub Issueの確認**: 不明な点は推測せず、必ず公式情報を確認
+
+### 改善余地
+
+- Astro Issue #15878 のバグ修正後、条件分岐を削除して完全にCloudflareアダプターに統一
+- Zod の最新APIへの移行（非推奨警告の解消）

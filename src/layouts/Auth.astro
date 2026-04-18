@@ -10,17 +10,22 @@ const { title, description } = Astro.props;
 ---
 
 <Base title={title} description={description}>
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-brand-100 px-4 py-12">
+  <div
+    class="from-brand-50 to-brand-100 flex min-h-screen items-center justify-center bg-gradient-to-br px-4 py-12"
+  >
     <div class="w-full max-w-md">
-      <div class="bg-white rounded-xl shadow-xl p-8">
-        <div class="text-center mb-8">
-          <h1 class="text-3xl font-bold text-gray-900 mb-2">{title}</h1>
+      <div class="rounded-xl bg-white p-8 shadow-xl">
+        <div class="mb-8 text-center">
+          <h1 class="mb-2 text-3xl font-bold text-gray-900">{title}</h1>
           {description && <p class="text-gray-600">{description}</p>}
         </div>
         <slot />
       </div>
       <div class="mt-6 text-center">
-        <a href="/" class="text-sm text-brand-600 hover:text-brand-700 transition-colors">
+        <a
+          href="/"
+          class="text-brand-600 hover:text-brand-700 text-sm transition-colors"
+        >
           トップページに戻る
         </a>
       </div>

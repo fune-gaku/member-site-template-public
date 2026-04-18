@@ -41,7 +41,7 @@ clone した既存ディレクトリに、**Astro 公式の最新テンプレー
 
 ## Step 1. GitHub テンプレートリポジトリから clone
 
-*※ すでにクローン済みの場合はこのステップをスキップして Step 2 へ進んでください**
+\*※ すでにクローン済みの場合はこのステップをスキップして Step 2 へ進んでください\*\*
 
 Claude プロジェクトテンプレート（`.claude/` や `init-claude.sh` 入り）から新プロジェクトを作成:
 
@@ -77,30 +77,29 @@ cd member-site-template
 
 ## 基本情報
 
-| 質問 | 入力値 |
-|---|---|
-| プロジェクト名 | `Astro Vue Supabase Cloudflare Template` |
+| 質問             | 入力値                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| プロジェクト名   | `Astro Vue Supabase Cloudflare Template`                                                                          |
 | プロジェクト概要 | `Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプレート（SSR・認証・Storage・Admin機能完備）` |
-| 使用者数 | `テンプレート利用者（開発者および利用企業）` |
-| 開発方針 | `型安全で公式推奨の実装パターンを厳守し、セキュリティとメンテナンス性を最優先` |
+| 使用者数         | `テンプレート利用者（開発者および利用企業）`                                                                      |
+| 開発方針         | `型安全で公式推奨の実装パターンを厳守し、セキュリティとメンテナンス性を最優先`                                    |
 
 ## 技術スタック
 
-| 質問 | 入力値 |
-|---|---|
-| フロントエンドフレームワーク | `Astro 6` |
-| UIライブラリ | `Vue 3` |
-| CSSフレームワーク | `Tailwind CSS v4` |
-| バックエンド | `Supabase` |
-| デプロイ先 | `Cloudflare Workers` |
+| 質問                         | 入力値               |
+| ---------------------------- | -------------------- |
+| フロントエンドフレームワーク | `Astro 6`            |
+| UIライブラリ                 | `Vue 3`              |
+| CSSフレームワーク            | `Tailwind CSS v4`    |
+| バックエンド                 | `Supabase`           |
+| デプロイ先                   | `Cloudflare Workers` |
 
 ## データベース
 
-| 質問 | 入力値 |
-|---|---|
-| DBMS | `PostgreSQL (Supabase)` |
+| 質問             | 入力値                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| DBMS             | `PostgreSQL (Supabase)`                                                                               |
 | スキーマ管理方法 | `Supabase Migrations (supabase/migrations/*.sql を Git で管理し、本番適用は SQL Editor から手動実行)` |
-
 
 **注**: 自動置換されないプレースホルダーは、Phase 1 完了後に手動で埋めれば良い。
 Phase 0 の段階では Astro プロジェクトを作成することが優先。
@@ -131,6 +130,7 @@ npm create astro@latest .astro-temp -- \
 ```
 
 **フラグの意味**:
+
 - `--template minimal`: 最小構成のテンプレート（余計なサンプルコードが入らない）
 - `--no-git`: git init をスキップ（後で member-site-template 側の git を使うため）
 - `--install`: 依存を自動インストール
@@ -152,6 +152,7 @@ rsync -av \
 ```
 
 **ポイント**:
+
 - `.astro-temp/` の末尾スラッシュに注意（中身をコピー。スラッシュがないとディレクトリごとコピーになる）
 - `--exclude='.git'`: Astro が作った隠れ `.git` があれば除外
 - `--exclude='node_modules'`: サイズが大きいので除外（後で再インストール）
@@ -176,6 +177,7 @@ npm install
 これで `node_modules/` が作成される。
 
 **確認**:
+
 ```bash
 ls -la
 # .claude/ と src/、public/、astro.config.mjs、package.json が揃っているはず
@@ -190,6 +192,7 @@ npx astro add cloudflare --yes
 ```
 
 これが自動で行うこと:
+
 - `@astrojs/cloudflare` を devDependencies に追加
 - `astro.config.mjs` に `import cloudflare from '@astrojs/cloudflare'` と `adapter: cloudflare()` を追記
 - `output: 'server'` に変更
@@ -206,6 +209,7 @@ npx astro add vue --yes
 ```
 
 これが自動で行うこと:
+
 - `@astrojs/vue` と `vue` を dependencies に追加
 - `astro.config.mjs` の `integrations` 配列に `vue()` を追記
 - `tsconfig.json` に Vue 用の設定を追記
@@ -219,6 +223,7 @@ npx astro add tailwind --yes
 ```
 
 これが自動で行うこと:
+
 - `@tailwindcss/vite` と `tailwindcss` を devDependencies に追加
 - `astro.config.mjs` の `vite.plugins` に `tailwindcss()` を追記
 - `src/styles/global.css` を作成（`@import "tailwindcss"` 入り）
@@ -328,6 +333,7 @@ member-site-template/
 ```
 
 **確認コマンド**:
+
 ```bash
 ls -la
 cat astro.config.mjs
@@ -338,13 +344,13 @@ cat package.json
 `astro.config.mjs` が以下のような内容になっていればOK（厳密一致でなくて良い）:
 
 ```js
-import { defineConfig } from 'astro/config';
-import cloudflare from '@astrojs/cloudflare';
-import vue from '@astrojs/vue';
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from "astro/config";
+import cloudflare from "@astrojs/cloudflare";
+import vue from "@astrojs/vue";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  output: 'server',
+  output: "server",
   adapter: cloudflare(),
   integrations: [vue()],
   vite: {
@@ -415,6 +421,7 @@ Robocopy .astro-temp member-site-template /E /XD .git node_modules
 Node.js のバージョンが古い可能性。`node -v` で 22.12.0 以上であることを確認。
 
 古い場合は nvm で更新:
+
 ```bash
 nvm install 22
 nvm use 22

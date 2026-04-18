@@ -2,19 +2,19 @@
 
 ## 技術スタック
 
-| カテゴリ | 技術 | バージョン | 用途 |
-|---------|------|-----------|------|
-| フレームワーク | Astro | 6.x | SSRフレームワーク（サーバーサイドレンダリング） |
-| アダプタ | @astrojs/cloudflare | 13.x | Cloudflare Workers デプロイ |
-| UIライブラリ | Vue | 3.x | Islands パターンでインタラクティブコンポーネント |
-| スタイリング | Tailwind CSS | 4.x | ユーティリティファーストCSS（`@tailwindcss/vite`） |
-| BaaS | Supabase | 最新 | 認証・データベース・ストレージ |
-| Supabase SDK | @supabase/supabase-js | 2.x | Supabase クライアント |
-| Supabase SSR | @supabase/ssr | 最新 | SSR用の公式ヘルパー |
-| バリデーション | Zod（astro/zod） | 最新 | スキーマバリデーション |
-| ランタイム | Cloudflare Workers | - | エッジランタイム |
-| パッケージマネージャ | npm | - | 依存関係管理 |
-| Node.js | Node.js | >=22.12.0 | 開発環境 |
+| カテゴリ             | 技術                  | バージョン | 用途                                               |
+| -------------------- | --------------------- | ---------- | -------------------------------------------------- |
+| フレームワーク       | Astro                 | 6.x        | SSRフレームワーク（サーバーサイドレンダリング）    |
+| アダプタ             | @astrojs/cloudflare   | 13.x       | Cloudflare Workers デプロイ                        |
+| UIライブラリ         | Vue                   | 3.x        | Islands パターンでインタラクティブコンポーネント   |
+| スタイリング         | Tailwind CSS          | 4.x        | ユーティリティファーストCSS（`@tailwindcss/vite`） |
+| BaaS                 | Supabase              | 最新       | 認証・データベース・ストレージ                     |
+| Supabase SDK         | @supabase/supabase-js | 2.x        | Supabase クライアント                              |
+| Supabase SSR         | @supabase/ssr         | 最新       | SSR用の公式ヘルパー                                |
+| バリデーション       | Zod（astro/zod）      | 最新       | スキーマバリデーション                             |
+| ランタイム           | Cloudflare Workers    | -          | エッジランタイム                                   |
+| パッケージマネージャ | npm                   | -          | 依存関係管理                                       |
+| Node.js              | Node.js               | >=22.12.0  | 開発環境                                           |
 
 ---
 
@@ -146,23 +146,23 @@ const supabase = createClient({
   request: Astro.request,
   cookies: Astro.cookies,
 });
-const { data } = await supabase.from('profiles').select('*');
+const { data } = await supabase.from("profiles").select("*");
 ```
 
 ### クライアントサイド（.vue ファイル）
 
 ```typescript
 // Vue コンポーネント内
-import { createBrowserSupabase } from '@/lib/supabase-browser';
+import { createBrowserSupabase } from "@/lib/supabase-browser";
 const supabase = createBrowserSupabase();
-const { data } = await supabase.from('profiles').select('*');
+const { data } = await supabase.from("profiles").select("*");
 ```
 
 ### Astro Actions
 
 ```typescript
 // actions/index.ts
-import { actions } from 'astro:actions';
+import { actions } from "astro:actions";
 await actions.auth.signIn({ email, password });
 ```
 
@@ -172,13 +172,13 @@ await actions.auth.signIn({ email, password });
 
 ### カラーパレット
 
-| 用途 | カラーコード | CSS変数 |
-|------|-------------|---------|
-| Brand Primary | `#0c8ee8` | `--color-brand-500` |
-| Brand Dark | `#0058a1` | `--color-brand-700` |
-| Brand Light | `#f0f7ff` | `--color-brand-50` |
-| Text | `#111827` | `text-gray-900` |
-| Background | `#ffffff` | `bg-white` |
+| 用途          | カラーコード | CSS変数             |
+| ------------- | ------------ | ------------------- |
+| Brand Primary | `#0c8ee8`    | `--color-brand-500` |
+| Brand Dark    | `#0058a1`    | `--color-brand-700` |
+| Brand Light   | `#f0f7ff`    | `--color-brand-50`  |
+| Text          | `#111827`    | `text-gray-900`     |
+| Background    | `#ffffff`    | `bg-white`          |
 
 ### タイポグラフィ
 

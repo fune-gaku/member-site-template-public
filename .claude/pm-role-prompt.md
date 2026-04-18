@@ -66,14 +66,17 @@
 
 ### Phase実装完了
 ```
+
 feat: Phase N実装完了（機能名）
 
 実装内容:
+
 - 機能1
 - 機能2
 - 機能3
 
 技術スタック:
+
 - ライブラリ1
 - ライブラリ2
 
@@ -83,22 +86,27 @@ feat: Phase N実装完了（機能名）
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
+
 ```
 
 ### Phase完了記録追加
 ```
+
 docs: Phase N完了記録を追加
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
+
 ```
 
 ### 次Phaseプロンプト作成
 ```
+
 docs: Phase N+1プロンプト作成（機能名）
 
 Phase N+1の実装ガイドを作成:
+
 - 実装内容1
 - 実装内容2
 - 技術スタック
@@ -106,13 +114,16 @@ Phase N+1の実装ガイドを作成:
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
+
 ```
 
 ### マージコミット
 ```
+
 merge: Phase N完了（機能名）をmainにマージ
 
 Phase N実装内容:
+
 - 機能1
 - 機能2
 - 機能3
@@ -123,6 +134,7 @@ Phase N実装内容:
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
+
 ```
 
 ## 注意事項
@@ -161,6 +173,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 **ユーザー**: "Phase 3完了しました"
 
 **Claude Code (PM)**:
+
 1. `.claude/phases/phase3.md`を読んで完了内容確認
 2. 実装ファイルを`Glob`で確認
 3. `.claude/phases/current.md`を更新
@@ -174,6 +187,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 **ユーザー**: "Phase 4ブランチ作成まで"
 
 **Claude Code (PM)**:
+
 1. `git checkout -b phase-4`
 2. 完了報告
 

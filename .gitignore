@@ -29,3 +29,7 @@ pnpm-debug.log*
 
 # worker configuration types
 worker-configuration.d.ts
+
+# test coverage
+coverage
+.vitest-cache

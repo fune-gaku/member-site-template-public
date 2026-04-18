@@ -67,6 +67,7 @@ npm install -D \
 ```
 
 これらのインストールを、Claude Code は以下のいずれかで実行:
+
 - 上記コマンドをそのまま提案してユーザーに実行してもらう
 - `package.json` の `devDependencies` に追加する指示を出す
 
@@ -603,7 +604,9 @@ describe("Index page with Vue component", () => {
     const result = await container.renderToString(IndexPage);
 
     // ログイン・サインアップの導線があること
-    expect(result.toLowerCase()).toMatch(/sign[-\s]?(in|up)|ログイン|サインアップ/);
+    expect(result.toLowerCase()).toMatch(
+      /sign[-\s]?(in|up)|ログイン|サインアップ/,
+    );
   });
 });
 ```
@@ -634,7 +637,7 @@ describe("Cloudflare Workers environment", () => {
 
 テスト実行方法を簡潔に書いたドキュメント。
 
-```markdown
+````markdown
 # テスト構成
 
 ## テストの種類
@@ -648,6 +651,7 @@ npm run test                 # 1回実行
 npm run test:watch           # ファイル変更監視
 npm run test:ui              # ブラウザUIで実行
 ```
+````
 
 ### Workers 統合テスト（`tests/workers/`）
 
@@ -682,7 +686,8 @@ npx vitest run --config vitest.workers.config.ts
   対する pgTAP テストで実装できる。
 - **E2E テスト**: Playwright によるサインアップ → メール確認 → ログインの
   実フロー確認。
-```
+
+````
 
 ---
 
@@ -749,17 +754,17 @@ npx vitest run --config vitest.workers.config.ts             # Workers
 もし Lint エラーが出る場合、Phase 1 のコードが ESLint のルールに
 完全準拠していない可能性がある。その場合は npm run lint:fix で
 自動修正できる範囲は修正し、残りは個別に対応する。
-```
+````
 
 ---
 
 ## ⑥ 引き継ぎメモ
 
-| 項目 | 誤り | 正しい |
-|---|---|---|
-| ESLint 設定形式 | `.eslintrc.js` / `.eslintrc.cjs` | `eslint.config.js`（Flat Config） |
-| Vitest 環境 | `environment: 'jsdom'` | `environment: 'node'`（Astro 6 で必須） |
-| Vitest 設定 | 自前の `defineConfig` | `getViteConfig()`（Astro 公式ヘルパー） |
-| Workers テスト | `miniflare` 直接利用 | `@cloudflare/vitest-pool-workers` |
-| Prettier Astro | `prettier-plugin-astro` なし | `prettier-plugin-astro` を plugins に含める |
-| Tailwind クラス整列 | 手動 | `prettier-plugin-tailwindcss` が自動整列 |
+| 項目                | 誤り                             | 正しい                                      |
+| ------------------- | -------------------------------- | ------------------------------------------- |
+| ESLint 設定形式     | `.eslintrc.js` / `.eslintrc.cjs` | `eslint.config.js`（Flat Config）           |
+| Vitest 環境         | `environment: 'jsdom'`           | `environment: 'node'`（Astro 6 で必須）     |
+| Vitest 設定         | 自前の `defineConfig`            | `getViteConfig()`（Astro 公式ヘルパー）     |
+| Workers テスト      | `miniflare` 直接利用             | `@cloudflare/vitest-pool-workers`           |
+| Prettier Astro      | `prettier-plugin-astro` なし     | `prettier-plugin-astro` を plugins に含める |
+| Tailwind クラス整列 | 手動                             | `prettier-plugin-tailwindcss` が自動整列    |

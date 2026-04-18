@@ -5,11 +5,11 @@ Astro 6 + Vue + Supabase + Cloudflare Workers での会員サイト構築を
 
 ## 📋 フェーズ構成
 
-| フェーズ | ファイル | 実行者 | 所要時間目安 |
-|---|---|---|---|
-| **Phase 0** | `phase0-initialization.md` | **あなた（手動）** | 10-15分 |
-| **Phase 1** | `phase1-main-implementation.md` | Claude Code | 20-30分 |
-| **Phase 2** | `phase2-quality-assurance.md` | Claude Code | 15-20分 |
+| フェーズ    | ファイル                        | 実行者             | 所要時間目安 |
+| ----------- | ------------------------------- | ------------------ | ------------ |
+| **Phase 0** | `phase0-initialization.md`      | **あなた（手動）** | 10-15分      |
+| **Phase 1** | `phase1-main-implementation.md` | Claude Code        | 20-30分      |
+| **Phase 2** | `phase2-quality-assurance.md`   | Claude Code        | 15-20分      |
 
 ## 🔄 実行フロー
 
@@ -48,23 +48,27 @@ Phase 1 と Phase 2 は Claude Code に渡すときに、以下の順で添付�
 2. **Phase のプロンプト本文**（`phase1-main-implementation.md` または `phase2-quality-assurance.md`）
 
 これにより Claude Code は:
+
 - プロジェクト固有のタグライン、命名規則、デザイン方針などをコンテキストから取得
 - プロンプト側は技術実装指示に集中
 
 ## ✅ 各フェーズの完了条件
 
 ### Phase 0 完了
+
 - [ ] `npm run dev` で開発サーバが起動
 - [ ] Astro デフォルトページが表示される
 - [ ] Supabase の URL / Publishable Key / Service Role Key をメモ済み
 
 ### Phase 1 完了
+
 - [ ] `.env` と `.dev.vars` が設定済み
 - [ ] マイグレーション `001_init.sql` を実行済み
 - [ ] サインアップ → 確認メール → ログイン → `/member/dashboard` の一連の流れが動作
 - [ ] 未認証で `/member/*` にアクセスすると `/auth/signin` にリダイレクトされる
 
 ### Phase 2 完了
+
 - [ ] `npm run lint` が成功
 - [ ] `npm run format:check` が成功
 - [ ] `npm run typecheck` が成功

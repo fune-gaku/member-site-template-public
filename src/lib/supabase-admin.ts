@@ -12,14 +12,10 @@ export function createAdminClient() {
     );
   }
 
-  return createClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    serviceRoleKey,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+  return createClient(import.meta.env.PUBLIC_SUPABASE_URL, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-  );
+  });
 }

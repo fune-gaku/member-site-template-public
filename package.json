@@ -12,7 +12,15 @@
     "deploy": "astro build && wrangler deploy",
     "astro": "astro",
     "generate-types": "wrangler types",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{astro,ts,tsx,js,jsx,vue,md,json}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{astro,ts,tsx,js,jsx,vue,md,json}\" --ignore-path .gitignore",
+    "test": "VITEST=true vitest run",
+    "test:watch": "VITEST=true vitest",
+    "test:ui": "VITEST=true vitest --ui",
+    "typecheck": "astro check"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.1.10",
@@ -27,5 +35,27 @@
   },
   "overrides": {
     "vite": "^7"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.8",
+    "@astrojs/node": "^10.0.5",
+    "@cloudflare/vitest-pool-workers": "^0.14.7",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
+    "@vitest/ui": "^4.1.4",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^1.7.0",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.5.0",
+    "happy-dom": "^20.9.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-astro": "^0.14.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.2",
+    "vitest": "^4.1.4"
   }
 }
