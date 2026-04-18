@@ -111,7 +111,9 @@ export const server = {
         } = await supabase.auth.getUser();
         if (!user) throw new ActionError({ code: "UNAUTHORIZED" });
 
-        const filePath = `${user.id}/${Date.now()}_${input.file.name}`;
+        // ファイル名をサニタイズ（パストラバーサル攻撃対策）
+        const sanitizedFileName = input.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const filePath = `${user.id}/${Date.now()}_${sanitizedFileName}`;
         const { error } = await supabase.storage
           .from("avatars")
           .upload(filePath, input.file, { upsert: true });
