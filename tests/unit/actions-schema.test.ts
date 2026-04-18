@@ -73,3 +73,93 @@ describe("admin.createUser schema", () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe("posts.create schema", () => {
+  const schema = z.object({
+    title: z.string().trim().min(1, "タイトルは必須です").max(200),
+    body: z.string().max(10_000).optional().default(""),
+  });
+
+  it("タイトルのみで有効", () => {
+    const result = schema.safeParse({ title: "テスト投稿" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.body).toBe("");
+    }
+  });
+
+  it("タイトル + 本文で有効", () => {
+    const result = schema.safeParse({ title: "t", body: "hello" });
+    expect(result.success).toBe(true);
+  });
+
+  it("空タイトルを拒否する", () => {
+    const result = schema.safeParse({ title: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("空白のみのタイトルを拒否する（trim 後に空）", () => {
+    const result = schema.safeParse({ title: "   " });
+    expect(result.success).toBe(false);
+  });
+
+  it("200文字超のタイトルを拒否する", () => {
+    const result = schema.safeParse({ title: "a".repeat(201) });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("posts.update schema", () => {
+  const schema = z.object({
+    id: z.string().uuid(),
+    title: z.string().trim().min(1).max(200),
+    body: z.string().max(10_000).optional().default(""),
+  });
+
+  it("有効な UUID と title で通る", () => {
+    const result = schema.safeParse({
+      id: "123e4567-e89b-12d3-a456-426614174000",
+      title: "更新後",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("UUID ではない id を拒否する", () => {
+    const result = schema.safeParse({
+      id: "not-a-uuid",
+      title: "更新後",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("admin.updateUserRole schema", () => {
+  const schema = z.object({
+    userId: z.string().uuid(),
+    role: z.enum(["member", "admin"]),
+  });
+
+  it("role=admin で有効", () => {
+    const result = schema.safeParse({
+      userId: "123e4567-e89b-12d3-a456-426614174000",
+      role: "admin",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("role=member で有効", () => {
+    const result = schema.safeParse({
+      userId: "123e4567-e89b-12d3-a456-426614174000",
+      role: "member",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("許可されないロール文字列を拒否する", () => {
+    const result = schema.safeParse({
+      userId: "123e4567-e89b-12d3-a456-426614174000",
+      role: "superadmin",
+    });
+    expect(result.success).toBe(false);
+  });
+});
