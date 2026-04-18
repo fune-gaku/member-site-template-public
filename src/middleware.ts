@@ -53,5 +53,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
 
-  return next();
+  const response = await next();
+
+  // 認証必須エリアのレスポンスは中間 CDN / ブラウザキャッシュを禁止。
+  // Supabase SSR 公式ガイド推奨: 認証 Cookie を含むレスポンスが
+  // 他ユーザーに配信されることを防ぐ。
+  if (isMemberArea || isAdminArea) {
+    response.headers.set("Cache-Control", "private, no-store");
+  }
+
+  return response;
 });

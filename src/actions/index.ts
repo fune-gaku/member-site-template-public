@@ -389,19 +389,17 @@ export const server = {
     }),
 
     listUsers: defineAction({
-      input: z
-        .object({
-          page: z.number().int().positive().optional(),
-          perPage: z.number().int().positive().max(1000).optional(),
-        })
-        .optional(),
+      input: z.object({
+        page: z.number().int().positive().optional(),
+        perPage: z.number().int().positive().max(1000).optional(),
+      }),
       handler: async (input, context) => {
         await requireAdmin(context);
 
         const supabaseAdmin = createAdminClient();
         const { data, error } = await supabaseAdmin.auth.admin.listUsers({
-          page: input?.page ?? 1,
-          perPage: input?.perPage ?? 100,
+          page: input.page ?? 1,
+          perPage: input.perPage ?? 100,
         });
         if (error) {
           console.error("admin.listUsers error", error);
