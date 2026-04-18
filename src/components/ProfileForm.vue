@@ -59,9 +59,8 @@ async function handleUploadAvatar() {
     const formData = new FormData();
     formData.append("file", avatarFile.value);
 
-    const { data, error: actionError } = await actions.storage.uploadAvatar(
-      formData,
-    );
+    const { data, error: actionError } =
+      await actions.storage.uploadAvatar(formData);
 
     if (actionError) {
       error.value = actionError.message;
