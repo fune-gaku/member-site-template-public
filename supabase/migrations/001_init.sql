@@ -89,8 +89,10 @@ using ((select auth.uid()) = user_id);
 -- ----------------------------------------
 -- avatars バケット + RLS
 -- ----------------------------------------
+-- バケットが既に存在する場合はスキップ（on conflict do nothing）
 insert into storage.buckets (id, name, public)
-values ('avatars', 'avatars', false);
+values ('avatars', 'avatars', false)
+on conflict (id) do nothing;
 
 -- RLS Policies for avatars bucket
 create policy "Users can view own avatars"
