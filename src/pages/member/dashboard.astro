@@ -2,6 +2,8 @@
 import Member from "../../layouts/Member.astro";
 
 const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+const isAdmin = profile?.role === "admin";
 ---
 
 <Member title="ダッシュボード" description="会員ダッシュボード">
@@ -9,128 +11,11 @@ const user = Astro.locals.user;
     <!-- Welcome Card -->
     <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
       <h2 class="mb-2 text-2xl font-bold text-gray-900">
-        ようこそ、{user?.email || "ゲスト"}さん
+        ようこそ、{user?.email ?? "ゲスト"}さん
       </h2>
       <p class="text-gray-600">
-        会員サイトへようこそ。こちらはダッシュボードページです。
+        会員サイトへようこそ。下のクイックアクションから各機能にアクセスできます。
       </p>
-    </div>
-
-    <!-- Stats Grid -->
-    <div class="grid gap-6 md:grid-cols-3">
-      <!-- Stat 1 -->
-      <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="mb-1 text-sm text-gray-600">総アクセス数</p>
-            <p class="text-3xl font-bold text-gray-900">0</p>
-          </div>
-          <div
-            class="bg-brand-100 flex h-12 w-12 items-center justify-center rounded-full"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-              ></path>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stat 2 -->
-      <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="mb-1 text-sm text-gray-600">投稿数</p>
-            <p class="text-3xl font-bold text-gray-900">0</p>
-          </div>
-          <div
-            class="bg-brand-100 flex h-12 w-12 items-center justify-center rounded-full"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              ></path>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stat 3 -->
-      <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="mb-1 text-sm text-gray-600">アクティビティ</p>
-            <p class="text-3xl font-bold text-gray-900">0</p>
-          </div>
-          <div
-            class="bg-brand-100 flex h-12 w-12 items-center justify-center rounded-full"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-            </svg>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-200 px-6 py-4">
-        <h3 class="text-lg font-semibold text-gray-900">
-          最近のアクティビティ
-        </h3>
-      </div>
-      <div class="p-6">
-        <div class="py-8 text-center">
-          <svg
-            class="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-            ></path>
-          </svg>
-          <p class="mt-4 text-sm text-gray-600">
-            まだアクティビティがありません
-          </p>
-        </div>
-      </div>
     </div>
 
     <!-- Quick Actions -->
@@ -138,7 +23,7 @@ const user = Astro.locals.user;
       <h3 class="mb-4 text-lg font-semibold text-gray-900">
         クイックアクション
       </h3>
-      <div class="grid gap-4 md:grid-cols-3">
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <a
           href="/member/profile"
           class="flex items-center rounded-lg border border-gray-200 p-4 transition hover:bg-gray-50"
@@ -151,6 +36,7 @@ const user = Astro.locals.user;
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
@@ -162,7 +48,7 @@ const user = Astro.locals.user;
           </div>
           <div>
             <div class="font-medium text-gray-900">プロフィール編集</div>
-            <div class="text-sm text-gray-600">情報を更新</div>
+            <div class="text-sm text-gray-600">表示名・アバターを更新</div>
           </div>
         </a>
 
@@ -178,20 +64,51 @@ const user = Astro.locals.user;
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               ></path>
             </svg>
           </div>
           <div>
-            <div class="font-medium text-gray-900">データを見る</div>
-            <div class="text-sm text-gray-600">投稿一覧</div>
+            <div class="font-medium text-gray-900">データ</div>
+            <div class="text-sm text-gray-600">投稿の作成・編集・削除</div>
           </div>
         </a>
+
+        {
+          isAdmin && (
+            <a
+              href="/admin/users"
+              class="flex items-center rounded-lg border border-red-200 bg-red-50 p-4 transition hover:bg-red-100"
+            >
+              <div class="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+                <svg
+                  class="h-5 w-5 text-red-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <div class="font-medium text-red-900">管理画面</div>
+                <div class="text-sm text-red-700">ユーザー管理・招待</div>
+              </div>
+            </a>
+          )
+        }
 
         <a
           href="/auth/signout"
@@ -205,6 +122,7 @@ const user = Astro.locals.user;
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"

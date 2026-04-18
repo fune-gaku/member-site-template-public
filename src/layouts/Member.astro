@@ -8,6 +8,8 @@ interface Props {
 
 const { title, description } = Astro.props;
 const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+const isAdmin = profile?.role === "admin";
 const currentPath = Astro.url.pathname;
 ---
 
@@ -62,6 +64,16 @@ const currentPath = Astro.url.pathname;
             >
               データ
             </a>
+            {
+              isAdmin && (
+                <a
+                  href="/admin/users"
+                  class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+                >
+                  管理画面
+                </a>
+              )
+            }
           </nav>
 
           <!-- User Menu -->
@@ -115,6 +127,16 @@ const currentPath = Astro.url.pathname;
           >
             データ
           </a>
+          {
+            isAdmin && (
+              <a
+                href="/admin/users"
+                class="block rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base font-medium text-red-700 transition-colors hover:bg-red-100"
+              >
+                管理画面
+              </a>
+            )
+          }
         </nav>
       </div>
     </header>

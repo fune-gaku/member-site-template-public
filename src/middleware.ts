@@ -16,13 +16,51 @@ export const onRequest = defineMiddleware(async (context, next) => {
   } = await supabase.auth.getUser();
 
   context.locals.user = user;
+  context.locals.profile = null;
 
-  // /member 配下は認証必須。未認証なら /auth/signin にリダイレクト。
-  if (context.url.pathname.startsWith("/member") && !user) {
+  const pathname = context.url.pathname;
+  const isMemberArea = pathname.startsWith("/member");
+  const isAdminArea = pathname.startsWith("/admin");
+
+  // 認証必須エリア: 未認証なら /auth/signin にリダイレクト
+  if ((isMemberArea || isAdminArea) && !user) {
     return context.redirect(
-      `/auth/signin?next=${encodeURIComponent(context.url.pathname)}`,
+      `/auth/signin?next=${encodeURIComponent(pathname)}`,
     );
   }
 
-  return next();
+  // パフォーマンス配慮: role は /member と /admin 配下のみ取得
+  if (user && (isMemberArea || isAdminArea)) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profileError) {
+      // 取得失敗時は最も制限の強い扱い（member 扱い）にフォールバック。
+      // 内部情報はサーバーログのみに残す。
+      console.error("middleware: failed to load profile role", profileError);
+      context.locals.profile = { role: "member" };
+    } else {
+      const role = profile?.role === "admin" ? "admin" : "member";
+      context.locals.profile = { role };
+    }
+
+    // /admin/* は admin ロールのみ許可
+    if (isAdminArea && context.locals.profile.role !== "admin") {
+      return context.redirect("/member/dashboard");
+    }
+  }
+
+  const response = await next();
+
+  // 認証必須エリアのレスポンスは中間 CDN / ブラウザキャッシュを禁止。
+  // Supabase SSR 公式ガイド推奨: 認証 Cookie を含むレスポンスが
+  // 他ユーザーに配信されることを防ぐ。
+  if (isMemberArea || isAdminArea) {
+    response.headers.set("Cache-Control", "private, no-store");
+  }
+
+  return response;
 });
