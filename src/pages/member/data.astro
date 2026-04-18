@@ -1,15 +1,47 @@
 ---
-import SampleDataTable from "../../components/SampleDataTable.vue";
+import PostList from "../../components/PostList.vue";
 import Member from "../../layouts/Member.astro";
+import { createClient } from "../../lib/supabase";
+
+interface Post {
+  id: string;
+  title: string;
+  body: string | null;
+  created_at: string;
+}
+
+const user = Astro.locals.user;
+
+// SSR で自分の投稿一覧を取得（RLS により自分の投稿のみ返る）
+let initialPosts: Post[] = [];
+if (user) {
+  const supabase = createClient({
+    request: Astro.request,
+    cookies: Astro.cookies,
+  });
+
+  const { data, error } = await supabase
+    .from("member_posts")
+    .select("id, title, body, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("data.astro: failed to load posts", error);
+  } else {
+    initialPosts = data ?? [];
+  }
+}
 ---
 
-<Member title="データ" description="データ一覧">
+<Member title="データ" description="投稿の作成・編集・削除">
   <div class="space-y-8">
     <div>
-      <h2 class="mb-2 text-2xl font-bold text-gray-900">データ一覧</h2>
-      <p class="text-gray-600">あなたの投稿データを確認できます。</p>
+      <h2 class="mb-2 text-2xl font-bold text-gray-900">マイポスト</h2>
+      <p class="text-gray-600">
+        タイトルと本文（任意）で自由に投稿を作成・編集・削除できます。
+      </p>
     </div>
 
-    <SampleDataTable client:load />
+    <PostList client:load initialPosts={initialPosts} />
   </div>
 </Member>
