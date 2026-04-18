@@ -7,7 +7,7 @@ Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプ
 **使用者**: テンプレート利用者（開発者および利用企業）
 **方針**: 型安全で公式推奨の実装パターンを厳守し、セキュリティとメンテナンス性を最優先
 
-**現在のフェーズ**: Phase 0（プロジェクト基盤構築） → [詳細](phases/current.md)
+**現在のフェーズ**: Phase 1（会員サイト本体実装） - Step 1完了 → [詳細](phases/current.md)
 
 ---
 
@@ -42,7 +42,9 @@ npm run dev
 
 | 変数名 | 説明 | 取得方法 |
 |--------|------|----------|
-{{ENV_VARS_TABLE}}
+| `PUBLIC_SUPABASE_URL` | Supabase Project URL（公開値） | Supabase Dashboard > Settings > API > Project URL |
+| `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase Publishable Key（公開値） | Supabase Dashboard > Settings > API > anon public |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Service Role Key（秘密値） | Supabase Dashboard > Settings > API > service_role secret<br/>ローカル: `.dev.vars` に記載<br/>本番: `wrangler secret put` または Cloudflare Dashboard |
 
 ---
 
@@ -54,7 +56,10 @@ npm run dev
 - API KeyやSecretをハードコードしない
 
 ### データベース
-{{DATABASE_NOTES}}
+- **RLS（Row Level Security）を必ず有効化**すること
+- マイグレーションファイルは `supabase/migrations/` に配置
+- 本番適用はSupabase SQL Editorから手動実行
+- `profiles`, `member_posts` テーブルとStorage `avatars` バケットを使用
 
 ### 開発フロー
 1. 各Phase開始前にプランを確認
@@ -69,7 +74,12 @@ npm run dev
 
 #### 確認が必要な技術
 
-{{TECH_CHECK_TABLE}}
+| 技術 | 確認方法 | 理由 |
+|------|---------|------|
+| Astro 6.x | [公式ドキュメント](https://docs.astro.build/) | 2025年リリース、APIに破壊的変更あり |
+| Supabase SSR (`@supabase/ssr`) | [公式ドキュメント](https://supabase.com/docs/guides/auth/server-side) | 旧auth-helpersから移行 |
+| Cloudflare Workers | [公式ドキュメント](https://developers.cloudflare.com/workers/) | `runtime` API削除など仕様変更 |
+| Tailwind CSS 4.x | [公式ドキュメント](https://tailwindcss.com/docs) | `@theme`による新しい設定方法 |
 
 #### 確認手順
 
@@ -101,7 +111,12 @@ npm run dev
 
 ## 開発フェーズ
 
-{{PHASES_TABLE}}
+| Phase | 内容 | ステータス |
+|-------|------|----------|
+| Phase 0 | プロジェクト基盤構築 | ✅ 完了 |
+| Phase 1 | 会員サイト本体実装（Step 1完了、Step 2-3進行中） | 🔄 進行中 |
+| Phase 2 | 品質保証（ESLint, Prettier, Vitest） | 📋 予定 |
+| Phase 3 | 本番デプロイ | 📋 予定 |
 
 ---
 
