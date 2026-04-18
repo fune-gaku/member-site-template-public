@@ -1,57 +1,29 @@
 <script setup lang="ts">
 import { actions } from "astro:actions";
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
 
 import { createBrowserSupabase } from "../lib/supabase-browser";
 
+const props = withDefaults(
+  defineProps<{
+    initialDisplayName?: string;
+    initialAvatarUrl?: string;
+  }>(),
+  {
+    initialDisplayName: "",
+    initialAvatarUrl: "",
+  },
+);
+
 const supabase = createBrowserSupabase();
 
-const displayName = ref("");
+const displayName = ref(props.initialDisplayName);
 const avatarFile = ref<File | null>(null);
-const avatarUrl = ref("");
+const avatarUrl = ref(props.initialAvatarUrl);
 const isLoading = ref(false);
 const isUploadingAvatar = ref(false);
 const error = ref("");
 const success = ref("");
-
-async function loadProfile() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("display_name, avatar_url")
-    .eq("user_id", user.id)
-    .single();
-
-  if (profileError) {
-    console.error("Profile load error:", profileError);
-    return;
-  }
-
-  if (profile) {
-    displayName.value = profile.display_name || "";
-
-    // avatar_url が存在する場合、署名付きURLを取得
-    if (profile.avatar_url) {
-      const { data: urlData, error: urlError } =
-        await actions.storage.getSignedUrl({
-          path: profile.avatar_url,
-        });
-
-      if (urlError) {
-        console.error("Signed URL error:", urlError);
-        return;
-      }
-
-      if (urlData) {
-        avatarUrl.value = urlData.url;
-      }
-    }
-  }
-}
 
 async function handleAvatarChange(event: Event) {
   const target = event.target as HTMLInputElement;
@@ -147,10 +119,6 @@ async function handleUpdateProfile() {
     isLoading.value = false;
   }
 }
-
-onMounted(() => {
-  loadProfile();
-});
 </script>
 
 <template>
