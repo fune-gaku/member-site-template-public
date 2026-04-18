@@ -22,8 +22,8 @@
 
 ```
 member-site-template/
+├── CLAUDE.md                  # メインドキュメント（Claude Code 自動読み込み）
 ├── .claude/                    # Claude Code プロジェクト情報
-│   ├── CLAUDE.md              # メインドキュメント
 │   ├── architecture.md        # アーキテクチャ
 │   ├── database.md            # データベース設計
 │   ├── security.md            # セキュリティガイドライン

@@ -7,18 +7,18 @@ Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプ
 **使用者**: テンプレート利用者（開発者および利用企業）
 **方針**: 型安全で公式推奨の実装パターンを厳守し、セキュリティとメンテナンス性を最優先
 
-**現在のフェーズ**: Phase 1（会員サイト本体実装） - ✅ 完了 → [詳細](phases/current.md)
+**現在のフェーズ**: Phase 1（会員サイト本体実装） - ✅ 完了 → [詳細](.claude/phases/current.md)
 
 ---
 
 ## ドキュメント構成
 
-- **[architecture.md](architecture.md)** - アーキテクチャ・技術スタック・ディレクトリ構成
-- **[database.md](database.md)** - データベーススキーマ・テーブル定義・ビュー
-- **[security.md](security.md)** - セキュリティガイドライン・チェックリスト
-- **[development.md](development.md)** - 開発ルール・コーディング規約・命名規則
-- **[deployment.md](deployment.md)** - デプロイ手順（Cloudflare Workers）
-- **[phases/](phases/)** - Phase別開発記録
+- **[architecture.md](.claude/architecture.md)** - アーキテクチャ・技術スタック・ディレクトリ構成
+- **[database.md](.claude/database.md)** - データベーススキーマ・テーブル定義・ビュー
+- **[security.md](.claude/security.md)** - セキュリティガイドライン・チェックリスト
+- **[development.md](.claude/development.md)** - 開発ルール・コーディング規約・命名規則
+- **[deployment.md](.claude/deployment.md)** - デプロイ手順（Cloudflare Workers）
+- **[phases/](.claude/phases/)** - Phase別開発記録
 
 ---
 
@@ -53,7 +53,7 @@ npm run dev
 ### セキュリティ
 
 - **環境変数は.envファイルのみに記載**（コミット前に必ず確認）
-- **コミット前に[セキュリティチェックリスト](security.md)を確認**
+- **コミット前に[セキュリティチェックリスト](.claude/security.md)を確認**
 - API KeyやSecretをハードコードしない
 
 ### データベース
@@ -66,9 +66,9 @@ npm run dev
 ### 開発フロー
 
 1. 各Phase開始前にプランを確認
-2. 実装中は[開発ルール](development.md)に従う
+2. 実装中は[開発ルール](.claude/development.md)に従う
 3. Phase完了時にセキュリティチェック
-4. 完了記録を`phases/phaseN.md`に残す
+4. 完了記録を`.claude/phases/phaseN.md`に残す
 5. コミット・プッシュ
 
 ### 最新情報・不明な情報の確認ルール
@@ -140,7 +140,7 @@ A. `npm install`で依存関係を再インストールしてください。
 
 問題が発生した場合は、以下を確認してください：
 
-1. [セキュリティガイドライン](security.md)
-2. [開発ルール](development.md)
+1. [セキュリティガイドライン](.claude/security.md)
+2. [開発ルール](.claude/development.md)
 3. エラーログの内容
 4. 外部サービスのダッシュボード・ログ
