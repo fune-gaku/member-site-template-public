@@ -9,7 +9,8 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
-  adapter: cloudflare(),
+  output: 'server',
+  adapter: cloudflare({ imageService: 'compile' }),
   integrations: [vue()],
 
   vite: {

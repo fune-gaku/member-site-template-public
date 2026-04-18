@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-brand-50: #f0f7ff;
+  --color-brand-100: #e0effe;
+  --color-brand-500: #0c8ee8;
+  --color-brand-600: #006fc6;
+  --color-brand-700: #0058a1;
+}
