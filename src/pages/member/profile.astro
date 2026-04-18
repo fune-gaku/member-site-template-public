@@ -1,6 +1,40 @@
 ---
 import ProfileForm from "../../components/ProfileForm.vue";
 import Member from "../../layouts/Member.astro";
+import { createClient } from "../../lib/supabase";
+
+const user = Astro.locals.user;
+let initialDisplayName = "";
+let initialAvatarUrl = "";
+
+if (user) {
+  const supabase = createClient({
+    request: Astro.request,
+    cookies: Astro.cookies,
+  });
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("display_name, avatar_url")
+    .eq("user_id", user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Profile SSR load error:", profileError);
+  } else if (profile) {
+    initialDisplayName = profile.display_name ?? "";
+    if (profile.avatar_url) {
+      const { data: urlData, error: urlError } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(profile.avatar_url, 3600);
+      if (urlError) {
+        console.error("Signed URL SSR error:", urlError);
+      } else if (urlData) {
+        initialAvatarUrl = urlData.signedUrl;
+      }
+    }
+  }
+}
 ---
 
 <Member title="プロフィール" description="プロフィール設定">
@@ -12,6 +46,10 @@ import Member from "../../layouts/Member.astro";
       </p>
     </div>
 
-    <ProfileForm client:load />
+    <ProfileForm
+      client:load
+      initialDisplayName={initialDisplayName}
+      initialAvatarUrl={initialAvatarUrl}
+    />
   </div>
 </Member>
