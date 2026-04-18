@@ -1,0 +1,11 @@
+# Cloudflare Workers Local Development Variables
+# ローカル開発時に Cloudflare Workers で使用する環境変数
+# 本番環境では Cloudflare Dashboard から設定
+
+# Supabase Project URL
+SUPABASE_URL=https://your-project-id.supabase.co
+
+# Supabase Service Role Key (Secret)
+# 取得方法: Supabase Dashboard > Settings > API > Project API keys > service_role secret
+# 警告: この Key は強力な権限を持つため、絶対にクライアントサイドで使用しないこと
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
