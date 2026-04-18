@@ -8,10 +8,13 @@
 create table public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
+  avatar_url text,
   role text not null default 'member' check (role in ('member', 'admin')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+comment on column public.profiles.avatar_url is 'Supabase Storage avatars バケット内のファイルパス（例: user_id/timestamp_filename.jpg）';
 
 alter table public.profiles enable row level security;
 

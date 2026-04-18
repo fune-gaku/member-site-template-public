@@ -122,6 +122,20 @@ export const server = {
             message: error.message,
           });
         }
+
+        // アップロード成功後、profiles テーブルの avatar_url を更新
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ avatar_url: filePath })
+          .eq("user_id", user.id);
+
+        if (updateError) {
+          throw new ActionError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: updateError.message,
+          });
+        }
+
         return { path: filePath };
       },
     }),

@@ -20,14 +20,36 @@ async function loadProfile() {
   } = await supabase.auth.getUser();
   if (!user) return;
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("display_name")
+    .select("display_name, avatar_url")
     .eq("user_id", user.id)
     .single();
 
+  if (profileError) {
+    console.error("Profile load error:", profileError);
+    return;
+  }
+
   if (profile) {
     displayName.value = profile.display_name || "";
+
+    // avatar_url が存在する場合、署名付きURLを取得
+    if (profile.avatar_url) {
+      const { data: urlData, error: urlError } =
+        await actions.storage.getSignedUrl({
+          path: profile.avatar_url,
+        });
+
+      if (urlError) {
+        console.error("Signed URL error:", urlError);
+        return;
+      }
+
+      if (urlData) {
+        avatarUrl.value = urlData.url;
+      }
+    }
   }
 }
 
@@ -61,9 +83,13 @@ async function handleUploadAvatar() {
   success.value = "";
 
   try {
-    const { data, error: actionError } = await actions.storage.uploadAvatar({
-      file: avatarFile.value,
-    });
+    // FormDataを作成
+    const formData = new FormData();
+    formData.append("file", avatarFile.value);
+
+    const { data, error: actionError } = await actions.storage.uploadAvatar(
+      formData,
+    );
 
     if (actionError) {
       error.value = actionError.message;
