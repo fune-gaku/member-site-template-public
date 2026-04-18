@@ -2,8 +2,8 @@
 
 ## 概要
 
-- **DBMS**: {{DBMS}}
-- **スキーマ管理**: {{SCHEMA_MANAGEMENT}}
+- **DBMS**: PostgreSQL (Supabase)
+- **スキーマ管理**: Supabase Migrations (supabase/migrations/*.sql を Git で管理し、本番適用は SQL Editor から手動実行)
 - **RLS（Row Level Security）**: {{RLS_POLICY}}
 
 ---

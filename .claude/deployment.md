@@ -2,7 +2,7 @@
 
 ## デプロイ先
 
-**{{DEPLOY_TARGET}}**
+**Cloudflare Workers**
 
 {{DEPLOY_TARGET_DESCRIPTION}}
 

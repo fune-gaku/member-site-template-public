@@ -1,11 +1,11 @@
-# {{PROJECT_NAME}}
+# Astro Vue Supabase Cloudflare Template
 
 ## 概要
 
-{{PROJECT_DESCRIPTION}}
+Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプレート（SSR・認証・Storage・Admin機能完備）
 
-**使用者**: {{USER_COUNT}}
-**方針**: {{PROJECT_POLICY}}
+**使用者**: テンプレート利用者（開発者および利用企業）
+**方針**: 型安全で公式推奨の実装パターンを厳守し、セキュリティとメンテナンス性を最優先
 
 **現在のフェーズ**: Phase 0（プロジェクト基盤構築） → [詳細](phases/current.md)
 
@@ -17,7 +17,7 @@
 - **[database.md](database.md)** - データベーススキーマ・テーブル定義・ビュー
 - **[security.md](security.md)** - セキュリティガイドライン・チェックリスト
 - **[development.md](development.md)** - 開発ルール・コーディング規約・命名規則
-- **[deployment.md](deployment.md)** - デプロイ手順（{{DEPLOY_TARGET}}）
+- **[deployment.md](deployment.md)** - デプロイ手順（Cloudflare Workers）
 - **[phases/](phases/)** - Phase別開発記録
 
 ---

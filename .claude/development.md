@@ -14,7 +14,7 @@
 
 ---
 
-### CSS ({{CSS_FRAMEWORK}})
+### CSS (Tailwind CSS v4)
 
 {{CSS_RULES}}
 

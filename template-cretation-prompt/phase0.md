@@ -56,8 +56,8 @@ gh repo create member-site-template \
   --clone
 
 # または git clone の場合
-# git clone https://github.com/<your-github>/claude-project-template.git funegaku-members
-# cd funegaku-members && rm -rf .git && git init
+# git clone https://github.com/<your-github>/claude-project-template.git member-site-template
+# cd member-site-template && rm -rf .git && git init
 
 cd member-site-template
 ```
@@ -113,13 +113,13 @@ Claude テンプレートのファイルと衝突しないよう、いったん�
 一時フォルダに Astro プロジェクトを作成する。
 
 **重要**: `npm create astro@latest` は**完全に空のディレクトリ**にしかインストールできない
-仕様のため（公式チュートリアル記載）、既存の `.claude/` などがある funegaku-members/
+仕様のため（公式チュートリアル記載）、既存の `.claude/` などがある member-site-template/
 に直接展開はできない。そのため一時ディレクトリに作ってから rsync でマージする。
 
 ```bash
-# 現在地を確認（funegaku-members にいるはず）
+# 現在地を確認（member-site-template にいるはず）
 pwd
-# → ~/Documents/GitHub/funegaku-members
+# → ~/Documents/GitHub/member-site-template
 
 # 親ディレクトリに戻って、一時フォルダに Astro を作成
 cd ..
@@ -132,7 +132,7 @@ npm create astro@latest .astro-temp -- \
 
 **フラグの意味**:
 - `--template minimal`: 最小構成のテンプレート（余計なサンプルコードが入らない）
-- `--no-git`: git init をスキップ（後で funegaku-members 側の git を使うため）
+- `--no-git`: git init をスキップ（後で member-site-template 側の git を使うため）
 - `--install`: 依存を自動インストール
 - `--yes`: すべての確認プロンプトに yes と答える
 
@@ -140,7 +140,7 @@ npm create astro@latest .astro-temp -- \
 
 ---
 
-## Step 4. Astro のファイルを funegaku-members/ にマージ
+## Step 4. Astro のファイルを member-site-template/ にマージ
 
 `rsync` で `.git` と `node_modules` を除外しつつコピー:
 
@@ -148,7 +148,7 @@ npm create astro@latest .astro-temp -- \
 rsync -av \
   --exclude='.git' \
   --exclude='node_modules' \
-  .astro-temp/ funegaku-members/
+  .astro-temp/ member-site-template/
 ```
 
 **ポイント**:
@@ -166,10 +166,10 @@ rm -rf .astro-temp
 
 ---
 
-## Step 6. funegaku-members で依存を再インストール
+## Step 6. member-site-template で依存を再インストール
 
 ```bash
-cd funegaku-members
+cd member-site-template
 npm install
 ```
 
@@ -279,7 +279,7 @@ git commit -m "Phase 0: Astro + Cloudflare + Vue + Tailwind + Supabase initializ
 `Authentication` > `URL Configuration`:
 
 - **Site URL**: 本番ドメインを設定（デプロイ後に変更でもOK）
-  - 例: `https://funegaku-members.your-subdomain.workers.dev`
+  - 例: `https://member-site-template.your-subdomain.workers.dev`
 - **Redirect URLs**: 以下を追加
   - `http://localhost:4321/**`
   - `http://localhost:4321/auth/callback`
@@ -300,7 +300,7 @@ git commit -m "Phase 0: Astro + Cloudflare + Vue + Tailwind + Supabase initializ
 ここまで完了すると、以下の構造になっているはず:
 
 ```
-funegaku-members/
+member-site-template/
 ├── .claude/                # Claude プロジェクトテンプレート由来
 │   ├── CLAUDE.md
 │   ├── architecture.md
@@ -374,7 +374,7 @@ Astro のデフォルトページが表示されれば Phase 0 完了。
 
 以下がすべて完了していれば次に進める:
 
-- [ ] `funegaku-members/` ディレクトリに `.claude/` と Astro プロジェクトが共存
+- [ ] `member-site-template/` ディレクトリに `.claude/` と Astro プロジェクトが共存
 - [ ] `package.json` に `@astrojs/cloudflare`、`@astrojs/vue`、`@tailwindcss/vite`、
       `@supabase/supabase-js`、`@supabase/ssr` が入っている
 - [ ] `astro.config.mjs` に Cloudflare アダプタ、Vue、Tailwind が設定されている
@@ -405,7 +405,7 @@ Windows で `rsync` がない場合、以下で代用できる:
 
 ```powershell
 # PowerShell
-Robocopy .astro-temp funegaku-members /E /XD .git node_modules
+Robocopy .astro-temp member-site-template /E /XD .git node_modules
 ```
 
 または Git Bash / WSL を使う。
