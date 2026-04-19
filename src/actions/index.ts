@@ -1,9 +1,41 @@
 import { z } from "astro/zod";
 import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
+import { env } from "cloudflare:workers";
 
+import { passwordSchema } from "../lib/password-schema";
+import { isHibpCheckEnabled, isPasswordPwned } from "../lib/pwned-password";
 import { createClient } from "../lib/supabase";
 import { createAdminClient } from "../lib/supabase-admin";
+
+/**
+ * 環境変数 `ENABLE_HIBP_CHECK=true` のときのみ HIBP 漏洩チェックを実行する。
+ * デフォルト（未設定）は無効。Supabase Pro プランで Leaked Password Protection を
+ * 有効化している場合は本チェックは不要。詳細は `.claude/deployment.md` 参照。
+ *
+ * API 障害時はフェイルオープン（`isPasswordPwned` が false を返す）。
+ */
+async function assertNotPwned(password: string): Promise<void> {
+  // `cloudflare:workers` の env は Cloudflare Workers 実行時のみ解決される。
+  // ローカル vitest の Node 環境や型チェック時にアクセスしても例外にならないよう
+  // 属性アクセスは try で包む。
+  let flag: string | undefined;
+  try {
+    flag = (env as unknown as Record<string, string | undefined>)
+      .ENABLE_HIBP_CHECK;
+  } catch {
+    flag = undefined;
+  }
+  if (!isHibpCheckEnabled(flag)) return;
+
+  if (await isPasswordPwned(password)) {
+    throw new ActionError({
+      code: "BAD_REQUEST",
+      message:
+        "このパスワードは過去の漏洩データに含まれています。別のパスワードを使用してください。",
+    });
+  }
+}
 
 /**
  * 認証済みユーザー + profile.role === "admin" を検証するヘルパー。
@@ -48,9 +80,12 @@ export const server = {
       accept: "form",
       input: z.object({
         email: z.string().email(),
-        password: z.string().min(6),
+        password: passwordSchema,
       }),
       handler: async (input, context) => {
+        // 漏洩パスワードチェック（ENABLE_HIBP_CHECK=true の場合のみ）
+        await assertNotPwned(input.password);
+
         const supabase = createClient({
           request: context.request,
           cookies: context.cookies,
@@ -344,11 +379,14 @@ export const server = {
       accept: "form",
       input: z.object({
         email: z.string().email(),
-        password: z.string().min(6),
+        password: passwordSchema,
         displayName: z.string().optional(),
       }),
       handler: async (input, context) => {
         await requireAdmin(context);
+
+        // 漏洩パスワードチェック（ENABLE_HIBP_CHECK=true の場合のみ）
+        await assertNotPwned(input.password);
 
         const supabaseAdmin = createAdminClient();
         const { data, error } = await supabaseAdmin.auth.admin.createUser({
