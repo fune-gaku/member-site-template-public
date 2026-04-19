@@ -84,7 +84,7 @@ Phase 0-2 がすべて完了したら:
 3. Cloudflare ダッシュボード → Workers & Pages → Create application
 4. GitHub 連携で対象リポジトリを選択
 5. Build command: `npx astro build`
-6. Deploy command: `npx wrangler deploy`
+6. Deploy command: `npx wrangler@latest deploy`
 7. Build variables に `PUBLIC_SUPABASE_URL` と `PUBLIC_SUPABASE_PUBLISHABLE_KEY` を設定
 8. Secrets に `SUPABASE_SERVICE_ROLE_KEY` を設定
 9. Save and Deploy
