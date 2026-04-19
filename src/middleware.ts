@@ -1,5 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
 
+import { safeNextPath } from "./lib/safe-redirect";
 import { createClient } from "./lib/supabase";
 
 export const onRequest = defineMiddleware(async (context, next) => {
@@ -24,8 +25,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // 認証必須エリア: 未認証なら /auth/signin にリダイレクト
   if ((isMemberArea || isAdminArea) && !user) {
+    // 多層防御: 将来 pathname 以外の値が載っても Open Redirect を防ぐため
+    // safeNextPath を経由する（CWE-601）。
+    const nextParam = safeNextPath(pathname);
     return context.redirect(
-      `/auth/signin?next=${encodeURIComponent(pathname)}`,
+      `/auth/signin?next=${encodeURIComponent(nextParam)}`,
     );
   }
 
