@@ -2,6 +2,11 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+import {
+  PASSWORD_POLICY_HINT,
+  validatePasswordStrength,
+} from "../lib/password-schema";
+
 const email = ref("");
 const password = ref("");
 const confirmPassword = ref("");
@@ -17,8 +22,9 @@ async function handleSubmit() {
     return;
   }
 
-  if (password.value.length < 6) {
-    error.value = "パスワードは6文字以上で入力してください";
+  const policyError = validatePasswordStrength(password.value);
+  if (policyError) {
+    error.value = policyError;
     return;
   }
 
@@ -90,10 +96,16 @@ async function handleSubmit() {
           v-model="password"
           type="password"
           required
+          minlength="8"
+          maxlength="72"
+          autocomplete="new-password"
           class="focus:ring-brand-500 focus:border-brand-500 w-full rounded-lg border border-gray-300 px-4 py-2 transition outline-none focus:ring-2"
-          placeholder="6文字以上"
+          :placeholder="PASSWORD_POLICY_HINT"
           :disabled="isLoading"
         />
+        <p class="mt-1 text-xs text-gray-500">
+          {{ PASSWORD_POLICY_HINT }}
+        </p>
       </div>
 
       <div>
