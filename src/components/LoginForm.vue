@@ -77,14 +77,7 @@ async function handleSubmit() {
         />
       </div>
 
-      <div class="flex items-center justify-between text-sm">
-        <label class="flex items-center">
-          <input
-            type="checkbox"
-            class="text-brand-600 focus:ring-brand-500 mr-2 rounded border-gray-300"
-          />
-          <span class="text-gray-700">ログイン状態を保持</span>
-        </label>
+      <div class="flex justify-end text-sm">
         <a
           href="/auth/reset-password"
           class="text-brand-600 hover:text-brand-700 font-medium"
