@@ -1,5 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
 
+import { applySecurityHeaders } from "./lib/security-headers";
 import { createClient } from "./lib/supabase";
 
 export const onRequest = defineMiddleware(async (context, next) => {
@@ -61,6 +62,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (isMemberArea || isAdminArea) {
     response.headers.set("Cache-Control", "private, no-store");
   }
+
+  // 全レスポンスに共通セキュリティヘッダ（CSP / HSTS / X-Frame-Options 等）を付与。
+  // Issue #004 対応。詳細は src/lib/security-headers.ts を参照。
+  applySecurityHeaders(response);
 
   return response;
 });
