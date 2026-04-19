@@ -500,11 +500,51 @@ curl -sI https://member-site-template.fune-gaku.workers.dev/ \
 
 ---
 
+## セッション寿命方針（Remember Me 非採用）
+
+### 基本方針
+
+本テンプレートでは **「ログイン状態を保持」（Remember Me）チェックボックスは採用しない**。セッションの寿命は **Supabase プロジェクト単位の設定に一元化** する。
+
+### 根拠（Supabase 公式設計）
+
+Supabase Auth のセッション寿命は、個々のサインインごとに切り替える API を提供していない。公式の [Sessions ガイド](https://supabase.com/docs/guides/auth/sessions) では、セッションの有効期限はすべて **プロジェクト単位**（Supabase Dashboard > Authentication > Sessions）で設定する前提になっている。
+
+公式が提供する 3 つの制御軸はいずれもプロジェクト設定：
+
+| 設定項目               | 説明                                                       | 設定場所                             |
+| ---------------------- | ---------------------------------------------------------- | ------------------------------------ |
+| Time-box user sessions | サインインから固定時間でセッションを強制失効               | Dashboard > Auth > Sessions          |
+| Inactivity timeout     | 一定時間リフレッシュされなかったセッションを失効           | Dashboard > Auth > Sessions          |
+| Single session per user | 同一ユーザーは最後にサインインしたセッションのみ有効に保つ | Dashboard > Auth > Sessions          |
+
+> "To make sure that users are required to re-authenticate periodically, you can set a positive value for the Time-box user sessions option in the Auth settings for your project."
+> — Supabase Docs, *Sessions*
+
+つまり **公式は per-login の Remember Me をサポートしていない**。JS クライアントで「長く保つ／保たない」を切り替える手段もない（Cookie は常に `@supabase/ssr` が secure / http-only で管理）。
+
+### テンプレートでの扱い
+
+- サインイン画面にチェックボックスを **置かない**（Issue #009 で削除済）。
+- 運用側で寿命を変えたい場合は、Supabase Dashboard の **Auth > Sessions** で以下を設定する：
+  - 長期利用メインの会員サイト → Time-box を長め（例: 30 日）+ Inactivity timeout を適度に
+  - 管理画面・金融系など高セキュリティ要件 → Time-box を短め（例: 24 時間）+ Single session を有効化
+- セッションリフレッシュは `@supabase/ssr` の `createServerClient` と `middleware.ts` の `supabase.auth.getUser()` が自動で行う（[認証フロー](./architecture.md#認証フロー) 参照）。
+
+### 実装上の注意
+
+- UI に「ログイン状態を保持」トグルを追加しないこと（Supabase の API 上、挙動を分岐できず誤解を生むため）。
+- セッションを明示的に終了させたい場合は **サインアウト** を使う（`supabase.auth.signOut()`）。
+- 設定変更は即時反映されない点に注意：公式ドキュメント曰く *"Sessions are not proactively destroyed when you change these settings, but rather the check is enforced whenever a session is refreshed next."* — 変更後も既存セッションは次回リフレッシュ時に評価される。
+
+---
+
 ## 参考資料
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [Supabase Security Best Practices](https://supabase.com/docs/guides/auth/row-level-security)
 - [Supabase RLS Deep Dive](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [Supabase Sessions ガイド](https://supabase.com/docs/guides/auth/sessions)
 - [Vue.js Security Best Practices](https://vuejs.org/guide/best-practices/security.html)
 - [Cloudflare Workers Security](https://developers.cloudflare.com/workers/platform/security/)
 - [Astro Security](https://docs.astro.build/en/guides/security/)
