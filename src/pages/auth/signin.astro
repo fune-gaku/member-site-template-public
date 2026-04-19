@@ -1,8 +1,13 @@
 ---
 import LoginForm from "../../components/LoginForm.vue";
 import Auth from "../../layouts/Auth.astro";
+import { safeNextPath } from "../../lib/safe-redirect";
+
+// Open Redirect 対策: `next` はサーバ側で検証してから
+// クライアントコンポーネントに props として渡す（CWE-601）。
+const nextPath = safeNextPath(Astro.url.searchParams.get("next"));
 ---
 
 <Auth title="サインイン" description="アカウントにログインしてください">
-  <LoginForm client:load />
+  <LoginForm client:load next={nextPath} />
 </Auth>

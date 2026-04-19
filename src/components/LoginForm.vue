@@ -2,6 +2,13 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+// `next` は signin.astro 側で safeNextPath() による検証済みの値を受け取る。
+// クライアント側で window.location.search から直接読むと Open Redirect
+// （CWE-601）を踏むため、必ず props 経由で受け取ること。
+const props = withDefaults(defineProps<{ next?: string }>(), {
+  next: "/member/dashboard",
+});
+
 const email = ref("");
 const password = ref("");
 const isLoading = ref(false);
@@ -23,10 +30,8 @@ async function handleSubmit() {
     if (actionError) {
       error.value = actionError.message;
     } else {
-      // ログイン成功時、ダッシュボードにリダイレクト
-      const urlParams = new URLSearchParams(window.location.search);
-      const next = urlParams.get("next") || "/member/dashboard";
-      window.location.href = next;
+      // ログイン成功時、サーバ検証済みの next へリダイレクト
+      window.location.href = props.next;
     }
   } catch (e) {
     console.error("Login error:", e);
