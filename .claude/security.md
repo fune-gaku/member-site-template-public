@@ -451,6 +451,55 @@ env.SUPABASE_SERVICE_ROLE_KEY;
 
 ---
 
+## セキュリティヘッダの動作確認
+
+Issue #004 の対応により、`src/middleware.ts` が全レスポンスに共通セキュリティヘッダ（CSP / HSTS / X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy / Cross-Origin-Opener-Policy）を付与しています。定義は `src/lib/security-headers.ts` を参照。
+
+### ローカル環境での確認
+
+```bash
+# Astro 開発サーバーを起動
+npm run dev
+
+# 別ターミナルで付与されているか確認
+curl -sI http://localhost:4321/ \
+  | grep -iE 'content-security|strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy|cross-origin-opener'
+```
+
+期待される出力例:
+
+```
+content-security-policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; ...
+cross-origin-opener-policy: same-origin
+permissions-policy: accelerometer=(), camera=(), ...
+referrer-policy: strict-origin-when-cross-origin
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+x-content-type-options: nosniff
+x-frame-options: DENY
+```
+
+### 本番環境（Cloudflare Workers）での確認
+
+```bash
+curl -sI https://member-site-template.fune-gaku.workers.dev/ \
+  | grep -iE 'content-security|strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy|cross-origin-opener'
+```
+
+### スキャナでの評価
+
+- [Mozilla Observatory](https://observatory.mozilla.org/) で **A 以上**
+- [securityheaders.com](https://securityheaders.com/) で **A 以上**
+
+### CSP 違反チェック
+
+ブラウザ DevTools の Console を開き、以下を操作しても CSP error が出ないことを確認:
+
+- サインアップ・サインイン・サインアウト
+- プロフィール画面でアバター画像を表示（`https://<ref>.supabase.co/...`）
+- 任意のページのハイドレーション
+
+---
+
 ## 参考資料
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
