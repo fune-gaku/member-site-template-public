@@ -339,6 +339,51 @@ export const server = {
     }),
   },
 
+  // ----------------------------------------------------------------
+  // profile
+  // RLS（`Users can update own profile`）＋ DB CHECK 制約 (profiles_display_name_length)
+  // との多層防御。クライアントからの直接書き込みは禁止し、本 Action に一本化する。
+  // Issue #007 参照。
+  // ----------------------------------------------------------------
+  profile: {
+    update: defineAction({
+      input: z.object({
+        displayName: z
+          .string()
+          .trim()
+          .max(100, "表示名は100文字以下で入力してください"),
+      }),
+      handler: async (input, context) => {
+        const supabase = createClient({
+          request: context.request,
+          cookies: context.cookies,
+        });
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          throw new ActionError({
+            code: "UNAUTHORIZED",
+            message: "ログインしてください",
+          });
+        }
+
+        const { error } = await supabase
+          .from("profiles")
+          .update({ display_name: input.displayName })
+          .eq("user_id", user.id);
+        if (error) {
+          console.error("profile.update error", error);
+          throw new ActionError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "プロフィールの更新に失敗しました",
+          });
+        }
+        return { success: true };
+      },
+    }),
+  },
+
   admin: {
     createUser: defineAction({
       accept: "form",

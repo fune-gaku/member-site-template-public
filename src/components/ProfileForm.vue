@@ -2,8 +2,6 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
-import { createBrowserSupabase } from "../lib/supabase-browser";
-
 const props = withDefaults(
   defineProps<{
     initialDisplayName?: string;
@@ -14,8 +12,6 @@ const props = withDefaults(
     initialAvatarUrl: "",
   },
 );
-
-const supabase = createBrowserSupabase();
 
 const displayName = ref(props.initialDisplayName);
 const avatarFile = ref<File | null>(null);
@@ -93,21 +89,13 @@ async function handleUpdateProfile() {
   success.value = "";
 
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      error.value = "ユーザー情報を取得できませんでした";
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ display_name: displayName.value })
-      .eq("user_id", user.id);
-
-    if (updateError) {
-      error.value = updateError.message;
+    // Issue #007: サーバー側 Zod 検証（trim + max 100）＋ DB CHECK 制約に一本化。
+    // ブラウザから profiles を直接 update せず、必ず Action 経由で書き込む。
+    const { error: actionError } = await actions.profile.update({
+      displayName: displayName.value,
+    });
+    if (actionError) {
+      error.value = actionError.message;
     } else {
       success.value = "プロフィールを更新しました";
     }
