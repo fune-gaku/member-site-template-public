@@ -161,6 +161,85 @@ curl -I "https://<your-site>/auth/confirm?token_hash=<...>&type=recovery&next=/a
 
 ---
 
+### Supabase Auth: SMTP (Resend) 設定（本番必須）
+
+Supabase のビルトイン SMTP は開発用で極端に低いレートに制限されているため、本番では必ず Custom SMTP に切り替える。本テンプレートでは **Resend** を採用する。前節の Email Templates は `{{ .TokenHash }}` + `/auth/confirm` 方式のまま変更不要で、メール配送経路のみを差し替える。
+
+#### 1. Resend 側の事前準備
+
+1. `https://resend.com` にサインアップ。
+2. **Domains → Add Domain** で送信用ドメインを追加（送信評判を隔離するためサブドメイン推奨。例: `mail.example.com`）。
+3. Resend が提示する **SPF (TXT)** と **DKIM (TXT)** レコードを DNS に追加 → **Verify DNS Records** でステータスが `verified` になるまで待機（伝播に最大 72 時間）。
+4. **DMARC (TXT)** は Resend の UI からは設定できず、**自ドメインの DNS に自分で追加** する（Resend 公式: "DMARC is added to a domain through a TXT record added to the domain at `_dmarc`"）。最初は `p=none;` から始め、十分にテストしてから `p=quarantine;` へ段階移行する。
+
+   ```
+   Name:  _dmarc.mail.example.com
+   Type:  TXT
+   Value: v=DMARC1; p=none; rua=mailto:dmarc@example.com
+   ```
+
+5. **API Keys → Create API Key**（Sending access でよい）で `re_xxx...` を発行。これが SMTP のパスワードになる。
+
+#### 2. Resend SMTP 接続情報（公式値）
+
+| 項目     | 値                                                   |
+| -------- | ---------------------------------------------------- |
+| Host     | `smtp.resend.com`                                    |
+| Port     | `465`（Implicit SSL/TLS）推奨、または `587` STARTTLS |
+| Username | `resend`（固定）                                     |
+| Password | Resend API Key（`re_...`）                           |
+
+#### 3. Supabase Dashboard で Custom SMTP を有効化
+
+##### 自動設定（推奨）
+
+Resend Dashboard → **Settings → Integrations → Supabase → Connect** で対象 Supabase プロジェクトを選択すると、Custom SMTP 設定が自動注入される。
+
+##### 手動設定
+
+Supabase Dashboard → **Authentication → Emails → SMTP Settings**:
+
+1. **Enable Custom SMTP** を ON
+2. **Sender email**: Resend で検証済みドメインのアドレス（例: `no-reply@mail.example.com`）
+3. **Sender name**: 任意（例: `会員サイト事務局` — UTF-8 日本語可）
+4. Host `smtp.resend.com` / Port `465` / Username `resend` / Password = Resend API Key → **Save**
+
+> **重要**: `Sender email` のドメインと Resend で `verified` になっているドメインが **一致していないと Resend 側で送信拒否** される。
+
+#### 4. レート制限の引き上げ
+
+Custom SMTP を有効化しても、Supabase の初期値は **30 通/時間** に抑えられている（Supabase 公式: "a low rate-limit of 30 messages per hour is imposed"）。**Authentication → Rate Limits → Rate limit for sending emails** を Resend プランの上限内で必要分まで引き上げる。
+
+#### 5. 動作確認（手動テスト）
+
+1. ステージング環境の実メールアドレスで `/auth/signup` または `/auth/reset-password` を実行。
+2. Resend Dashboard → **Logs / Emails** で拒否理由（`domain_not_verified` / `from_not_allowed` 等）がないか確認。
+3. Supabase Dashboard → **Logs → Auth Logs** で SMTP 4xx/5xx・レート超過がないか確認。
+4. 受信メールのリンクに対して前節のスキャナ耐性チェック（`curl -I` → ブラウザで「続行」）を実行し、OTP が 1 度目の GET で消費されないことを確認。
+5. `mail-tester.com` などでスコアを確認（SPF / DKIM / DMARC が揃えば 10/10 を狙える）。
+
+#### 6. チェックリスト
+
+- [ ] Resend Domains で使用ドメインが `verified`（SPF / DKIM pass）
+- [ ] DNS に `_dmarc.<domain>` の TXT レコードを追加済み（まず `p=none;`）
+- [ ] Resend API Key を発行し、Supabase の SMTP Password に設定済み
+- [ ] Supabase `Sender email` のドメインと Resend の検証済みドメインが一致
+- [ ] Supabase `Rate limit for sending emails` を 30 通/時間から必要値に引き上げ済み
+- [ ] Email Templates は `{{ .TokenHash }}` + `/auth/confirm` 方式のまま（前節）変更していない
+- [ ] 実メールアドレス宛の signup / reset-password で到達確認済み
+
+> 参考（いずれも公式）:
+>
+> - [Supabase: Auth SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
+> - [Supabase: Rate Limits](https://supabase.com/docs/guides/auth/rate-limits)
+> - [Supabase × Resend Integration](https://supabase.com/partners/integrations/resend)
+> - [Resend × Supabase SMTP](https://resend.com/docs/send-with-supabase-smtp)
+> - [Resend: Send with SMTP](https://resend.com/docs/send-with-smtp)
+> - [Resend: Domains](https://resend.com/docs/dashboard/domains/introduction)
+> - [Resend: DMARC](https://resend.com/docs/dashboard/domains/dmarc)
+
+---
+
 ### Supabase Auth: パスワードポリシー（必須）
 
 Issue #006 で実装した Zod スキーマ（`src/lib/password-schema.ts`）は 8 文字以上 + 英大小・数字を要求する。**Supabase Dashboard 側でも同等以上のポリシーを有効化** し、アプリ層と Auth 層の二重防御を確立する。
