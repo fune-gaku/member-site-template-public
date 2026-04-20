@@ -30,8 +30,7 @@
     "@tailwindcss/vite": "^4.2.2",
     "astro": "^6.1.7",
     "tailwindcss": "^4.2.2",
-    "vue": "^3.5.32",
-    "wrangler": "^4.83.0"
+    "vue": "^3.5.32"
   },
   "overrides": {
     "vite": "^7"
@@ -56,6 +55,7 @@
     "prettier-plugin-tailwindcss": "^0.7.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.2",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "wrangler": "^4.84.0"
   }
 }
