@@ -2,6 +2,11 @@ import { z } from "astro/zod";
 import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
 
+import {
+  ALLOWED_AVATAR_MIME,
+  MAX_AVATAR_SIZE,
+  sanitizeAvatarFileName,
+} from "../lib/avatar-upload";
 import { createClient } from "../lib/supabase";
 import { createAdminClient } from "../lib/supabase-admin";
 
@@ -134,10 +139,34 @@ export const server = {
   },
 
   storage: {
+    /**
+     * アバター画像アップロード。
+     *
+     * 防御多層:
+     *   1. クライアント側 (ProfileForm.vue) で MIME / サイズを検証 (UX 向上のみ)
+     *   2. Astro Action の Zod .refine で MIME / サイズを早期検証 (400 応答)
+     *   3. Supabase Storage バケット設定 (allowed_mime_types / file_size_limit)
+     *      が **真の防衛線**。DevTools で 1, 2 を迂回されてもここで拒否される。
+     *      → supabase/migrations/005_avatar_bucket_restrictions.sql
+     *
+     * 併せて upload() 呼び出し時に contentType を明示指定し、
+     * クライアントが送る Content-Type を盲信しない。
+     *
+     * @see https://supabase.com/docs/guides/storage/buckets/fundamentals
+     * @see https://supabase.com/docs/guides/storage/uploads/standard-uploads
+     * @see https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
+     */
     uploadAvatar: defineAction({
       accept: "form",
       input: z.object({
-        file: z.instanceof(File),
+        file: z
+          .instanceof(File)
+          .refine((f) => f.size > 0 && f.size <= MAX_AVATAR_SIZE, {
+            message: "ファイルサイズは5MB以下にしてください",
+          })
+          .refine((f) => ALLOWED_AVATAR_MIME.has(f.type), {
+            message: "PNG / JPEG / WebP / GIF のみアップロード可能です",
+          }),
       }),
       handler: async (input, context) => {
         const supabase = createClient({
@@ -149,15 +178,18 @@ export const server = {
         } = await supabase.auth.getUser();
         if (!user) throw new ActionError({ code: "UNAUTHORIZED" });
 
-        // ファイル名をサニタイズ（パストラバーサル攻撃対策）
-        const sanitizedFileName = input.file.name.replace(
-          /[^a-zA-Z0-9._-]/g,
-          "_",
-        );
+        // ファイル名をサニタイズ（Issue #001 / #008）
+        // 日本語・絵文字・多言語は保持し、OS / URL で危険な文字と `..` のみ無害化。
+        const sanitizedFileName = sanitizeAvatarFileName(input.file.name);
         const filePath = `${user.id}/${Date.now()}_${sanitizedFileName}`;
         const { error } = await supabase.storage
           .from("avatars")
-          .upload(filePath, input.file, { upsert: true });
+          .upload(filePath, input.file, {
+            upsert: true,
+            // Zod で検証済みの MIME を明示指定。
+            // クライアントが送る Content-Type を盲信しない。
+            contentType: input.file.type,
+          });
 
         if (error) {
           throw new ActionError({

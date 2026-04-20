@@ -451,11 +451,82 @@ env.SUPABASE_SERVICE_ROLE_KEY;
 
 ---
 
+## ファイルアップロードのガイドライン
+
+### 基本方針（Issue #008 / #001 で整備済み）
+
+`avatars` バケットのようなユーザーアップロードは、**多層防御**を徹底する。重要度の高い順に:
+
+1. **バケット設定（Supabase Storage）が真の防衛線**
+   - `storage.buckets.allowed_mime_types` と `file_size_limit` を必ず設定する
+     （→ `supabase/migrations/005_avatar_bucket_restrictions.sql`）
+   - 公式ドキュメントでも *"Upload restrictions like max file size and allowed content types are defined at the bucket level"* と明記されている
+2. **サーバ側（Astro Action の Zod）で早期検証**
+   - `.refine()` で MIME タイプとサイズを 400 応答で弾く（UX 向上）
+   - `upload()` 呼び出し時に `contentType: input.file.type` を **明示指定**し、クライアントが送ってくる Content-Type を盲信しない
+3. **クライアント側検証は UX 目的のみ**
+   - `<input accept="...">` と JS の `file.type` チェックは DevTools で迂回可能
+   - これ単体をセキュリティ対策として扱わない
+
+### 許可する MIME タイプ
+
+`avatars` バケットは以下の 4 種類のみを許可する:
+
+- `image/png`
+- `image/jpeg`
+- `image/webp`
+- `image/gif`
+
+**`image/svg+xml` は許可しない**。SVG は XML + JavaScript を埋め込める実行コンテナであり、署名付き URL で開かれると `<ref>.supabase.co` 上で Stored XSS が成立し得る（[MDN: SVG restrictions](https://developer.mozilla.org/en-US/docs/Web/SVG/SVG_as_an_Image#restrictions)）。どうしても SVG を扱いたい場合は、ダウンロード専用にする or 別バケットで `Content-Disposition: attachment` 固定、のような追加対策を要する。
+
+### ファイルサイズ
+
+- 上限: **5 MB** (5 \* 1024 \* 1024 バイト)
+- 定義場所: `src/lib/avatar-upload.ts` の `MAX_AVATAR_SIZE` を **真実の源**として使い、バケット設定・Action・UI で共有する
+
+### ファイル名サニタイゼーション（Issue #001）
+
+- **日本語・絵文字・多言語 Unicode は保持する** (UX)
+- `/` `\` `:` `*` `?` `"` `<` `>` `|` と制御文字のみ `_` に置換 (OS 互換 / パストラバーサル)
+- `..` は `_` に畳み込む（パストラバーサル対策）
+- 先頭末尾の空白・ドットはトリム（Windows の trailing-dot 解釈事故回避）
+- 実装: `src/lib/avatar-upload.ts` の `sanitizeAvatarFileName()`
+- 旧実装 `/[^a-zA-Z0-9._-]/g` は国際化できないため廃止
+
+### 運用: 既存オブジェクトの棚卸し
+
+バケット制限を後から追加した場合、過去にアップロードされたファイルはそのまま残る。以下のクエリで違反オブジェクトを洗い出し、運用判断で削除する:
+
+```sql
+-- 5MB 超 or 許可されていない MIME のオブジェクト
+select id, name, owner, metadata->>'mimetype' as mime, metadata->>'size' as size
+  from storage.objects
+ where bucket_id = 'avatars'
+   and (
+     (metadata->>'size')::bigint > 5 * 1024 * 1024
+     or coalesce(metadata->>'mimetype', '') not in (
+       'image/png','image/jpeg','image/webp','image/gif'
+     )
+   );
+```
+
+### 参考
+
+- [Supabase Storage: Fundamentals](https://supabase.com/docs/guides/storage/buckets/fundamentals)
+- [Supabase Storage: Creating Buckets](https://supabase.com/docs/guides/storage/buckets/creating-buckets)
+- [Supabase Storage: Standard Uploads](https://supabase.com/docs/guides/storage/uploads/standard-uploads)
+- [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+- [RFC 3986 URI](https://www.rfc-editor.org/rfc/rfc3986)
+
+---
+
 ## 参考資料
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [Supabase Security Best Practices](https://supabase.com/docs/guides/auth/row-level-security)
 - [Supabase RLS Deep Dive](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [Supabase Storage Fundamentals](https://supabase.com/docs/guides/storage/buckets/fundamentals)
+- [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
 - [Vue.js Security Best Practices](https://vuejs.org/guide/best-practices/security.html)
 - [Cloudflare Workers Security](https://developers.cloudflare.com/workers/platform/security/)
 - [Astro Security](https://docs.astro.build/en/guides/security/)

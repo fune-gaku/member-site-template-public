@@ -2,6 +2,11 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+import {
+  ALLOWED_AVATAR_ACCEPT_ATTR,
+  ALLOWED_AVATAR_MIME,
+  MAX_AVATAR_SIZE,
+} from "../lib/avatar-upload";
 import { createBrowserSupabase } from "../lib/supabase-browser";
 
 const props = withDefaults(
@@ -31,14 +36,16 @@ async function handleAvatarChange(event: Event) {
   if (!file) return;
 
   // ファイルサイズチェック（5MB）
-  if (file.size > 5 * 1024 * 1024) {
+  // クライアント側検証は UX 向け。真の防衛線はサーバ Zod + Supabase バケット設定。
+  if (file.size > MAX_AVATAR_SIZE) {
     error.value = "ファイルサイズは5MB以下にしてください";
     return;
   }
 
-  // 画像形式チェック
-  if (!file.type.startsWith("image/")) {
-    error.value = "画像ファイルを選択してください";
+  // 画像形式チェック（Issue #008）
+  // 許可: PNG / JPEG / WebP / GIF。SVG は XSS リスクのため明示的に拒否。
+  if (!ALLOWED_AVATAR_MIME.has(file.type)) {
+    error.value = "PNG / JPEG / WebP / GIF のみアップロード可能です";
     return;
   }
 
@@ -162,12 +169,14 @@ async function handleUpdateProfile() {
         <div class="flex-1">
           <input
             type="file"
-            accept="image/*"
+            :accept="ALLOWED_AVATAR_ACCEPT_ATTR"
             class="file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 block w-full cursor-pointer text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
             :disabled="isUploadingAvatar"
             @change="handleAvatarChange"
           />
-          <p class="mt-2 text-xs text-gray-500">PNG, JPG, GIF（最大5MB）</p>
+          <p class="mt-2 text-xs text-gray-500">
+            PNG / JPEG / WebP / GIF（最大5MB）
+          </p>
 
           <button
             v-if="avatarFile"
