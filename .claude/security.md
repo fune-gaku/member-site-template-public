@@ -602,7 +602,7 @@ curl -i -X POST \
 
 1. **バケット設定（Supabase Storage）が真の防衛線**
    - `storage.buckets.allowed_mime_types` と `file_size_limit` を必ず設定する
-     （→ `supabase/migrations/005_avatar_bucket_restrictions.sql`）
+     （→ `supabase/migrations/001_init.sql` の avatars バケット INSERT セクション）
    - 公式ドキュメントでも *"Upload restrictions like max file size and allowed content types are defined at the bucket level"* と明記されている
 2. **サーバ側（Astro Action の Zod）で早期検証**
    - `.refine()` で MIME タイプとサイズを 400 応答で弾く（UX 向上）

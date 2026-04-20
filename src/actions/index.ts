@@ -299,7 +299,7 @@ export const server = {
      *   2. Astro Action の Zod .refine で MIME / サイズを早期検証 (400 応答)
      *   3. Supabase Storage バケット設定 (allowed_mime_types / file_size_limit)
      *      が **真の防衛線**。DevTools で 1, 2 を迂回されてもここで拒否される。
-     *      → supabase/migrations/005_avatar_bucket_restrictions.sql
+     *      → supabase/migrations/001_init.sql (avatars バケット INSERT セクション)
      *
      * 併せて upload() 呼び出し時に contentType を明示指定し、
      * クライアントが送る Content-Type を盲信しない。

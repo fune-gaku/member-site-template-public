@@ -3,7 +3,7 @@
 ## 概要
 
 - **DBMS**: PostgreSQL (Supabase)
-- **スキーマ管理**: Supabase Migrations (`supabase/migrations/*.sql` を Git で管理し、本番適用は SQL Editor から手動実行)
+- **スキーマ管理**: `supabase/migrations/001_init.sql` 1 ファイルに全テーブル・RLS・Storage バケット・トリガーを統合。本番/新規環境ともこの 1 ファイルを SQL Editor で実行すれば完成。開発環境のリセットは `000_cleanup.sql` → `001_init.sql` の順に実行
 - **RLS（Row Level Security）**: 全テーブルで有効化、ユーザーは自分のデータのみアクセス可能
 
 ---
@@ -23,13 +23,14 @@
 
 ユーザーのプロフィール情報を管理するテーブル。
 
-| カラム名       | 型            | 制約                                                                    | 説明                       |
-| -------------- | ------------- | ----------------------------------------------------------------------- | -------------------------- |
-| `user_id`      | `uuid`        | PRIMARY KEY, REFERENCES `auth.users(id)` ON DELETE CASCADE              | Supabase Auth のユーザーID |
-| `display_name` | `text`        | NULL可                                                                  | 表示名                     |
-| `role`         | `text`        | NOT NULL, DEFAULT `'member'`, CHECK (`role` IN (`'member'`, `'admin'`)) | ユーザーロール             |
-| `created_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                               | 作成日時                   |
-| `updated_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                               | 更新日時                   |
+| カラム名       | 型            | 制約                                                                                  | 説明                                                |
+| -------------- | ------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `user_id`      | `uuid`        | PRIMARY KEY, REFERENCES `auth.users(id)` ON DELETE CASCADE                            | Supabase Auth のユーザーID                          |
+| `display_name` | `text`        | NULL可, CHECK `char_length(display_name) <= 100`（Issue #007）                        | 表示名（多層防御として 100 文字以下に制限）         |
+| `avatar_url`   | `text`        | NULL可                                                                                | Supabase Storage のアバターファイルパス             |
+| `role`         | `text`        | NOT NULL, DEFAULT `'member'`, CHECK (`role` IN (`'member'`, `'admin'`))               | ユーザーロール                                      |
+| `created_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                                             | 作成日時                                            |
+| `updated_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                                             | 更新日時                                            |
 
 **インデックス**:
 
@@ -184,9 +185,11 @@ const { data: posts } = await supabase
 
 ### Buckets
 
-| バケット名 | 公開設定          | 用途                       |
-| ---------- | ----------------- | -------------------------- |
-| `avatars`  | Private（非公開） | ユーザーのアバター画像保存 |
+| バケット名 | 公開設定          | 用途                       | 制限（Issue #008）                                                                                |
+| ---------- | ----------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `avatars`  | Private（非公開） | ユーザーのアバター画像保存 | `allowed_mime_types`: `image/png` `image/jpeg` `image/webp` `image/gif` のみ、`file_size_limit`: 5 MB |
+
+**`image/svg+xml` を意図的に除外**: SVG は XML + JS 実行コンテナのため Stored XSS リスクがあり、画像として扱わない。
 
 **RLS ポリシー**:
 
@@ -261,6 +264,9 @@ avatars/
 
 ### マイグレーション管理
 
-- マイグレーションファイルは `001_init.sql`, `002_add_xxx.sql` のように連番で管理
+- **テンプレート方針**: 本テンプレートは `001_init.sql` 1 ファイルに全初期化をまとめている
+  （インクリメンタル migration ではなく、新規プロジェクトが 1 回実行するだけで構成が完成する形）
+- 将来的にスキーマを変更する場合は、`002_xxx.sql` のように追加ファイルを作るか、
+  `001_init.sql` を更新して既存ユーザーは `000_cleanup.sql` → `001_init.sql` で再初期化する
 - 本番適用前に必ずローカルでテスト
 - 破壊的変更（テーブル削除など）は慎重に行う

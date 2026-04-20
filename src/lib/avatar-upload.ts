@@ -8,7 +8,7 @@
  *  - 許可 MIME は 4 種類に限定。`image/svg+xml` は XML + JS 実行コンテナのため
  *    Stored XSS リスクがあり明示的に **除外** する（OWASP File Upload Cheat Sheet）。
  *  - サイズ上限は 5MB。クライアント表示用の UI / サーバ Zod / Supabase バケット設定で
- *    同一値を共有する（真の防衛線は supabase/migrations/005_avatar_bucket_restrictions.sql）。
+ *    同一値を共有する（真の防衛線は supabase/migrations/001_init.sql の avatars バケット INSERT）。
  *  - ファイル名は Unicode を保持し、OS / URL / パストラバーサルで危険な
  *    限られた文字のみ `_` に置換する（RFC 3986）。
  */
