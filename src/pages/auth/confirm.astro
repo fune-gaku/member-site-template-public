@@ -1,0 +1,127 @@
+---
+/**
+ * Issue #002 採用: B 案「確認ボタン経由」パターンの OTP 検証ランディングページ。
+ *
+ * メールクライアントやセキュリティ製品 (Gmail / Outlook / Microsoft Defender Safe Links 等) が
+ * 受信メールの URL を GET でプリフェッチすることにより OTP が消費されてしまう Supabase の既知挙動を
+ * 回避するため、本ページでは GET 時には何も検証せず、ユーザーの明示的な POST
+ * （「続行」ボタン）を経由して `auth.confirmOtp` Action で `verifyOtp` を実行する。
+ *
+ * - GET: `token_hash` と `type` を hidden フィールドに載せた確認フォームを表示。
+ * - POST: `auth.confirmOtp` で verifyOtp → 成功時は `type` に応じて分岐リダイレクト。
+ *   - `type === "recovery"` → `/auth/update-password`
+ *   - `type === "invite"`   → `/auth/update-password?mode=invite`
+ *   - それ以外（signup / email / email_change 等）→ `next` が安全なら優先、無ければ
+ *     `/member/dashboard`
+ *
+ * @see https://supabase.com/docs/reference/javascript/auth-verifyotp
+ * @see https://supabase.com/docs/guides/auth/auth-email-templates
+ */
+import { actions } from "astro:actions";
+
+import Auth from "../../layouts/Auth.astro";
+import { safeNextPath } from "../../lib/safe-redirect";
+
+const url = new URL(Astro.request.url);
+const tokenHash = url.searchParams.get("token_hash") ?? "";
+const type = url.searchParams.get("type") ?? "";
+const rawNext = url.searchParams.get("next");
+
+const VALID_TYPES = [
+  "invite",
+  "recovery",
+  "email_change",
+  "email",
+  "signup",
+  "magiclink",
+] as const;
+type ValidType = (typeof VALID_TYPES)[number];
+const isValidType = (t: string): t is ValidType =>
+  (VALID_TYPES as readonly string[]).includes(t);
+
+let error: string | null = null;
+
+if (Astro.request.method === "POST") {
+  const formData = await Astro.request.formData();
+  const { data, error: actionError } = await Astro.callAction(
+    actions.auth.confirmOtp,
+    formData,
+  );
+
+  if (actionError || !data?.success) {
+    if (actionError) console.error("auth/confirm verify failed", actionError);
+    return Astro.redirect("/auth/signin?error=confirm_failed");
+  }
+
+  const postedType = formData.get("type");
+  const rawPostedNext = formData.get("next");
+  const postedNext = typeof rawPostedNext === "string" ? rawPostedNext : null;
+
+  switch (postedType) {
+    case "recovery":
+      return Astro.redirect("/auth/update-password");
+    case "invite":
+      return Astro.redirect("/auth/update-password?mode=invite");
+    case "signup":
+    case "email_change":
+    case "email":
+    case "magiclink":
+    default:
+      return Astro.redirect(safeNextPath(postedNext));
+  }
+}
+
+// GET: 必要パラメータが無い / 不正 なら signin にエスケープ
+if (!tokenHash || !type || !isValidType(type)) {
+  error = "リンクが不正または期限切れです。再度メールを送信してください。";
+}
+
+// `next` は POST にも持ち回すが、ここでも safeNextPath でサニタイズして埋め込む
+const nextForForm = rawNext ? safeNextPath(rawNext) : "";
+---
+
+<Auth title="メール認証" description="続行ボタンを押して認証を完了してください">
+  {
+    error ? (
+      <div class="space-y-4">
+        <div class="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p class="text-sm text-red-800">{error}</p>
+        </div>
+        <div class="text-center text-sm text-gray-600">
+          <a
+            href="/auth/signin"
+            class="text-brand-600 hover:text-brand-700 font-medium"
+          >
+            サインインに戻る
+          </a>
+        </div>
+      </div>
+    ) : (
+      <form method="POST" class="space-y-6">
+        <input type="hidden" name="token_hash" value={tokenHash} />
+        <input type="hidden" name="type" value={type} />
+        {nextForForm && <input type="hidden" name="next" value={nextForForm} />}
+
+        <p class="text-sm text-gray-700">
+          下のボタンをクリックして、メールの確認を完了してください。
+        </p>
+
+        <button
+          type="submit"
+          class="bg-brand-600 hover:bg-brand-700 focus:ring-brand-200 w-full rounded-lg px-4 py-3 font-medium text-white transition focus:ring-4"
+        >
+          続行
+        </button>
+
+        <div class="text-center text-sm text-gray-600">
+          <a
+            href="/auth/signin"
+            class="text-brand-600 hover:text-brand-700 font-medium"
+          >
+            サインインに戻る
+          </a>
+        </div>
+      </form>
+    )
+  }
+</Auth>

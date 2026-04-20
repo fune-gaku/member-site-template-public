@@ -1,0 +1,123 @@
+<script setup lang="ts">
+import { actions } from "astro:actions";
+import { ref } from "vue";
+
+import {
+  PASSWORD_POLICY_HINT,
+  validatePasswordStrength,
+} from "../lib/password-schema";
+
+const password = ref("");
+const confirmPassword = ref("");
+const isLoading = ref(false);
+const error = ref("");
+const success = ref(false);
+
+async function handleSubmit() {
+  error.value = "";
+
+  if (password.value !== confirmPassword.value) {
+    error.value = "パスワードが一致しません";
+    return;
+  }
+
+  const policyError = validatePasswordStrength(password.value);
+  if (policyError) {
+    error.value = policyError;
+    return;
+  }
+
+  isLoading.value = true;
+
+  try {
+    const formData = new FormData();
+    formData.append("password", password.value);
+    const { error: actionError } = await actions.auth.updatePassword(formData);
+
+    if (actionError) {
+      error.value = actionError.message;
+    } else {
+      success.value = true;
+      // 新パスワードで再ログインしてもらう (OWASP Forgot Password Cheat Sheet 準拠)
+      setTimeout(() => {
+        window.location.href = "/auth/signin?reset=done";
+      }, 1500);
+    }
+  } catch (e) {
+    console.error("Update password error:", e);
+    error.value = "予期しないエラーが発生しました";
+  } finally {
+    isLoading.value = false;
+  }
+}
+</script>
+
+<template>
+  <div>
+    <div
+      v-if="success"
+      class="mb-6 rounded-lg border border-green-200 bg-green-50 p-4"
+    >
+      <p class="text-sm text-green-800">
+        パスワードを更新しました。サインイン画面に移動します...
+      </p>
+    </div>
+
+    <form v-else class="space-y-6" @submit.prevent="handleSubmit">
+      <div v-if="error" class="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p class="text-sm text-red-800">{{ error }}</p>
+      </div>
+
+      <div>
+        <label
+          for="password"
+          class="mb-2 block text-sm font-medium text-gray-700"
+        >
+          新しいパスワード
+        </label>
+        <input
+          id="password"
+          v-model="password"
+          type="password"
+          required
+          minlength="8"
+          maxlength="72"
+          autocomplete="new-password"
+          class="focus:ring-brand-500 focus:border-brand-500 w-full rounded-lg border border-gray-300 px-4 py-2 transition outline-none focus:ring-2"
+          :placeholder="PASSWORD_POLICY_HINT"
+          :disabled="isLoading"
+        />
+        <p class="mt-1 text-xs text-gray-500">
+          {{ PASSWORD_POLICY_HINT }}
+        </p>
+      </div>
+
+      <div>
+        <label
+          for="confirm-password"
+          class="mb-2 block text-sm font-medium text-gray-700"
+        >
+          新しいパスワード（確認）
+        </label>
+        <input
+          id="confirm-password"
+          v-model="confirmPassword"
+          type="password"
+          required
+          autocomplete="new-password"
+          class="focus:ring-brand-500 focus:border-brand-500 w-full rounded-lg border border-gray-300 px-4 py-2 transition outline-none focus:ring-2"
+          placeholder="新しいパスワードを再入力"
+          :disabled="isLoading"
+        />
+      </div>
+
+      <button
+        type="submit"
+        :disabled="isLoading"
+        class="bg-brand-600 hover:bg-brand-700 focus:ring-brand-200 w-full rounded-lg px-4 py-3 font-medium text-white transition focus:ring-4 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {{ isLoading ? "更新中..." : "パスワードを更新" }}
+      </button>
+    </form>
+  </div>
+</template>

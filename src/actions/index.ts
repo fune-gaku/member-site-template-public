@@ -151,10 +151,14 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
+        // NOTE: 真の情報源は Supabase Dashboard の Email Templates 設定。
+        // Dashboard のテンプレート (例: `{{ .SiteURL }}/auth/confirm?token_hash=...&type=recovery&next=/auth/update-password`)
+        // がリンクを生成するため、本 redirectTo は Dashboard 側でテンプレートが未設定の場合の
+        // フォールバックとしてのみ機能する。詳細は .claude/deployment.md 参照（Issue #002 / #002-B）。
         const { error } = await supabase.auth.resetPasswordForEmail(
           input.email,
           {
-            redirectTo: `${context.url.origin}/auth/callback?type=recovery`,
+            redirectTo: `${context.url.origin}/auth/confirm?next=/auth/update-password`,
           },
         );
         if (error) {
@@ -163,6 +167,112 @@ export const server = {
             message: error.message,
           });
         }
+        return { success: true };
+      },
+    }),
+
+    /**
+     * Issue #002: メールスキャナー対策 (B 案 / 公式推奨) 用の明示的 OTP 確認 Action。
+     *
+     * Supabase の OTP (`token_hash`) フローはメールリンクを GET でプリフェッチされると
+     * 一度きりのトークンが消費されてしまうため、`{{ .ConfirmationURL }}` を直接踏ませずに
+     * `/auth/confirm` ランディングページで「続行」ボタンを踏ませ、フォーム POST で検証する。
+     *
+     * `accept: "form"` なので自動的に CSRF 相当のブラウザ Origin 制約が効く。
+     *
+     * @see https://supabase.com/docs/reference/javascript/auth-verifyotp
+     * @see https://supabase.com/docs/guides/auth/server-side/creating-a-client
+     */
+    confirmOtp: defineAction({
+      accept: "form",
+      input: z.object({
+        token_hash: z.string().min(1),
+        type: z.enum([
+          "invite",
+          "recovery",
+          "email_change",
+          "email",
+          "signup",
+          "magiclink",
+        ]),
+      }),
+      handler: async (input, context) => {
+        const supabase = createClient({
+          request: context.request,
+          cookies: context.cookies,
+        });
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: input.token_hash,
+          type: input.type,
+        });
+        if (error) {
+          console.error("auth.confirmOtp error", error);
+          throw new ActionError({
+            code: "BAD_REQUEST",
+            message: "リンクが無効または期限切れです",
+          });
+        }
+        return { success: true };
+      },
+    }),
+
+    /**
+     * Issue #002-B: パスワードリセット / 招待直後の新パスワード設定用 Action。
+     *
+     * Supabase 公式 Password Auth 3-step フローの最終ステップ:
+     *   1. resetPasswordForEmail
+     *   2. verifyOtp (recovery セッション確立)
+     *   3. updateUser({ password })  ← 本 Action
+     *
+     * OWASP Forgot Password Cheat Sheet に従い、完了後は `signOut` で recovery セッションを
+     * 即切りにし、ユーザーに新パスワードでの再ログインを強制する
+     * （メールを盗み見た攻撃者が長期セッションを取得するのを防ぐ）。
+     *
+     * @see https://supabase.com/docs/guides/auth/passwords
+     * @see https://supabase.com/docs/reference/javascript/auth-updateuser
+     * @see https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
+     */
+    updatePassword: defineAction({
+      accept: "form",
+      input: z.object({
+        password: passwordSchema,
+      }),
+      handler: async (input, context) => {
+        // HIBP 漏洩パスワードチェック（ENABLE_HIBP_CHECK=true の場合のみ）
+        await assertNotPwned(input.password);
+
+        const supabase = createClient({
+          request: context.request,
+          cookies: context.cookies,
+        });
+
+        // recovery / invite フローでは verifyOtp によって一時的な認証済みセッションが
+        // 確立されている前提。セッションが無い状態での呼び出しは拒否する。
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          throw new ActionError({
+            code: "UNAUTHORIZED",
+            message:
+              "セッションが無効です。もう一度リセットメールを送信してください。",
+          });
+        }
+
+        const { error } = await supabase.auth.updateUser({
+          password: input.password,
+        });
+        if (error) {
+          console.error("auth.updatePassword error", error);
+          throw new ActionError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+
+        // OWASP 推奨: 更新直後に recovery セッションを明示的に切り、
+        // 新パスワードでの再ログインを強制する。
+        await supabase.auth.signOut();
         return { success: true };
       },
     }),

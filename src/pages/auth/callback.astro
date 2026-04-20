@@ -1,6 +1,20 @@
 ---
-import type { EmailOtpType } from "@supabase/supabase-js";
-
+/**
+ * Issue #002 以降: `/auth/callback` は **PKCE フロー専用** に限定する。
+ *
+ * - PKCE (`?code=...`) — ブラウザ発行の code_verifier とペアになっているため、
+ *   メールスキャナの GET プリフェッチで消費されても攻撃者は verifier を持たず安全。
+ *   `exchangeCodeForSession` を自動実行してよい。
+ * - OTP (`?token_hash=...&type=...`) — サーバー発行・スキャナ耐性なしのため、
+ *   `/auth/confirm` ランディングページで明示的な POST を経由して verify する。
+ *
+ * 過去の OTP 形式リンク互換のため `token_hash` を受け取った場合は `/auth/confirm` に
+ * フォワードし、`next` クエリは保持する。
+ *
+ * @see .claude/architecture.md の「認証フロー」節
+ * @see https://supabase.com/docs/guides/auth/server-side/creating-a-client
+ */
+import { safeNextPath } from "../../lib/safe-redirect";
 import { createClient } from "../../lib/supabase";
 
 const supabase = createClient({
@@ -9,17 +23,27 @@ const supabase = createClient({
 });
 
 const url = new URL(Astro.request.url);
-const token_hash = url.searchParams.get("token_hash");
-const type = url.searchParams.get("type") as EmailOtpType | null;
 const code = url.searchParams.get("code");
+const token_hash = url.searchParams.get("token_hash");
+const type = url.searchParams.get("type");
+const nextParam = url.searchParams.get("next");
+const nextPath = safeNextPath(nextParam);
 
+// 旧リンク互換: `token_hash` が付いている場合は /auth/confirm に転送。
 if (token_hash && type) {
-  const { error } = await supabase.auth.verifyOtp({ token_hash, type });
-  if (!error) return Astro.redirect("/member/dashboard");
+  const qs = new URLSearchParams();
+  qs.set("token_hash", token_hash);
+  qs.set("type", type);
+  if (nextParam) qs.set("next", nextParam);
+  return Astro.redirect(`/auth/confirm?${qs.toString()}`);
 }
+
+// PKCE フロー: スキャナが GET しても code_verifier が無いと成立しないため安全。
 if (code) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (!error) return Astro.redirect("/member/dashboard");
+  if (!error) return Astro.redirect(nextPath);
+  console.error("auth/callback exchangeCodeForSession error", error);
 }
+
 return Astro.redirect("/auth/signin?error=auth_failed");
 ---
