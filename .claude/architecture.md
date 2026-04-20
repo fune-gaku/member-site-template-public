@@ -136,6 +136,68 @@ member-site-template/
 
 ---
 
+### メール経由の認証フロー（Issue #002 / #002-B）
+
+Supabase のメール認証には **2 種類のトークン方式** があり、メールスキャナ（Gmail / Outlook / Microsoft Defender Safe Links / 企業 MTA の URL プレビュー等）の GET プリフェッチ耐性が異なる。本テンプレートでは公式推奨の「ランディングページ + 明示クリック（B 案）」パターンを採用し、両者を別エンドポイントに分離している。
+
+| 方式                             | 代表的な発生源                                      | エンドポイント   | スキャナ耐性                | 備考                                                                       |
+| -------------------------------- | --------------------------------------------------- | ---------------- | --------------------------- | -------------------------------------------------------------------------- |
+| PKCE (`?code=...`)               | ブラウザ発の signup (`supabase.auth.signUp`)        | `/auth/callback` | ✅ あり                      | code_verifier がブラウザ側に残るため、GET で消費されても安全                |
+| OTP (`?token_hash=...&type=...`) | admin invite / password reset / confirm signup 等   | `/auth/confirm`  | ❌ なし（単独）→ B 案で解消 | GET でプリフェッチされると OTP が消費されるため、明示的 POST を必須にする |
+
+#### `/auth/confirm` フロー（OTP 方式、Issue #002）
+
+```
+1. メールテンプレートのリンクに {{ .TokenHash }} と type をクエリとして埋め込む
+   例: {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/auth/update-password
+   ↓
+2. ユーザー（またはスキャナ）がリンクを GET → /auth/confirm は hidden input に
+   token_hash と type を詰めた「続行」ボタンを表示するのみ（verify しない）
+   ↓
+3. ユーザーが「続行」を明示的にクリック → フォーム POST
+   ↓
+4. auth.confirmOtp Action が supabase.auth.verifyOtp({ token_hash, type }) を実行
+   ↓
+5. 成功時に type に応じて分岐リダイレクト:
+   - recovery → /auth/update-password
+   - invite   → /auth/update-password?mode=invite
+   - その他   → safeNextPath(next) または /member/dashboard
+   失敗時 → /auth/signin?error=confirm_failed
+```
+
+`next` クエリは `src/lib/safe-redirect.ts` の `safeNextPath` で必ずサニタイズし、Open Redirect (CWE-601) を防ぐ。
+
+#### `/auth/update-password` フロー（Issue #002-B）
+
+`verifyOtp` 成功で確立された **recovery 一時セッション** を使って `supabase.auth.updateUser({ password })` を呼ぶ。
+
+```
+1. /auth/update-password ページロード時に supabase.auth.getUser() で recovery セッション確認
+   - 無ければ /auth/signin?error=recovery_session_required にリダイレクト
+   ↓
+2. UpdatePasswordForm.vue で新パスワードを入力
+   - Zod passwordSchema（8 文字 + 英大小 + 数字、72 文字以下）
+   - 任意で HIBP 漏洩チェック（ENABLE_HIBP_CHECK=true のとき）
+   ↓
+3. auth.updatePassword Action が supabase.auth.updateUser({ password }) を実行
+   ↓
+4. 成功直後に supabase.auth.signOut() で recovery セッションを即切り
+   （OWASP Forgot Password Cheat Sheet 推奨: 更新後の強制再ログイン）
+   ↓
+5. /auth/signin?reset=done に遷移し、新パスワードでの再ログインを促す
+```
+
+#### `/auth/callback` フロー（PKCE 専用、互換維持）
+
+- `?code=...` 付きで来れば `exchangeCodeForSession(code)` を自動実行（PKCE 耐性あり）
+- 互換: 旧形式の `?token_hash=...&type=...` が来た場合は `/auth/confirm` に内部リダイレクト
+
+#### Supabase Dashboard 側のメールテンプレート
+
+**すべてのメールで `{{ .ConfirmationURL }}` は禁止**。必ず `{{ .TokenHash }}` ベースで `/auth/confirm` を経由させる。具体的な文字列は `.claude/deployment.md` の「Supabase Email Templates 設定」節を参照。
+
+---
+
 ## データフロー
 
 ### サーバーサイド（.astro ファイル）
