@@ -74,7 +74,7 @@
 | SQLインジェクション      | 中           | Supabaseクライアント使用（パラメータ化クエリ）            |
 | 不正ファイルアップロード | 中           | 拡張子・MIME・サイズ制限（5MB）                           |
 | セッションハイジャック   | 中           | Secure Cookie、HTTPS、トークン自動リフレッシュ            |
-| CSRF攻撃                 | 低           | SameSite Cookie（`@supabase/ssr` が自動管理）             |
+| CSRF攻撃                 | 低           | SameSite Cookie（`@supabase/ssr`）+ Astro Actions POST 限定 + `security.checkOrigin`（Origin/Referer 照合）。[CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)参照 |
 | RLS バイパス             | 高           | RLS を全テーブルで有効化、service_role キーはサーバーのみ |
 
 ---
@@ -536,6 +536,61 @@ Supabase Auth のセッション寿命は、個々のサインインごとに切
 - UI に「ログイン状態を保持」トグルを追加しないこと（Supabase の API 上、挙動を分岐できず誤解を生むため）。
 - セッションを明示的に終了させたい場合は **サインアウト** を使う（`supabase.auth.signOut()`）。
 - 設定変更は即時反映されない点に注意：公式ドキュメント曰く *"Sessions are not proactively destroyed when you change these settings, but rather the check is enforced whenever a session is refreshed next."* — 変更後も既存セッションは次回リフレッシュ時に評価される。
+
+---
+
+## CSRF 対策（サインアウト経路）
+
+### 基本方針（Issue #005 で整備済み）
+
+サインアウトのように **状態を変更する操作は必ず POST** とする（RFC 9110 §9.2.1 "safe methods"）。リンクベース CSRF（`<a href="/auth/signout">` を踏ませる／メーラーのプリフェッチ）による **意図しない強制ログアウト** を防ぐため、以下を徹底する：
+
+1. **Astro Action + `<form method="POST" action={actions.auth.signOut}>` のみを経由** して `supabase.auth.signOut()` を呼ぶ。
+2. `/auth/signout` ページは互換のため残すが、**GET には `405 Method Not Allowed`** を返す。
+3. `astro.config.mjs` の `security.checkOrigin` を **既定値 `true` のまま維持**。これで Astro がクロスオリジン POST を自動的に 403 で拒否する。
+4. ナビゲーションヘッダ（`Member.astro` / `Admin.astro`）やダッシュボードの「サインアウト」ボタンは全て form POST（Action 呼び出し）に統一する。`<a href="/auth/signout">` は作らない。
+
+### 手動 CSRF 検証手順
+
+本番デプロイ直後、または `/auth/signout` や `auth.signOut` Action を改修した場合は、必ず以下 3 コマンドを実行して挙動を確認する。
+
+```bash
+# 1) 攻撃者視点: クロスオリジン GET（リンク踏ませ・メーラー URL プリフェッチを模擬）
+curl -i -X GET https://member-site-template.fune-gaku.workers.dev/auth/signout
+# 期待: HTTP/2 405 / Allow: POST （Cookie が付いていても sb-* の delete は起きない）
+
+# 2) 攻撃者視点: クロスオリジン POST（Origin ヘッダが別サイト）
+curl -i -X POST \
+  -H "Origin: https://evil.example.com" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  https://member-site-template.fune-gaku.workers.dev/_actions/auth.signOut
+# 期待: HTTP/2 403 （Astro security.checkOrigin が Origin/Referer 不一致で拒否）
+
+# 3) 同一オリジン POST（正規フロー、ダッシュボードのボタン相当）
+curl -i -X POST \
+  -H "Origin: https://member-site-template.fune-gaku.workers.dev" \
+  -H "Referer: https://member-site-template.fune-gaku.workers.dev/member/dashboard" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --cookie "sb-...=..." \
+  https://member-site-template.fune-gaku.workers.dev/_actions/auth.signOut
+# 期待: HTTP/2 200 / Set-Cookie: sb-...=; Max-Age=0 （セッション Cookie 削除）
+```
+
+ローカル（`npm run dev` + `npm run preview`）でも同じ 3 パターンを `http://localhost:4321` に対して流し、**GET が 405** かつ **クロスオリジン POST が 403** になることを確認する。
+
+### 受け入れ基準（Issue #005）
+
+- [x] `curl -X GET /auth/signout` が **405 Method Not Allowed** を返す
+- [x] クロスオリジン POST が **403** で拒否される（`security.checkOrigin` の動作）
+- [x] スパムメールの URL スキャナーが GET しても Cookie 削除が走らない（curl で確認）
+- [x] ダッシュボード・ナビゲーションヘッダのサインアウトがクリック 1 回で従来どおり動作する
+
+### 参考
+
+- [Astro: Actions (forms and mutations)](https://docs.astro.build/en/guides/actions/)
+- [Astro: security.checkOrigin](https://docs.astro.build/en/reference/configuration-reference/#securitycheckorigin)
+- [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
+- [RFC 9110 §9.2.1 Safe Methods](https://www.rfc-editor.org/rfc/rfc9110#section-9.2.1)
 
 ---
 

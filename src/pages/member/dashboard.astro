@@ -1,9 +1,18 @@
 ---
+import { actions } from "astro:actions";
+
 import Member from "../../layouts/Member.astro";
 
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
 const isAdmin = profile?.role === "admin";
+
+// Issue #005: サインアウトはフォーム POST のみで副作用を起こす。
+// Action 成功後はここでリダイレクトする（Astro 作法）。
+const signOutResult = Astro.getActionResult(actions.auth.signOut);
+if (signOutResult && !signOutResult.error) {
+  return Astro.redirect("/");
+}
 ---
 
 <Member title="ダッシュボード" description="会員ダッシュボード">
@@ -110,33 +119,35 @@ const isAdmin = profile?.role === "admin";
           )
         }
 
-        <a
-          href="/auth/signout"
-          class="flex items-center rounded-lg border border-gray-200 p-4 transition hover:bg-gray-50"
-        >
-          <div
-            class="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-red-100"
+        <form method="POST" action={actions.auth.signOut} class="contents">
+          <button
+            type="submit"
+            class="flex w-full items-center rounded-lg border border-gray-200 p-4 text-left transition hover:bg-gray-50"
           >
-            <svg
-              class="h-5 w-5 text-red-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
+            <div
+              class="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-red-100"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              ></path>
-            </svg>
-          </div>
-          <div>
-            <div class="font-medium text-gray-900">サインアウト</div>
-            <div class="text-sm text-gray-600">ログアウト</div>
-          </div>
-        </a>
+              <svg
+                class="h-5 w-5 text-red-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <div class="font-medium text-gray-900">サインアウト</div>
+              <div class="text-sm text-gray-600">ログアウト</div>
+            </div>
+          </button>
+        </form>
       </div>
     </div>
   </div>

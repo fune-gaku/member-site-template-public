@@ -1,4 +1,6 @@
 ---
+import { actions } from "astro:actions";
+
 import Base from "./Base.astro";
 
 interface Props {
@@ -9,6 +11,12 @@ interface Props {
 const { title, description } = Astro.props;
 const user = Astro.locals.user;
 const currentPath = Astro.url.pathname;
+
+// Issue #005: サインアウトはフォーム POST のみで副作用を起こす。
+const signOutResult = Astro.getActionResult(actions.auth.signOut);
+if (signOutResult && !signOutResult.error) {
+  return Astro.redirect("/");
+}
 ---
 
 <Base title={title} description={description}>
@@ -55,7 +63,7 @@ const currentPath = Astro.url.pathname;
             <span class="hidden text-sm text-gray-300 sm:inline">
               {user?.email ?? ""}
             </span>
-            <form action="/auth/signout" method="GET">
+            <form method="POST" action={actions.auth.signOut}>
               <button
                 type="submit"
                 class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-100"

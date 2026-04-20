@@ -1,32 +1,24 @@
 ---
 import { actions } from "astro:actions";
 
-if (Astro.request.method === "POST" || Astro.request.method === "GET") {
-  const { data, error } = await Astro.callAction(actions.auth.signOut);
-
-  if (error) {
-    console.error("Logout failed:", error);
-  }
-
-  return Astro.redirect("/");
+// GET（およびそれ以外）では絶対に副作用を起こさない。
+// RFC 9110 §9.2.1 の "safe methods" 原則に従い、GET リクエストでは
+// 405 Method Not Allowed を返して CSRF（リンク踏ませ型の強制ログアウト）を防ぐ。
+// 実サインアウトはダッシュボード等のフォーム POST（Astro Action `auth.signOut`）経由で行う。
+if (Astro.request.method !== "POST") {
+  return new Response("Method Not Allowed", {
+    status: 405,
+    headers: { Allow: "POST" },
+  });
 }
----
 
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>サインアウト中...</title>
-  </head>
-  <body>
-    <div
-      style="display: flex; justify-content: center; align-items: center; min-height: 100vh;"
-    >
-      <p>サインアウト中...</p>
-    </div>
-    <script>
-      window.location.href = "/";
-    </script>
-  </body>
-</html>
+// 互換のため POST で直接叩かれた場合はこのページからも Action を呼んで
+// リダイレクトする。Astro の `security.checkOrigin`（既定 true）がクロスオリジン
+// POST を 403 で弾くため、同一オリジンからの POST のみが到達する。
+// `accept: "form"` 化に伴い `callAction` の第2引数は FormData を渡す。
+const { error } = await Astro.callAction(actions.auth.signOut, new FormData());
+if (error) {
+  console.error("Logout failed:", error);
+}
+return Astro.redirect("/");
+---

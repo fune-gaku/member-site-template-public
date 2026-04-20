@@ -133,12 +133,19 @@ export const server = {
     }),
 
     signOut: defineAction({
+      // `<form method="POST" action={actions.auth.signOut}>` からの FormData 送信を受け付ける。
+      // GET による強制ログアウト（CSRF）を防ぐため、Action ルート経由のみを正とする。
+      // `security.checkOrigin`（astro.config.mjs で既定値 true を維持）により
+      // クロスオリジン POST は 403 で自動拒否される。
+      accept: "form",
       handler: async (_, context) => {
         const supabase = createClient({
           request: context.request,
           cookies: context.cookies,
         });
         await supabase.auth.signOut();
+        // 値を返すのみ。リダイレクトは呼び出し側（フォームを持つページ）で
+        // `Astro.getActionResult()` を見て行う（Astro 作法）。
         return { success: true };
       },
     }),
