@@ -1,4 +1,6 @@
 ---
+import { actions } from "astro:actions";
+
 import Base from "./Base.astro";
 
 interface Props {
@@ -11,6 +13,13 @@ const user = Astro.locals.user;
 const profile = Astro.locals.profile;
 const isAdmin = profile?.role === "admin";
 const currentPath = Astro.url.pathname;
+
+// Issue #005: サインアウトはフォーム POST のみで副作用を起こす。
+// GET を 405 にするため、ヘッダのフォームも method="POST" + Astro Action に差し替え。
+const signOutResult = Astro.getActionResult(actions.auth.signOut);
+if (signOutResult && !signOutResult.error) {
+  return Astro.redirect("/");
+}
 ---
 
 <Base title={title} description={description}>
@@ -81,7 +90,7 @@ const currentPath = Astro.url.pathname;
             <span class="text-sm text-gray-700">
               {user?.email || "ゲスト"}
             </span>
-            <form action="/auth/signout" method="GET">
+            <form method="POST" action={actions.auth.signOut}>
               <button
                 type="submit"
                 class="bg-brand-600 hover:bg-brand-700 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors"
