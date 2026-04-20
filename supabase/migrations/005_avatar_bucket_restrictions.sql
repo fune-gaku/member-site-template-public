@@ -26,34 +26,47 @@ update storage.buckets
        file_size_limit = 5 * 1024 * 1024  -- 5 MB (bytes)
  where id = 'avatars';
 
--- 既存のオブジェクトで上記ポリシーに違反しているものを棚卸しする。
+-- ========================================
+-- 既存オブジェクトの棚卸し（migration とは別に、運用側で手動実行）
+-- ========================================
+-- 既存のオブジェクトで上記ポリシーに違反しているものがあるか、運用開始後に
+-- 以下のクエリを Supabase SQL Editor で実行して確認する。
 -- 削除は行わない（データ損失を防ぐため）。運用側で確認 → 手動削除する前提。
 -- 運用開始直後なら 0 件のはず。
-do $$
-declare
-  oversized_count int;
-  disallowed_mime_count int;
-begin
-  select count(*) into oversized_count
-    from storage.objects
-   where bucket_id = 'avatars'
-     and (
-       metadata->>'size' is null
-       or (metadata->>'size')::bigint > 5 * 1024 * 1024
-     );
+--
+-- NOTE: 元は DO $$ ... $$ 匿名ブロックで RAISE WARNING していたが、
+-- Supabase Database Linter が DECLARE 節のローカル変数 (int) を CREATE TABLE と
+-- 誤認識して RLS 警告を出すため、棚卸しを SELECT 文に分離した。
+-- 公式ドキュメント: https://www.postgresql.org/docs/current/plpgsql-declarations.html
+-- (DO ブロック内の DECLARE 変数は実行中メモリのローカル変数であり永続テーブルではない)
 
-  select count(*) into disallowed_mime_count
-    from storage.objects
-   where bucket_id = 'avatars'
-     and coalesce(metadata->>'mimetype', '') not in (
-       'image/png', 'image/jpeg', 'image/webp', 'image/gif'
-     );
+-- 棚卸しクエリ 1: ファイルサイズ違反 (5MB 超)
+-- select count(*) as oversized_count
+--   from storage.objects
+--  where bucket_id = 'avatars'
+--    and (
+--      metadata->>'size' is null
+--      or (metadata->>'size')::bigint > 5 * 1024 * 1024
+--    );
 
-  if oversized_count > 0 then
-    raise warning 'avatars bucket has % object(s) over 5MB; please review manually (see Issue #008)', oversized_count;
-  end if;
+-- 棚卸しクエリ 2: MIME タイプ違反
+-- select count(*) as disallowed_mime_count
+--   from storage.objects
+--  where bucket_id = 'avatars'
+--    and coalesce(metadata->>'mimetype', '') not in (
+--      'image/png', 'image/jpeg', 'image/webp', 'image/gif'
+--    );
 
-  if disallowed_mime_count > 0 then
-    raise warning 'avatars bucket has % object(s) with disallowed MIME; please review manually (see Issue #008)', disallowed_mime_count;
-  end if;
-end $$;
+-- 棚卸しクエリ 3: 違反オブジェクトの詳細 (削除判断用)
+-- select id, name, owner,
+--        metadata->>'mimetype' as mime,
+--        metadata->>'size' as size_bytes,
+--        created_at
+--   from storage.objects
+--  where bucket_id = 'avatars'
+--    and (
+--      (metadata->>'size')::bigint > 5 * 1024 * 1024
+--      or coalesce(metadata->>'mimetype', '') not in (
+--        'image/png', 'image/jpeg', 'image/webp', 'image/gif'
+--      )
+--    );
