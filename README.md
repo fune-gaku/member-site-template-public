@@ -52,6 +52,22 @@ cp .dev.vars.example .dev.vars
 
 > `.env` / `.dev.vars` は `.gitignore` 済み。**絶対にコミットしない**こと。
 
+### セキュリティ運用（初回のみ）
+
+秘密情報の誤コミット検知と依存関係の脆弱性検知を有効化します。
+
+1. gitleaks をローカルにインストール（pre-commit hook 用）:
+   ```bash
+   brew install gitleaks
+   ```
+   `npm install` 実行時に `.githooks/pre-commit` が有効化され、コミット時に staged ファイルから秘密情報を自動検知します。gitleaks 未インストール時はコミットが中断されます。
+
+2. GitHub リポジトリの Settings > Code security で以下を ON:
+   - Dependabot alerts
+   - Dependabot security updates
+
+依存関係の脆弱性は CI（[.github/workflows/npm-audit.yml](.github/workflows/npm-audit.yml)）が PR 時と週次で `npm audit --audit-level=high` を自動実行します。詳細は [.claude/security.md](.claude/security.md) を参照。
+
 ---
 
 ## ローカル開発

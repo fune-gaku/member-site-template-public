@@ -2,13 +2,15 @@
 
 ## 概要
 
-このドキュメントでは、会員サイトテンプレート開発時のセキュリティ方針とチェックリストを定義します。
-
-**重要**: **コミット前に必ずセキュリティチェックリストを確認**してください。
+このドキュメントでは、会員サイトテンプレートで実装済みのセキュリティ対策と運用方針を定義します。
 
 ---
 
 ## セキュリティチェックリスト
+
+**このチェックリストの役割**: 本テンプレートが対応しているセキュリティ項目の一覧（実装状況のスナップショット）。新規プロジェクトはこの `[x]` 状態からスタートします。リグレッション（既存 `[x]` 項目を壊していないか）の確認に使ってください。
+
+**コミット前に毎回動的に確認する項目**は [コミット前チェックフロー](#コミット前チェックフロー) 節を参照。**新規テーブル/ポリシー/関数を追加する際のチェック**は [.claude/database.md](./database.md#新規マイグレーション時のセルフチェックリスト) を参照。
 
 ### ✅ 認証・認可
 
@@ -23,6 +25,11 @@
 - [x] `/member/*` 配下は認証必須（未認証時リダイレクト）
 - [x] `SUPABASE_SERVICE_ROLE_KEY` はサーバーのみで使用
 - [x] Admin クライアントは毎リクエスト生成（セッション漏洩防止）
+- [x] CSRF 対策：状態変更操作は POST のみ、`security.checkOrigin` 有効（→ [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)）
+- [x] OTP / PKCE の適切な分離：メールリンクは `/auth/confirm` のランディング経由でスキャナ GET 耐性を確保（→ [メール経由の認証フロー](./architecture.md#メール経由の認証フロー-issue-002--002-b)）
+- [x] Open Redirect 対策：`next` クエリは `safeNextPath` でサニタイズ（`src/lib/safe-redirect.ts`）
+- [x] Supabase メールテンプレートで `{{ .ConfirmationURL }}` は禁止、`{{ .TokenHash }}` + `/auth/confirm` 経由に統一
+- [x] Supabase Dashboard のセキュリティ設定を完了（→ [Supabase Dashboard セキュリティ設定チェックリスト](#supabase-dashboard-セキュリティ設定チェックリスト)）
 
 ### ✅ インジェクション対策
 
@@ -53,12 +60,16 @@
 - [x] APIエンドポイント（Astro Actions）が認証を要求している
 - [x] 権限昇格攻撃を防止（`revoke update (role)` でカラムレベル権限制御）
 
-### ✅ その他
+### ✅ その他（ネットワーク・ヘッダ・運用）
 
-- [ ] 依存パッケージに既知の脆弱性がない（`npm audit`）
-- [ ] CORS設定が適切（Cloudflare Workers が自動管理）
-- [ ] HTTPS強制（Cloudflare Workers が自動管理）
-- [x] セキュアなCookie設定（`@supabase/ssr` が自動管理）
+- [x] 依存パッケージに既知の脆弱性がない（CI の `npm audit --audit-level=high` が PR と週次で自動チェック）
+- [x] Dependabot で依存パッケージの更新を週次で自動追跡（[.github/dependabot.yml](../.github/dependabot.yml)）
+- [x] gitleaks の pre-commit hook で秘密情報のコミットを自動ブロック（[.githooks/pre-commit](../.githooks/pre-commit)）
+- [x] セキュリティヘッダ（CSP / HSTS / X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy / Cross-Origin-Opener-Policy）を全レスポンスに付与（`src/lib/security-headers.ts`、→ [セキュリティヘッダの動作確認](#セキュリティヘッダの動作確認)）
+- [x] CORS 設定が適切（Cloudflare Workers が自動管理）
+- [x] HTTPS 強制（Cloudflare Workers が自動管理）
+- [x] セキュアな Cookie 設定（`@supabase/ssr` が自動管理）
+- [x] マイグレーション運用ルールを定義（→ [マイグレーション運用ルール](#マイグレーション運用ルール)）
 
 ---
 
@@ -348,6 +359,89 @@ with check (
 
 ---
 
+## Supabase Dashboard セキュリティ設定チェックリスト
+
+マイグレーション SQL に現れないが、**新規 Supabase プロジェクト構築時に Dashboard で必ず設定する項目**。Supabase 公式 [Going into Prod](https://supabase.com/docs/guides/deployment/going-into-prod) と [Password Security](https://supabase.com/docs/guides/auth/password-security) に基づく。
+
+### Auth 設定（Authentication > Providers > Email / Settings）
+
+| 項目 | 推奨値 | 理由 |
+| --- | --- | --- |
+| Email confirmation | **ON** | メール到達性を保証、なりすまし登録防止 |
+| OTP 有効期限 | **≤ 3600 秒（1 時間）** | Supabase 公式推奨上限。超えると Security Advisor が警告 |
+| Minimum password length | **8 文字** | `src/lib/auth-schemas.ts` の Zod `passwordSchema` と一致させる |
+| Password requirements | **数字 + 小文字 + 大文字** | アプリ側 Zod と一致させる（Zod で先に弾き、Dashboard で二重防御） |
+| Confirm email change | **ON** | メール変更時の乗っ取り防止 |
+| Secure email change | **ON** | 旧メール側での承認を要求 |
+
+### Sessions 設定（Authentication > Sessions）
+
+本テンプレートの方針は [セッション寿命方針（Remember Me 非採用）](#セッション寿命方針remember-me-非採用) 参照。プロジェクトの要件に応じて以下を設定:
+
+| 項目 | 汎用会員サイト | 管理画面・金融系 |
+| --- | --- | --- |
+| Time-box user sessions | 30 日 | 24 時間以内 |
+| Inactivity timeout | 適度な値 | 短め |
+| Single session per user | OFF | **ON** |
+
+### 組織・プロジェクト側（Account > Security / Organization）
+
+| 項目 | 推奨 | 備考 |
+| --- | --- | --- |
+| Supabase アカウントの MFA | **有効** | 乗っ取られるとプロジェクトごと支配される |
+| Organization の複数 owner | **2 名以上** | Bus factor 対策 |
+| GitHub 連携アカウントの 2FA | **有効** | 同上 |
+
+### Pro プラン以上で追加で有効化する項目
+
+無料プランでは使えないが、課金後に必ず有効化するもの:
+
+| 項目 | プラン | 用途 |
+| --- | --- | --- |
+| Leaked password protection（HIBP）| **Pro 以上** | 流出済みパスワードを拒否。無料プランではアプリ層の `ENABLE_HIBP_CHECK=true` で代替中 |
+| Point in Time Recovery (PITR) | **Pro 以上（アドオン）** | DB 障害時の任意時点復元 |
+| Network restrictions | **Pro 以上** | DB 接続元 IP 制限 |
+
+---
+
+## マイグレーション運用ルール
+
+### 基本方針
+
+| ルール | 理由 |
+| --- | --- |
+| [supabase/migrations/000_cleanup.sql](../supabase/migrations/000_cleanup.sql) は **開発専用**、本番では絶対に実行しない | `drop table cascade` が含まれるため実行するとユーザーデータが全消失 |
+| 本番適用は **Supabase SQL Editor で手動実行**、CI から自動適用しない | レビュー機会を確保し、事故時の巻き戻し判断を人間に残す |
+| 既存マイグレーションファイル（`001_init.sql` など）は **基本的に変更しない**、新規ファイル `002_xxx.sql` を追加 | 適用済み環境との差分管理のため |
+| 破壊的変更（`drop column` / `drop table` / `alter type`）は **PR レビュー必須** | データ損失・ダウンタイムに直結 |
+| 本番適用前に **必ずローカル環境で `000_cleanup.sql` → `001_init.sql` + 新規ファイル** の順で再現確認 | 他マイグレーションとの干渉を検出 |
+
+### 本番適用フロー
+
+```
+1. ローカル開発で 002_xxx.sql を作成
+   ↓
+2. ローカル Supabase で 000_cleanup.sql → 001_init.sql → 002_xxx.sql を順に実行して動作確認
+   ↓
+3. PR レビュー（破壊的変更があれば必ず）
+   ↓
+4. main マージ
+   ↓
+5. 本番 Supabase Dashboard > SQL Editor で 002_xxx.sql のみを手動実行
+   ↓
+6. 本番 Supabase Dashboard > Database > Advisors を実行し、新規違反がないか確認
+   ↓
+7. アプリをデプロイ（スキーマ差分による実行時エラーを回避）
+```
+
+### マイグレーション適用直後に必ずやること
+
+1. **Supabase Security Advisor を Run**（新規マイグレーションが RLS 未有効テーブル等を生まないか）
+2. **Supabase Performance Advisor を Run**（FK に index 漏れがないか）
+3. **本番の動作確認**（`curl` で `/member/*` が 200 / サインアップが通る 等）
+
+---
+
 ## npm audit
 
 定期的に脆弱性チェックを実行：
@@ -400,8 +494,38 @@ Astro の `context.cookies.set()` が自動的に `Set-Cookie` ヘッダーに�
    ↓
 5. git diff で機密情報がないか確認
    ↓
-6. コミット
+6. コミット（.githooks/pre-commit で gitleaks が自動実行される）
 ```
+
+### 自動化されているチェック
+
+| 層 | 仕組み | タイミング | 対象 |
+| --- | --- | --- | --- |
+| ローカル | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks | コミット時 | staged ファイルの秘密情報 |
+| CI（GitHub Actions）| [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml) | PR（package.json 変更）+ 週次月曜 | 依存パッケージの脆弱性（high 以上で fail）|
+| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST | npm / GitHub Actions の更新 PR 自動生成 |
+
+**初回セットアップ**:
+
+```bash
+brew install gitleaks   # pre-commit hook が機能するために必須
+npm install             # prepare スクリプトで core.hooksPath を .githooks に設定
+```
+
+**GitHub リポジトリ設定**（一度だけ有効化）:
+
+- Settings > Code security > Dependabot alerts: **ON**
+- Settings > Code security > Dependabot security updates: **ON**
+
+Secret scanning / Push protection は Private + Free プランでは使えないため、gitleaks の pre-commit hook で代替している。
+
+### 手動で定期実施する項目
+
+| 項目 | 頻度 | 確認場所 |
+| --- | --- | --- |
+| Supabase Security Advisor / Performance Advisor | 月 1 回、マイグレーション適用直後 | Supabase Dashboard > Database > Advisors |
+| [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) でのヘッダ再評価（A 以上維持） | 四半期に 1 回、または本番デプロイ後 | 本番 URL を入力 |
+| CSRF 3 点検（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）| `/auth/signout` 周辺を改修した直後 | [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路) のコマンド参照 |
 
 ---
 

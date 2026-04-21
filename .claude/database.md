@@ -270,3 +270,45 @@ avatars/
   `001_init.sql` を更新して既存ユーザーは `000_cleanup.sql` → `001_init.sql` で再初期化する
 - 本番適用前に必ずローカルでテスト
 - 破壊的変更（テーブル削除など）は慎重に行う
+- 運用フロー・Advisor 実行タイミングは [.claude/security.md](./security.md#マイグレーション運用ルール) を参照
+
+---
+
+## 新規マイグレーション時のセルフチェックリスト
+
+新規テーブル・ポリシー・関数を `002_xxx.sql` 以降で追加する際、以下を順にチェックする。**1 つでも未チェックなら本番適用しない**。既存実装（`001_init.sql`）がすべての項目を満たしているため、これに倣う。
+
+### 新規テーブル
+
+- [ ] `alter table <table> enable row level security;` を入れた（忘れると誰でも全データ参照可能）
+- [ ] RLS ポリシーを **select / insert / update / delete** の必要な操作分すべて作った
+- [ ] 各ポリシーに **`to authenticated`**（または `to anon`）を明示した（`to` 省略は anon でも評価されパフォーマンス低下）
+- [ ] ポリシー内で **`(select auth.uid())`** を使った（裸の `auth.uid()` は行ごとに再評価されて遅い）
+- [ ] FK カラム（`user_id` 等）および **ポリシーで参照するカラムに index** を貼った
+- [ ] ユーザー入力系の text カラムには **CHECK 制約** で長さ上限を設定（多層防御、例: `profiles.display_name` は 100 文字）
+- [ ] `role` のような**権限に直結するカラム**は、一般ユーザーから `revoke update (col)` して column-level privilege で保護した
+
+### 新規ポリシー（既存テーブルへの追加）
+
+- [ ] 既存テーブルの RLS が既に enable されていることを確認した
+- [ ] `using` 句（SELECT/UPDATE/DELETE）と `with check` 句（INSERT/UPDATE）の**使い分けを理解**して書いた
+- [ ] 同じカラムに対する複数ポリシーで、**OR 結合されても穴が生じない**ことを確認した
+
+### 新規関数・トリガー
+
+- [ ] **`security definer`** を付けた（所有者権限での実行が必要な場合）
+- [ ] **`set search_path = public`**（または明示スキーマ）を付けた（スキーマインジェクション防止）
+- [ ] 関数は Exposed schemas（`public` など）に配置しない場合 `revoke all` で外部 REST 公開を防いだ
+
+### Storage バケット
+
+- [ ] `storage.buckets` への INSERT で **`allowed_mime_types`** と **`file_size_limit`** を明示した（NULL は無制限）
+- [ ] `on conflict (id) do update` で既存バケットの制限も同期した
+- [ ] `image/svg+xml` を許可する場合は `Content-Disposition: attachment` 等の追加対策を検討した
+- [ ] `storage.objects` に対する RLS ポリシーを作った（`bucket_id` + `(storage.foldername(name))[1] = (select auth.jwt()->>'sub')` パターン）
+
+### 適用前・適用後の検証
+
+- [ ] ローカル Supabase で `000_cleanup.sql` → `001_init.sql` → 新規 `002_xxx.sql` を流して**全てエラーなく通る**
+- [ ] 本番適用直後に **Supabase Dashboard > Database > Advisors** を Run し、新規違反が出ていないことを確認
+- [ ] アプリをデプロイし、該当テーブル/ポリシーが期待通り動作することを確認（サインアップ、自分のデータ参照、他ユーザーのデータ参照不可、等）

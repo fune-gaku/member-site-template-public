@@ -1,0 +1,22 @@
+#!/bin/sh
+# 秘密情報（APIキー、トークン等）のコミットを防ぐ
+# 詳細: .claude/security.md の「コミット前チェックフロー」参照
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "❌ gitleaks が見つかりません。"
+  echo "   brew install gitleaks でインストールしてからコミットしてください。"
+  echo "   （緊急時に限り git commit --no-verify で回避可能ですが非推奨）"
+  exit 1
+fi
+
+gitleaks git --staged --redact --verbose
+status=$?
+
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "❌ 秘密情報が検出されました。コミットを中止します。"
+  echo "   誤検知の場合は .gitleaksignore に該当行のフィンガープリントを追加してください。"
+  exit 1
+fi
+
+exit 0

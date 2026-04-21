@@ -20,7 +20,8 @@
     "test": "VITEST=true vitest run",
     "test:watch": "VITEST=true vitest",
     "test:ui": "VITEST=true vitest --ui",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.1.10",
