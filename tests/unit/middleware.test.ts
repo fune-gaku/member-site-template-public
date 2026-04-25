@@ -363,6 +363,9 @@ describe("middleware: /_actions/* ボディサイズガード (Issue #9)", () =>
     // 代表的なヘッダをサンプリング検査（applySecurityHeaders の網羅は別テスト）
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(response.headers.get("X-Frame-Options")).toBe("DENY");
-    expect(response.headers.get("Content-Security-Policy")).not.toBeNull();
+    // CSP は middleware ではなく Astro の <meta> 経由で注入されるため
+    // 411/413 のような middleware 直接生成レスポンスでは付与されない。
+    // これらは plain text なので CSP 不要 (HTML レンダリングがない)。
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
   });
 });

@@ -32,6 +32,27 @@ export default defineConfig({
     // checkOrigin は Astro 6 の既定値 (true) のまま明示せず維持。
     // tests/workers/csrf.test.ts で実 workerd 上の挙動を検証している。
     allowedDomains,
+    // CSP: Astro が <head> に <meta http-equiv="content-security-policy"> を
+    // 注入し、bundle した script/style の hash を script-src/style-src に
+    // 自動追加する。これにより 'unsafe-inline' を排除できる。
+    // 制限: dev サーバではメタタグが注入されない (build/preview 限定)。
+    //       Shiki や ClientRouter は非対応 (本テンプレは未使用)。
+    // 既定の script-src/style-src 以外は directives に列挙する。
+    csp: {
+      directives: [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "form-action 'self'",
+        // Supabase Storage 署名付き URL (avatar 表示) を許可
+        "img-src 'self' data: blob: https://*.supabase.co",
+        "font-src 'self' data:",
+        // Supabase Auth / REST / Realtime
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+        'upgrade-insecure-requests',
+      ],
+    },
   },
 
   vite: {
