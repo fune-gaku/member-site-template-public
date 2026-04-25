@@ -82,43 +82,36 @@ npm run dev
 
 ### 最新情報・不明な情報の確認ルール
 
-**重要**: Claude Codeの知識カットオフ（2025年1月）以降の情報や、不確実な情報については、**必ず公式ドキュメントまたはスキルを利用して確認**してください。
+**重要**: モデルの知識は学習時点で固定されている。以下に該当するときは **必ず一次情報で検証** してから実装に反映する。
 
-#### 確認が必要な技術
+- 直近のメジャーバージョン（Astro 6 / Tailwind 4 等）の API 仕様・設定方法
+- 「破壊的変更があった」と記憶している API（その差分の正確な形）
+- バージョン番号・引数名・フラグ名のような細部
+- 自分の記憶通りに動かないとき（旧 API を引きずっていないか確認）
 
-| 技術                           | 確認方法                                                              | 理由                                |
-| ------------------------------ | --------------------------------------------------------------------- | ----------------------------------- |
-| Astro 6.x                      | [公式ドキュメント](https://docs.astro.build/)                         | 2025年リリース、APIに破壊的変更あり |
-| Supabase SSR (`@supabase/ssr`) | [公式ドキュメント](https://supabase.com/docs/guides/auth/server-side) | 旧auth-helpersから移行              |
-| Cloudflare Workers             | [公式ドキュメント](https://developers.cloudflare.com/workers/)        | `runtime` API削除など仕様変更       |
-| Tailwind CSS 4.x               | [公式ドキュメント](https://tailwindcss.com/docs)                      | `@theme`による新しい設定方法        |
+#### 確認手段の優先順位
 
-#### 確認手順
+| 優先 | 対象技術 | 推奨ツール |
+| ---- | -------- | ---------- |
+| 1    | Astro 6 | `mcp__astro-docs__search_astro_docs` Skill（環境にあれば最優先） |
+| 1    | Supabase / Cloudflare Workers / Tailwind 4 / Vue 3 等 | `WebFetch` で公式ドキュメント URL を直接取得 |
+| 2    | 一般的なベストプラクティス・既知の不具合 | `WebSearch`（公式 issue や stackoverflow を含めて検索） |
 
-```
-1. 実装前に技術仕様を確認
-   ↓
-2. 不明・不確実な点がある場合
-   ↓
-3. 公式ドキュメント検索 or MCP Skillを使用
-   ↓
-4. 最新情報に基づいて実装
-   ↓
-5. 動作確認
-```
+#### 公式ドキュメント主要 URL
 
-#### 使用可能なツール
+- Astro 6: https://docs.astro.build/
+- Astro Cloudflare アダプター: https://docs.astro.build/en/guides/integrations-guide/cloudflare/
+- Supabase SSR: https://supabase.com/docs/guides/auth/server-side
+- Cloudflare Workers: https://developers.cloudflare.com/workers/
+- Tailwind CSS 4: https://tailwindcss.com/docs
+- Vue 3: https://vuejs.org/
 
-- **公式ドキュメント検索**: MCP Skillまたは公式サイト
-- **WebFetch**: 公式ドキュメントURL指定で最新情報取得
-- **WebSearch**: 最新のベストプラクティス・トラブルシューティング検索
+#### 手順
 
-**例**:
-
-```
-❌ 古い知識で実装 → エラー発生 → 修正に時間がかかる
-✅ 事前に公式ドキュメント確認 → 正しい実装 → スムーズな開発
-```
+1. 実装前に該当箇所が「最新情報の対象」か判定
+2. 対象なら一次情報を取得（Skill > WebFetch > WebSearch の順）
+3. 取得した情報に基づき実装
+4. ローカルで動作確認
 
 ---
 
