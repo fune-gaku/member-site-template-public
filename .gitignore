@@ -36,3 +36,8 @@ coverage
 
 # Claude Code per-user local settings (do NOT commit)
 .claude/settings.local.json
+
+# Design mock-up HTML / archives (Phase 1 design reference, kept locally only)
+# 実装は src/ にあり、これらは参照用。コミットせずローカル保持のみ。
+mocks/
+mocks.zip
