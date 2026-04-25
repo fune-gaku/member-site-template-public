@@ -35,7 +35,7 @@ export default [
 
   // 共通ルール
   {
-    files: ["**/*.{js,ts,tsx,astro,vue}"],
+    files: ["**/*.{js,mjs,cjs,ts,tsx,astro,vue}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
