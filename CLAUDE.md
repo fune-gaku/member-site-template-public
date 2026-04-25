@@ -75,7 +75,8 @@ npm run dev
 2. 実装中は development.md / security.md（@import 済み）に従い、サブタスクは TodoWrite で追跡
 3. コミット前に security.md のチェックリストを確認
 4. コミット本文に「なぜそうしたか」を記述（Why は git log に残し、What はコードを読めば分かる前提）
-5. プッシュ
+5. **main マージ前に必ず** [security.md「セキュリティレビュー手順（必須）」](.claude/security.md#セキュリティレビュー手順必須) を実行（`/security-review` → OpenAI Codex → Claude Code 統合レビュー）。結果を PR description に貼る
+6. プッシュ
 
 ### 最新情報・不明な情報の確認ルール
 

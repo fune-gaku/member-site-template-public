@@ -582,6 +582,106 @@ Secret scanning / Push protection は Private + Free プランでは使えない
 
 ---
 
+## セキュリティレビュー手順（必須）
+
+**全 PR / 全マージで必須**。pull request を main にマージする前、または PR を介さない直接マージの直前に、3 段階レビューを必ず通す。**人間 + 自動ツール 2 種 + Claude Code 1 種の 4 視点** で多層的に検証する。
+
+> 適用範囲は **すべての変更**。Step 1 / Step 2 はそれぞれ数分で終わるため、例外を作って判断揺れを起こすより一律実施する方が継続しやすい。最小例外は本節末尾参照。
+
+### 3 段階フロー
+
+#### Step 1: `/security-review` skill による自動レビュー
+
+Claude Code 上で内蔵 skill を実行する。pending changes（現在のブランチの差分）に対し、認証・認可・XSS・CSRF・SQLi・情報漏洩などのセキュリティ観点を自動レビューする。
+
+```
+/security-review
+```
+
+出力結果（findings）を Step 3 の入力としてそのまま保管する。
+
+#### Step 2: OpenAI Codex によるセキュリティチェック
+
+OpenAI Codex（CLI / Web UI、運用環境で利用可能な経路）で以下のテンプレートを使ってレビューを依頼する。
+
+```markdown
+以下の git diff に対するセキュリティレビューをお願いします。
+このプロジェクトは Astro 6 SSR + Vue 3 + Supabase + Cloudflare Workers
+で構成された会員サイトテンプレートです。
+
+【観点】
+
+- 認証・認可（IDOR / 権限昇格 / セッション管理）
+- RLS バイパス（Supabase Postgres）
+- インジェクション（XSS / SQLi / コマンド）
+- CSRF（Astro Actions の状態変更経路）
+- Open Redirect
+- 情報漏洩（エラーメッセージ / ログ / レスポンス）
+- ファイルアップロード
+- 依存関係のサプライチェーン
+- セキュリティヘッダ（CSP / HSTS / その他）
+
+【出力フォーマット】
+重大度別に Critical / High / Medium / Low に分類してください。
+各指摘について:
+
+- 該当ファイル・行
+- 何が問題か
+- 推奨される修正
+
+差分:
+[ここに `git diff main...HEAD` の出力を貼り付け]
+```
+
+差分が大きい場合はファイル単位に分割して依頼する。出力結果を Step 3 の入力としてそのまま保管する。
+
+#### Step 3: Claude Code による統合レビュー
+
+Step 1 / Step 2 の出力を Claude Code に渡し、以下のテンプレートで統合レビューを依頼する。
+
+```markdown
+ブランチ <branch-name> のセキュリティレビュー結果を統合してください。
+
+## /security-review skill の結果
+
+[ここに Step 1 の出力を貼り付け]
+
+## OpenAI Codex の結果
+
+[ここに Step 2 の出力を貼り付け]
+
+以下の観点で統合し、PR description にそのまま貼れる形で出力してください:
+
+1. **重複の確認** — 両者が同じ箇所を指摘している項目（high confidence）
+2. **false positive** — どちらか片方の指摘で、コード精査の結果該当しない
+   もの（理由を併記）
+3. **優先度判定** — Critical / High / Medium / Low + 修正の容易さ
+4. **対応方針** — Fix in this PR / Follow-up Issue / Reject（各々の理由）
+5. **総括** — このブランチをマージしてよいか
+
+可能なら、対象ファイル・行を具体的に示してください。
+```
+
+### 受け入れ基準
+
+main マージの前提として、PR description（または PR 不経由のときはマージコミット本文）に以下を記録する:
+
+- [ ] Step 1 を実行し、Critical / High が 0、または Step 3 で false positive 判定が記録されている
+- [ ] Step 2 を実行し、Critical / High が 0、または Step 3 で false positive 判定が記録されている
+- [ ] Step 3 の統合レビュー結果（重複・FP・優先度・対応方針・総括）が貼られている
+- [ ] 後続 Issue 化したものは GitHub Issue として登録済み（Issue 番号を記録）
+
+### 最小例外
+
+以下のみ Step 1 / Step 2 をスキップして Step 3（Claude Code レビュー）だけで済ませてよい。スキップ時は PR description にその旨と理由を明記する。
+
+- 単一の typo 修正（コードロジックに影響しないコメント / ドキュメントの誤字のみ）
+- フォーマット専用コミット（`npm run format` / `npm run lint:fix` の結果のみで実質ロジック変更なし）
+
+判定が微妙な場合は **常に 3 段階を回す** を選択する。
+
+---
+
 ## インシデント対応
 
 ### 環境変数が漏洩した場合
