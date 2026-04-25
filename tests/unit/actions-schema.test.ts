@@ -1,6 +1,8 @@
 import { z } from "astro/zod";
 import { describe, it, expect } from "vitest";
 
+import { SIGNIN_GENERIC_ERROR_MESSAGE } from "../../src/lib/auth-errors";
+
 // src/actions/index.ts から schema だけを再定義してテスト
 // （実際の actions は Astro コンテキストが必要なため）
 
@@ -32,6 +34,50 @@ describe("auth.signUp schema", () => {
       password: "abc",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("auth.signIn schema (Issue #8 / A3)", () => {
+  // actions/index.ts の signIn input と同じ形
+  const schema = z.object({
+    email: z.string().email(),
+    password: z.string(),
+  });
+
+  it("有効なメール + パスワードを受け入れる", () => {
+    const result = schema.safeParse({
+      email: "user@example.com",
+      password: "anything",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("形式不正なメール（auth に到達せずバリデーション層で 400）", () => {
+    const result = schema.safeParse({
+      email: "not-an-email",
+      password: "anything",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("auth.signIn account enumeration defense (Issue #8 / A3)", () => {
+  it("統一エラーメッセージは存在不存在を区別しない汎用文言である", () => {
+    expect(SIGNIN_GENERIC_ERROR_MESSAGE).toBe(
+      "メールアドレスまたはパスワードが正しくありません",
+    );
+  });
+
+  it("メールアドレスの登録有無を示唆する語が含まれていない", () => {
+    // 過去に Supabase が返してきた enumeration 漏洩文言が
+    // 統一メッセージに紛れ込まないことをガードする
+    const lowered = SIGNIN_GENERIC_ERROR_MESSAGE.toLowerCase();
+    expect(lowered).not.toMatch(/not\s*found/);
+    expect(lowered).not.toMatch(/already/);
+    expect(lowered).not.toMatch(/confirm/);
+    expect(lowered).not.toMatch(/exists?/);
+    expect(lowered).not.toMatch(/registered/);
+    expect(SIGNIN_GENERIC_ERROR_MESSAGE).not.toMatch(/未登録|登録されていません|確認/);
   });
 });
 

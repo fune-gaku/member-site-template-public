@@ -3,6 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
 import { env } from "cloudflare:workers";
 
+import { SIGNIN_GENERIC_ERROR_MESSAGE } from "../lib/auth-errors";
 import {
   ALLOWED_AVATAR_MIME,
   MAX_AVATAR_SIZE,
@@ -128,9 +129,16 @@ export const server = {
           password: input.password,
         });
         if (error) {
+          // Issue #8 (A3): アカウント列挙対策。
+          // Supabase は「存在しないユーザー」と「間違ったパスワード」を
+          // どちらも `Invalid login credentials` で返すが、
+          // `Email not confirmed` など一部のエラーは登録有無を漏らすため
+          // すべて統一メッセージで応答する。元エラーは Workers Logs に残す。
+          // Timing は Supabase 側の bcrypt 検証が概ね吸収する想定。
+          console.error("auth.signIn error:", error);
           throw new ActionError({
             code: "UNAUTHORIZED",
-            message: error.message,
+            message: SIGNIN_GENERIC_ERROR_MESSAGE,
           });
         }
         return { success: true };
