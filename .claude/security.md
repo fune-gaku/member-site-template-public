@@ -196,11 +196,29 @@ Secret scanning / Push protection は Private + Free プランでは使えない
 
 ## セキュリティレビュー手順（必須）
 
-**全 PR / 全マージで必須**。pull request を main にマージする前、または PR を介さない直接マージの直前に、3 段階レビューを必ず通す。**人間 + 自動ツール 2 種 + Claude Code 1 種の 4 視点** で多層的に検証する。
+**全 PR / 全マージで必須**。pull request を main にマージする前、または PR を介さない直接マージの直前に、レビューを必ず通す。
 
-> 適用範囲は **すべての変更**。Step 1 / Step 2 はそれぞれ数分で終わるため、例外を作って判断揺れを起こすより一律実施する方が継続しやすい。最小例外は本節末尾参照。
+> 適用範囲は **すべての変更**。例外を作って判断揺れを起こすより一律実施する方が継続しやすい。最小例外は本節末尾参照。
 
-### 3 段階フロー
+### 推奨経路: `/codex-cross-review` 収束ループ
+
+PR を作っている運用なら、**Codex × Claude Code の二人レビュー収束ループ**を一発で回せる。Codex が指摘 → Claude Code が full context で evaluation/fix → 再 Codex → 双方 LGTM まで反復し、CI green 確認 → ユーザー承認でマージ。
+
+```
+/codex-cross-review <PR-number-or-url>
+```
+
+詳細は [.claude/commands/codex-cross-review.md](../.claude/commands/codex-cross-review.md)。前提:
+
+- OpenAI Codex CLI: `npm i -g @openai/codex`（または `brew install --cask codex`）→ `codex login`
+- ChatGPT Plus / Pro / Business / Edu / Enterprise plan
+- gh CLI（既導入）
+
+PR が無い / Codex CLI が無い場合は、以下の **手動 3 段階フロー（fallback）** を実施する。
+
+### 手動 3 段階フロー（fallback）
+
+PR が無い / Codex CLI が無い場合の代替経路。**人間 + 自動ツール 2 種 + Claude Code 1 種の 4 視点** で多層的に検証する。
 
 #### Step 1: `/security-review` skill による自動レビュー
 

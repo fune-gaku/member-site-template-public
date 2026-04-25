@@ -30,10 +30,24 @@
 
       "Bash(gh pr view:*)",
       "Bash(gh pr list:*)",
+      "Bash(gh pr checkout:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr comment:*)",
       "Bash(gh issue view:*)",
       "Bash(gh issue list:*)",
       "Bash(gh run list:*)",
-      "Bash(gh run view:*)"
+      "Bash(gh run view:*)",
+      "Bash(gh api repos/*/pulls/*/comments:*)",
+      "Bash(gh api repos/*/issues/*/comments:*)",
+      "Bash(gh auth status)",
+
+      "Bash(codex --version)",
+      "Bash(command -v codex)",
+      "Bash(codex exec:*)",
+
+      "Bash(git fetch:*)",
+      "Bash(git merge origin/*:*)",
+      "Bash(date:*)"
     ],
     "deny": [
       "Bash(rm -rf /*)",
