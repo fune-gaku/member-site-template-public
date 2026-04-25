@@ -33,3 +33,6 @@ worker-configuration.d.ts
 # test coverage
 coverage
 .vitest-cache
+
+# Claude Code per-user local settings (do NOT commit)
+.claude/settings.local.json
