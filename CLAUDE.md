@@ -75,7 +75,7 @@ npm run dev
 2. 実装中は development.md / security.md（@import 済み）に従い、サブタスクは TodoWrite で追跡
 3. **【コミット前 / 静的チェックリスト照合】** Claude Code に [security.md「セキュリティチェックリスト」](.claude/security.md#セキュリティチェックリスト) と直近の差分を照合させる（既存 `[x]` を壊していないか、`[ ]` 該当があれば対応）。速い・軽い早期検出層
 4. コミット本文に「なぜそうしたか」を記述（Why は git log に残し、What はコードを読めば分かる前提）
-5. **【main マージ前 / 自動ツール差分レビュー】** [security.md「セキュリティレビュー手順（必須）」](.claude/security.md#セキュリティレビュー手順必須) を実行（`/security-review` skill → OpenAI Codex → Claude Code 統合レビュー）。結果を PR description に貼る。重い・厳密な PR ゲート
+5. **【main マージ前 / 収束ループレビュー】** PR を作成して `/codex-cross-review <PR>` を実行（Codex × Claude Code の二人レビューが LGTM 収束まで反復、CI green 確認 → ユーザー承認でマージ）。詳細と fallback の手動 3 段階は [security.md「セキュリティレビュー手順（必須）」](.claude/security.md#セキュリティレビュー手順必須)
 6. プッシュ
 
 ### 最新情報・不明な情報の確認ルール
