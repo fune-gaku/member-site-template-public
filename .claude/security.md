@@ -4,6 +4,16 @@
 
 このドキュメントでは、会員サイトテンプレートで実装済みのセキュリティ対策と運用方針を定義します。
 
+### 関連ドキュメント
+
+セキュリティに関連する記述は本リポジトリ内で以下に分散している。役割で使い分ける:
+
+| ドキュメント                                                              | 役割                                                                                                                      |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 本ファイル                                                                | チェックリスト（実装済み / 将来課題） / 脅威モデル / コーディングルール / **新規実装時のセルフチェック** / 既存実装の解説 |
+| [database.md](./database.md#新規マイグレーション時のセルフチェックリスト) | RLS / カラムレベル権限 / 新規マイグレーション時のセルフチェック                                                           |
+| [deployment.md「セキュリティ設定」](./deployment.md#セキュリティ設定)     | Supabase Email Templates / Custom SMTP (Resend) / パスワードポリシー — 本番デプロイ時に必須の Dashboard 側設定            |
+
 ---
 
 ## セキュリティチェックリスト
@@ -30,6 +40,7 @@
 - [x] Open Redirect 対策：`next` クエリは `safeNextPath` でサニタイズ（`src/lib/safe-redirect.ts`）
 - [x] Supabase メールテンプレートで `{{ .ConfirmationURL }}` は禁止、`{{ .TokenHash }}` + `/auth/confirm` 経由に統一
 - [x] Supabase Dashboard のセキュリティ設定を完了（→ [Supabase Dashboard セキュリティ設定チェックリスト](#supabase-dashboard-セキュリティ設定チェックリスト)）
+- [ ] **未実装（将来課題）**: admin role への MFA / TOTP 必須化。Supabase Auth は MFA factor をサポートしているため、admin が増えるタイミングで導入を検討する
 
 ### ✅ インジェクション対策
 
@@ -59,6 +70,8 @@
 - [x] ファイルストレージのアクセス制御が適切（Storage RLS）
 - [x] APIエンドポイント（Astro Actions）が認証を要求している
 - [x] 権限昇格攻撃を防止（`revoke update (role)` でカラムレベル権限制御）
+- [x] Mass Assignment 対策：Zod input スキーマで受け付けるフィールドを必要最小限に絞り、`user_id` などサーバー側で確定すべき値はクライアント入力を信頼せず `auth.getUser()` から導出（`posts.create` / `posts.update` / `admin.updateUserRole`）
+- [x] IDOR（Insecure Direct Object Reference）対策：ID 参照型の更新／削除 Action（`posts.update` / `posts.delete` 等）は RLS に加え、サーバ側で `.eq("user_id", user.id)` を明示して **多層防御**（[src/actions/index.ts](../src/actions/index.ts) 参照）
 
 ### ✅ その他（ネットワーク・ヘッダ・運用）
 
@@ -70,6 +83,46 @@
 - [x] HTTPS 強制（Cloudflare Workers が自動管理）
 - [x] セキュアな Cookie 設定（`@supabase/ssr` が自動管理）
 - [x] マイグレーション運用ルールを定義（→ [マイグレーション運用ルール](#マイグレーション運用ルール)）
+- [ ] **未実装（将来課題）**: Astro Actions のレートリミット（書き込み系: `posts.create` / `auth.signUp` / `admin.inviteUser` 等）。当面は Supabase Auth 側の組込みレートと Cloudflare の DDoS 自動軽減に依存。本格運用時は Cloudflare Rate Limiting Rules で `/_actions/*` を制限する
+- [ ] **未実装（将来課題）**: Storage `avatars` のユーザー別クォータ。1 ユーザーが履歴蓄積で容量を圧迫する可能性あり。当面は [運用: 既存オブジェクトの棚卸し](#運用-既存オブジェクトの棚卸し) のクエリで手動管理
+
+---
+
+## 新規実装時のセルフチェックリスト
+
+[database.md「新規マイグレーション時のセルフチェックリスト」](./database.md#新規マイグレーション時のセルフチェックリスト) と並ぶ、**コードを足すときに確認する観点**。「実装済みスナップショット」とは目的が違うので独立節にしている。
+
+### 新規 Astro Action を追加するとき
+
+- [ ] `defineAction` の `input` に Zod スキーマを指定し、**サーバーが受け付けるフィールドだけを並べる**（Mass Assignment 防止）
+- [ ] `user_id` などサーバー側で確定すべき値はクライアント入力から取らず、`supabase.auth.getUser()` の `user.id` から導出する
+- [ ] 認証必須なら handler 冒頭で `auth.getUser()` を呼び、未認証なら `ActionError({ code: "UNAUTHORIZED" })` を投げる
+- [ ] admin 専用なら `requireAdmin(context)` を使う（`role === "admin"` の検証 + 認証統合）
+- [ ] ID 参照型の更新／削除は **RLS に加えて `.eq("user_id", user.id)` を明示** して多層防御（IDOR / horizontal privilege escalation）
+- [ ] 自分自身に対する破壊的操作は handler 側でも明示的に拒否（例: `admin.updateUserRole` の self-demotion 禁止）
+- [ ] エラー時は内部詳細を返さず、ユーザー向けの簡潔な日本語メッセージを `ActionError.message` に詰める。詳細は `console.error("<context>:", error)` で残す
+- [ ] 入力の各フィールドに合理的な上限を Zod の `.max()` で設ける（DoS 抑止 / 多層防御）
+- [ ] テスト: 認証失敗 / バリデーション失敗 / 認可失敗 / 正常系の少なくとも 4 ケースを `tests/unit/actions-schema.test.ts` などに追加
+- [ ] 高頻度な書き込み系（投稿作成・招待送信等）は将来 Cloudflare Rate Limiting で制限する想定。重要な Action は GitHub Issue として記録しておく
+
+### 新規ページ・ルートを追加するとき
+
+- [ ] 認証要否を `src/middleware.ts` のパス判定に反映（`/member/*` / `/admin/*` 配下なら自動で適用される）
+- [ ] 状態変更は GET ではなく POST + `<form action={actions.x.y}>` 経由（[CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路) と同じ原則）
+- [ ] ハイドレーションが必要な Vue コンポーネントだけ `client:load` を付ける（最小限の JS 配信）
+- [ ] 新規の外部リソース（フォント / 画像ホスト / 外部 API）を読み込むなら、CSP に該当ホストを追加（`src/lib/security-headers.ts`）して DevTools で違反が出ないかを必ず確認
+- [ ] 認証情報を含む応答が CDN にキャッシュされないことを確認（`/_actions/*` や `/member/*` `/admin/*` で `Cache-Control: private, no-store` 相当の挙動になっているか）
+- [ ] `next` 等のリダイレクト先パラメータを受ける場合は必ず `safeNextPath` でサニタイズ（Open Redirect / CWE-601）
+- [ ] テスト: SSR 出力の最低限の検証を `tests/integration/pages.test.ts` に追加
+
+### 新規 npm 依存を追加するとき
+
+- [ ] **runtime か dev か** を意識し、runtime は最小化（バンドルサイズ・サプライチェーンリスクを縮める）
+- [ ] パッケージの GitHub / npm ページを開き、メンテナンス頻度・直近のセキュリティ Advisory・スター数で健全性を確認
+- [ ] postinstall / preinstall script を持つか `npm view <pkg> scripts` で確認（あれば挙動を読む）
+- [ ] `npm audit --audit-level=high` でヒットしないこと
+- [ ] 追加後に `npm ls <pkg>` で意図しない複数バージョン共存が起きていないか確認（必要なら `package.json` の `overrides` で固定）
+- [ ] 追加コミットは `chore(deps): ...` で単独に作る（複数依存の追加・複数依存の更新を 1 コミットに混ぜない）
 
 ---
 
