@@ -106,6 +106,31 @@ describe("checkActionBodySize", () => {
         if (!res.ok) expect(res.status).toBe(411);
       }
     });
+
+    it("RFC 9110 §8.6 違反（hex / 指数表記 / 符号 / 前後空白 / カンマ結合）は 411", () => {
+      // RFC 9110: Content-Length = 1*DIGIT のみ。Number() は受け入れてしまう値を弾く
+      const violations = [
+        "0x10", // 16 進
+        "1e3", // 指数
+        "+100", // 符号
+        " 100", // 前空白
+        "100 ", // 後空白
+        "100, 200", // 多重ヘッダ（Headers.get() の結合）
+        "100,200", // カンマ結合
+      ];
+      for (const bad of violations) {
+        const res = checkActionBodySize(path, bad);
+        expect(res.ok, `should reject "${bad}"`).toBe(false);
+        if (!res.ok) expect(res.status).toBe(411);
+      }
+    });
+
+    it("Number.MAX_SAFE_INTEGER + 1 (精度損失) は 413", () => {
+      // 2^53 - 1 を超える Content-Length は精度を失うため上限超過扱い
+      const res = checkActionBodySize(path, "9007199254740993");
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.status).toBe(413);
+    });
   });
 
   describe("ファイルアップロード Action（6MB 上限）", () => {

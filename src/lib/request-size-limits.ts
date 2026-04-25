@@ -64,9 +64,17 @@ export function checkActionBodySize(
   if (contentLengthHeader === null || contentLengthHeader.trim() === "") {
     return { ok: false, status: 411, message: "Length Required" };
   }
-  const length = Number(contentLengthHeader);
-  if (!Number.isFinite(length) || !Number.isInteger(length) || length < 0) {
+  // RFC 9110 §8.6: `Content-Length = 1*DIGIT`。
+  // `Number()` は `0x10` / `1e3` / `+100` / 前後空白などを受け入れてしまうため、
+  // 仕様逸脱を取りこぼさないよう厳格に十進整数のみを受ける。
+  // 多重ヘッダ（`Headers.get()` が `, ` 結合で返す "100, 200" 等）も同時に弾ける。
+  if (!/^\d+$/.test(contentLengthHeader)) {
     return { ok: false, status: 411, message: "Length Required" };
+  }
+  const length = Number(contentLengthHeader);
+  // 2^53 - 1 を超える Content-Length は精度を失うため、安全側に倒して上限超過扱い。
+  if (!Number.isSafeInteger(length)) {
+    return { ok: false, status: 413, message: "Payload Too Large" };
   }
 
   if (length > limit) {
