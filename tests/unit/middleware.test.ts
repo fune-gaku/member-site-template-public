@@ -234,3 +234,135 @@ describe("middleware: /admin 配下の認可", () => {
     expect(context.locals.profile).toEqual({ role: "admin" });
   });
 });
+
+describe("middleware: /_actions/* ボディサイズガード (Issue #9)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * /_actions/* に POST する場合の context をビルドする。
+   * 100KB 一般 / 6MB アップロードの両方を扱えるよう Content-Length を任意で受け取る。
+   */
+  function buildActionContext(opts: {
+    pathname: string;
+    contentLength: string | null;
+  }) {
+    const url = new URL(`https://example.com${opts.pathname}`);
+    const headers = new Headers({ "content-type": "application/json" });
+    if (opts.contentLength !== null) {
+      headers.set("content-length", opts.contentLength);
+    }
+    const request = new Request(url, {
+      method: "POST",
+      headers,
+      // body は省略（middleware は読まない、Content-Length だけ見る）
+    });
+    return {
+      url,
+      request,
+      cookies: {},
+      locals: { user: null, profile: null },
+      redirect: vi.fn(),
+      // biome-ignore lint/suspicious/noExplicitAny: モック簡略化のため
+    } as any;
+  }
+
+  it("一般 Action に 200KB を送ると 413 / Supabase は呼ばれない", async () => {
+    const context = buildActionContext({
+      pathname: "/_actions/posts.create",
+      contentLength: String(200 * 1024),
+    });
+    const next = vi.fn(async () => new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(response.status).toBe(413);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("アップロード Action に 5.5MB を送ると middleware は通る (next が呼ばれる)", async () => {
+    vi.mocked(createClient).mockReturnValue(
+      buildSupabaseMock({ user: null }) as unknown as ReturnType<
+        typeof createClient
+      >,
+    );
+    const context = buildActionContext({
+      pathname: "/_actions/storage.uploadAvatar",
+      contentLength: String(5.5 * 1024 * 1024),
+    });
+    const next = vi.fn(async () => new Response("ok"));
+
+    await onRequest(context, next);
+
+    expect(next).toHaveBeenCalled();
+  });
+
+  it("アップロード Action に 7MB を送ると 413 / Supabase は呼ばれない", async () => {
+    const context = buildActionContext({
+      pathname: "/_actions/storage.uploadAvatar",
+      contentLength: String(7 * 1024 * 1024),
+    });
+    const next = vi.fn(async () => new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(response.status).toBe(413);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("Action パスに Content-Length 欠損で POST すると 411", async () => {
+    const context = buildActionContext({
+      pathname: "/_actions/posts.create",
+      contentLength: null,
+    });
+    const next = vi.fn(async () => new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(response.status).toBe(411);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("非 Action パスは Content-Length 欠損でも従来どおり通る (リグレッション無し)", async () => {
+    vi.mocked(createClient).mockReturnValue(
+      buildSupabaseMock({ user: null }) as unknown as ReturnType<
+        typeof createClient
+      >,
+    );
+    // Content-Length 無しで /auth/signin (非 Action) を叩く
+    const context = {
+      url: new URL("https://example.com/auth/signin"),
+      request: new Request("https://example.com/auth/signin"),
+      cookies: {},
+      locals: { user: null, profile: null },
+      redirect: vi.fn(),
+      // biome-ignore lint/suspicious/noExplicitAny: モック簡略化のため
+    } as any;
+    const next = vi.fn(async () => new Response("ok"));
+
+    await onRequest(context, next);
+
+    // Action ではないので 411 にはならず、通常通り middleware を通過する
+    expect(next).toHaveBeenCalled();
+  });
+
+  it("413 / 411 レスポンスにもセキュリティヘッダが付与される", async () => {
+    const context = buildActionContext({
+      pathname: "/_actions/posts.create",
+      contentLength: String(1_000_000),
+    });
+    const next = vi.fn(async () => new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(response.status).toBe(413);
+    // 代表的なヘッダをサンプリング検査（applySecurityHeaders の網羅は別テスト）
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(response.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(response.headers.get("Content-Security-Policy")).not.toBeNull();
+  });
+});

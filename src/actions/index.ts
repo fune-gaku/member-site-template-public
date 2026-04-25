@@ -85,7 +85,7 @@ export const server = {
     signUp: defineAction({
       accept: "form",
       input: z.object({
-        email: z.string().email(),
+        email: z.string().email().max(254),
         password: passwordSchema,
       }),
       handler: async (input, context) => {
@@ -116,8 +116,8 @@ export const server = {
     signIn: defineAction({
       accept: "form",
       input: z.object({
-        email: z.string().email(),
-        password: z.string(),
+        email: z.string().email().max(254),
+        password: z.string().max(200),
       }),
       // 本体は `src/lib/auth-signin.ts` の `performSignIn` に分離してある。
       // Issue #8 (A3): すべての失敗ケースを統一メッセージに正規化することで
@@ -152,7 +152,7 @@ export const server = {
 
     resetPassword: defineAction({
       accept: "form",
-      input: z.object({ email: z.string().email() }),
+      input: z.object({ email: z.string().email().max(254) }),
       handler: async (input, context) => {
         const supabase = createClient({
           request: context.request,
@@ -193,7 +193,7 @@ export const server = {
     confirmOtp: defineAction({
       accept: "form",
       input: z.object({
-        token_hash: z.string().min(1),
+        token_hash: z.string().min(1).max(512),
         type: z.enum([
           "invite",
           "recovery",
@@ -363,7 +363,7 @@ export const server = {
     }),
 
     getSignedUrl: defineAction({
-      input: z.object({ path: z.string() }),
+      input: z.object({ path: z.string().max(512) }),
       handler: async (input, context) => {
         const supabase = createClient({
           request: context.request,
@@ -567,9 +567,9 @@ export const server = {
     createUser: defineAction({
       accept: "form",
       input: z.object({
-        email: z.string().email(),
+        email: z.string().email().max(254),
         password: passwordSchema,
-        displayName: z.string().optional(),
+        displayName: z.string().max(100).optional(),
       }),
       handler: async (input, context) => {
         await requireAdmin(context);
@@ -596,7 +596,7 @@ export const server = {
 
     inviteUser: defineAction({
       accept: "form",
-      input: z.object({ email: z.string().email() }),
+      input: z.object({ email: z.string().email().max(254) }),
       handler: async (input, context) => {
         await requireAdmin(context);
 
