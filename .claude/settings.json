@@ -40,6 +40,7 @@
       "Bash(gh api repos/*/pulls/*/comments:*)",
       "Bash(gh api repos/*/issues/*/comments:*)",
       "Bash(gh auth status)",
+      "Bash(gh repo view:*)",
 
       "Bash(codex --version)",
       "Bash(command -v codex)",
