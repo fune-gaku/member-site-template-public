@@ -37,36 +37,36 @@
 
 ### ファイル名
 
-| 種類 | 命名規則 | 例 |
-| --- | --- | --- |
-| Vue コンポーネント | `PascalCase.vue` | `ProfileForm.vue` / `PostList.vue` |
-| Astro レイアウト | `PascalCase.astro` | `Member.astro` / `Admin.astro` |
-| Astro ページ | `kebab-case.astro` | `signin.astro` / `update-password.astro` |
-| TS モジュール（lib・util） | `kebab-case.ts` | `safe-redirect.ts` / `auth-schemas.ts` |
-| 型定義のみ | `*.d.ts` | `env.d.ts` |
-| テスト | `<topic>.test.ts` | `actions-schema.test.ts` |
-| マイグレーション | `NNN_short-topic.sql`（NNN は 3 桁ゼロ詰め連番） | `001_init.sql` |
+| 種類                       | 命名規則                                         | 例                                       |
+| -------------------------- | ------------------------------------------------ | ---------------------------------------- |
+| Vue コンポーネント         | `PascalCase.vue`                                 | `ProfileForm.vue` / `PostList.vue`       |
+| Astro レイアウト           | `PascalCase.astro`                               | `Member.astro` / `Admin.astro`           |
+| Astro ページ               | `kebab-case.astro`                               | `signin.astro` / `update-password.astro` |
+| TS モジュール（lib・util） | `kebab-case.ts`                                  | `safe-redirect.ts` / `auth-schemas.ts`   |
+| 型定義のみ                 | `*.d.ts`                                         | `env.d.ts`                               |
+| テスト                     | `<topic>.test.ts`                                | `actions-schema.test.ts`                 |
+| マイグレーション           | `NNN_short-topic.sql`（NNN は 3 桁ゼロ詰め連番） | `001_init.sql`                           |
 
 ### 変数・関数
 
-| 種類 | 命名規則 | 例 |
-| --- | --- | --- |
-| 変数・関数 | `camelCase` | `displayName` / `createBrowserSupabase()` |
-| モジュールレベル定数 | `UPPER_SNAKE_CASE` | `MAX_AVATAR_SIZE` |
-| 型・インターフェース | `PascalCase` | `Profile` / `MemberPost` |
-| Vue コンポーネント本体 | `PascalCase`（ファイル名と一致） | `ProfileForm` |
-| Action 名前空間 | `camelCase`（短く） | `actions.auth.signIn` / `actions.posts.create` |
+| 種類                   | 命名規則                         | 例                                             |
+| ---------------------- | -------------------------------- | ---------------------------------------------- |
+| 変数・関数             | `camelCase`                      | `displayName` / `createBrowserSupabase()`      |
+| モジュールレベル定数   | `UPPER_SNAKE_CASE`               | `MAX_AVATAR_SIZE`                              |
+| 型・インターフェース   | `PascalCase`                     | `Profile` / `MemberPost`                       |
+| Vue コンポーネント本体 | `PascalCase`（ファイル名と一致） | `ProfileForm`                                  |
+| Action 名前空間        | `camelCase`（短く）              | `actions.auth.signIn` / `actions.posts.create` |
 
 ### データベース
 
-| 種類 | 命名規則 | 例 |
-| --- | --- | --- |
-| テーブル | `snake_case`（複数形） | `profiles` / `member_posts` |
-| カラム | `snake_case` | `display_name` / `created_at` |
-| 主キー | `id` 単独カラム（型は `uuid`、`gen_random_uuid()` デフォルト）または対象テーブル名と紐付く `<entity>_id` | `profiles.user_id` |
-| 外部キー | `<対象>_id` | `member_posts.user_id` |
-| RLS ポリシー名 | `"Users can <verb> own <noun>"` | `"Users can update own profile"` |
-| トリガー関数 | `snake_case`（動詞句） | `handle_new_user()` |
+| 種類           | 命名規則                                                                                                 | 例                               |
+| -------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| テーブル       | `snake_case`（複数形）                                                                                   | `profiles` / `member_posts`      |
+| カラム         | `snake_case`                                                                                             | `display_name` / `created_at`    |
+| 主キー         | `id` 単独カラム（型は `uuid`、`gen_random_uuid()` デフォルト）または対象テーブル名と紐付く `<entity>_id` | `profiles.user_id`               |
+| 外部キー       | `<対象>_id`                                                                                              | `member_posts.user_id`           |
+| RLS ポリシー名 | `"Users can <verb> own <noun>"`                                                                          | `"Users can update own profile"` |
+| トリガー関数   | `snake_case`（動詞句）                                                                                   | `handle_new_user()`              |
 
 ---
 

@@ -62,7 +62,9 @@ describe("validatePasswordStrength (client-side helper)", () => {
   });
 
   it("returns length error for over-72 chars", () => {
-    expect(validatePasswordStrength("A1" + "a".repeat(71))).toMatch(/72文字以下/);
+    expect(validatePasswordStrength("A1" + "a".repeat(71))).toMatch(
+      /72文字以下/,
+    );
   });
 
   it("returns complexity error when missing uppercase", () => {

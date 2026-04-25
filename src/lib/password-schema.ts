@@ -51,5 +51,4 @@ export function validatePasswordStrength(password: string): string | null {
 }
 
 /** フォーム入力欄に掲示する文言（placeholder / helper 共通）。 */
-export const PASSWORD_POLICY_HINT =
-  "8文字以上・英大小文字・数字を含む";
+export const PASSWORD_POLICY_HINT = "8文字以上・英大小文字・数字を含む";

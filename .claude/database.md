@@ -23,14 +23,14 @@
 
 ユーザーのプロフィール情報を管理するテーブル。
 
-| カラム名       | 型            | 制約                                                                                  | 説明                                                |
-| -------------- | ------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `user_id`      | `uuid`        | PRIMARY KEY, REFERENCES `auth.users(id)` ON DELETE CASCADE                            | Supabase Auth のユーザーID                          |
-| `display_name` | `text`        | NULL可, CHECK `char_length(display_name) <= 100`（Issue #007）                        | 表示名（多層防御として 100 文字以下に制限）         |
-| `avatar_url`   | `text`        | NULL可                                                                                | Supabase Storage のアバターファイルパス             |
-| `role`         | `text`        | NOT NULL, DEFAULT `'member'`, CHECK (`role` IN (`'member'`, `'admin'`))               | ユーザーロール                                      |
-| `created_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                                             | 作成日時                                            |
-| `updated_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                                             | 更新日時                                            |
+| カラム名       | 型            | 制約                                                                    | 説明                                        |
+| -------------- | ------------- | ----------------------------------------------------------------------- | ------------------------------------------- |
+| `user_id`      | `uuid`        | PRIMARY KEY, REFERENCES `auth.users(id)` ON DELETE CASCADE              | Supabase Auth のユーザーID                  |
+| `display_name` | `text`        | NULL可, CHECK `char_length(display_name) <= 100`（Issue #007）          | 表示名（多層防御として 100 文字以下に制限） |
+| `avatar_url`   | `text`        | NULL可                                                                  | Supabase Storage のアバターファイルパス     |
+| `role`         | `text`        | NOT NULL, DEFAULT `'member'`, CHECK (`role` IN (`'member'`, `'admin'`)) | ユーザーロール                              |
+| `created_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                               | 作成日時                                    |
+| `updated_at`   | `timestamptz` | NOT NULL, DEFAULT `now()`                                               | 更新日時                                    |
 
 **インデックス**:
 
@@ -185,8 +185,8 @@ const { data: posts } = await supabase
 
 ### Buckets
 
-| バケット名 | 公開設定          | 用途                       | 制限（Issue #008）                                                                                |
-| ---------- | ----------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
+| バケット名 | 公開設定          | 用途                       | 制限（Issue #008）                                                                                    |
+| ---------- | ----------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `avatars`  | Private（非公開） | ユーザーのアバター画像保存 | `allowed_mime_types`: `image/png` `image/jpeg` `image/webp` `image/gif` のみ、`file_size_limit`: 5 MB |
 
 **`image/svg+xml` を意図的に除外**: SVG は XML + JS 実行コンテナのため Stored XSS リスクがあり、画像として扱わない。

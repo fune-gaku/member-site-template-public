@@ -325,15 +325,15 @@ npx wrangler rollback --name member-site-template <version-id>
 
 ## モニタリング
 
-| 対象 | 確認場所 | 何を見るか |
-| --- | --- | --- |
-| Worker 起動・リクエスト | Cloudflare Dashboard > Workers & Pages > 該当 Worker > **Logs** | `wrangler.jsonc` の `observability.enabled: true` で有効化済。リクエストごとの `console.error` / 例外を即時確認 |
-| Worker メトリクス | 同 Worker > **Metrics** | リクエスト数 / CPU 時間 / エラーレート / サブリクエスト数 |
-| Supabase Auth ログ | Supabase Dashboard > **Logs → Auth Logs** | サインアップ／サインインの失敗、SMTP 4xx/5xx、OTP 失効 |
-| Supabase DB ログ | Supabase Dashboard > **Logs → Postgres Logs** | クエリエラー、RLS 違反 |
-| Security / Performance Advisor | Supabase Dashboard > **Database → Advisors** | RLS 未有効テーブル / インデックス不足等。マイグレーション適用直後に必ず実行（[security.md「マイグレーション適用直後に必ずやること」](./security.md#マイグレーション適用直後に必ずやること) 参照） |
-| 依存パッケージ脆弱性 | GitHub > Security > Dependabot | `npm audit --audit-level=high` の CI と Dependabot が週次で監視 |
-| セキュリティヘッダ | [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) | 四半期に 1 回 A 以上を維持 |
+| 対象                           | 確認場所                                                                                                      | 何を見るか                                                                                                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker 起動・リクエスト        | Cloudflare Dashboard > Workers & Pages > 該当 Worker > **Logs**                                               | `wrangler.jsonc` の `observability.enabled: true` で有効化済。リクエストごとの `console.error` / 例外を即時確認                                                                                   |
+| Worker メトリクス              | 同 Worker > **Metrics**                                                                                       | リクエスト数 / CPU 時間 / エラーレート / サブリクエスト数                                                                                                                                         |
+| Supabase Auth ログ             | Supabase Dashboard > **Logs → Auth Logs**                                                                     | サインアップ／サインインの失敗、SMTP 4xx/5xx、OTP 失効                                                                                                                                            |
+| Supabase DB ログ               | Supabase Dashboard > **Logs → Postgres Logs**                                                                 | クエリエラー、RLS 違反                                                                                                                                                                            |
+| Security / Performance Advisor | Supabase Dashboard > **Database → Advisors**                                                                  | RLS 未有効テーブル / インデックス不足等。マイグレーション適用直後に必ず実行（[security.md「マイグレーション適用直後に必ずやること」](./security.md#マイグレーション適用直後に必ずやること) 参照） |
+| 依存パッケージ脆弱性           | GitHub > Security > Dependabot                                                                                | `npm audit --audit-level=high` の CI と Dependabot が週次で監視                                                                                                                                   |
+| セキュリティヘッダ             | [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) | 四半期に 1 回 A 以上を維持                                                                                                                                                                        |
 
 ---
 
@@ -375,11 +375,11 @@ npx wrangler rollback --name member-site-template <version-id>
 
 ## バックアップ
 
-| 対象 | 仕組み | 頻度 |
-| --- | --- | --- |
-| Supabase Postgres | 自動バックアップ（無料: 日次・直近 7 日 / Pro: 日次 + PITR） | プラン依存 |
-| Supabase Storage（avatars） | 自動バックアップは Postgres と同基準。PITR 対象外なので、重要データはアプリ側で別途エクスポート | 必要に応じ |
-| Worker 設定 | `wrangler.jsonc` を Git で管理。Secret は CLI で再投入（[deployment.md「デプロイ手順」](#デプロイ手順)）| 都度 |
-| Cloudflare KV / R2（採用時） | 各サービスの公式バックアップ機構に従う | — |
+| 対象                         | 仕組み                                                                                                   | 頻度       |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- | ---------- |
+| Supabase Postgres            | 自動バックアップ（無料: 日次・直近 7 日 / Pro: 日次 + PITR）                                             | プラン依存 |
+| Supabase Storage（avatars）  | 自動バックアップは Postgres と同基準。PITR 対象外なので、重要データはアプリ側で別途エクスポート          | 必要に応じ |
+| Worker 設定                  | `wrangler.jsonc` を Git で管理。Secret は CLI で再投入（[deployment.md「デプロイ手順」](#デプロイ手順)） | 都度       |
+| Cloudflare KV / R2（採用時） | 各サービスの公式バックアップ機構に従う                                                                   | —          |
 
 無料プランから本番運用に移すときは、最低限 **Pro プランの PITR を有効化**（[security.md「Pro プラン以上で追加で有効化する項目」](./security.md#pro-プラン以上で追加で有効化する項目) 参照）。マイグレーション適用前には、Supabase Dashboard > **Database → Backups** から手動スナップショットを取って巻き戻し可能にしておく。
