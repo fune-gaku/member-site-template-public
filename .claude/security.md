@@ -166,11 +166,12 @@
 
 ### 自動化されているチェック
 
-| 層                      | 仕組み                                                                  | タイミング                        | 対象                                       |
-| ----------------------- | ----------------------------------------------------------------------- | --------------------------------- | ------------------------------------------ |
-| ローカル                | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks              | コミット時                        | staged ファイルの秘密情報                  |
-| CI（GitHub Actions）    | [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml)   | PR（package.json 変更）+ 週次月曜 | 依存パッケージの脆弱性（high 以上で fail） |
-| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST                | npm / GitHub Actions の更新 PR 自動生成    |
+| 層                      | 仕組み                                                                  | タイミング                        | 対象                                                                   |
+| ----------------------- | ----------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------- |
+| ローカル                | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks              | コミット時                        | staged ファイルの秘密情報                                              |
+| CI（GitHub Actions）    | [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml)   | PR（package.json 変更）+ 週次月曜 | 依存パッケージの脆弱性（high 以上で fail）                             |
+| CI（GitHub Actions）    | [.github/workflows/test.yml](../.github/workflows/test.yml)             | 全 PR + main への push            | unit / integration / workers テスト全件（CSRF 405 / 403 ガードを含む） |
+| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST                | npm / GitHub Actions の更新 PR 自動生成                                |
 
 **初回セットアップ**:
 
