@@ -13,10 +13,19 @@ Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプ
 
 ## ドキュメント構成
 
+### 常時参照（Claude Code 起動時に自動読み込み）
+
+以下のファイルは Claude Code の `@import` 構文によりこの CLAUDE.md と同時にコンテキストへ展開される。実装・レビュー・コミットの判断材料として常に手元にある前提で参照してよい。
+
+@.claude/security.md
+@.claude/development.md
+
+### 必要時に参照（明示的に Read で開く）
+
+下記は通常はコンテキストに入っていないため、関連作業に着手する直前に `Read` で開くこと。
+
 - **[architecture.md](.claude/architecture.md)** - アーキテクチャ・技術スタック・ディレクトリ構成
 - **[database.md](.claude/database.md)** - データベーススキーマ・テーブル定義・ビュー
-- **[security.md](.claude/security.md)** - セキュリティガイドライン・チェックリスト
-- **[development.md](.claude/development.md)** - 開発ルール・コーディング規約・命名規則
 - **[deployment.md](.claude/deployment.md)** - デプロイ手順（Cloudflare Workers）
 - **[phases/](.claude/phases/)** - Phase別開発記録
 
