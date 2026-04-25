@@ -34,7 +34,8 @@
     "vue": "^3.5.32"
   },
   "overrides": {
-    "vite": "^7"
+    "vite": "^7",
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.2",
