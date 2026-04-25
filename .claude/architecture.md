@@ -22,57 +22,92 @@
 
 ```
 member-site-template/
-├── CLAUDE.md                  # メインドキュメント（Claude Code 自動読み込み）
-├── .claude/                    # Claude Code プロジェクト情報
-│   ├── architecture.md        # アーキテクチャ
-│   ├── database.md            # データベース設計
-│   ├── security.md            # セキュリティガイドライン
-│   ├── development.md         # 開発ルール
-│   ├── deployment.md          # デプロイ手順
-│   └── phases/                # Phase別記録
-│       └── current.md         # 現在のPhase
+├── CLAUDE.md                          # メインドキュメント（@import で security.md / development.md を常時ロード）
+├── README.md                          # セットアップ・デプロイ手順
+├── .claude/                           # Claude Code プロジェクト情報
+│   ├── architecture.md                # 本ファイル：アーキテクチャ
+│   ├── database.md                    # データベース設計
+│   ├── deployment.md                  # デプロイ手順
+│   ├── development.md                 # 開発ルール（@import で常時ロード）
+│   ├── security.md                    # セキュリティガイドライン（@import で常時ロード）
+│   ├── settings.json                  # Claude Code 共有設定（permission allowlist）
+│   └── commands/
+│       └── codex-cross-review.md      # /codex-cross-review : Codex × Claude Code 二人レビュー収束ループ
 ├── src/
 │   ├── actions/
-│   │   └── index.ts           # Astro Actions（認証・ストレージ・管理）
+│   │   └── index.ts                   # Astro Actions（auth.* / posts.* / admin.*）
 │   ├── components/
-│   │   ├── SignupForm.vue     # サインアップフォーム
-│   │   ├── LoginForm.vue      # ログインフォーム
-│   │   ├── ProfileForm.vue    # プロフィール編集（アバター含む）
-│   │   └── SampleDataTable.vue # サンプルデータ表示
+│   │   ├── SignupForm.vue             # サインアップフォーム
+│   │   ├── LoginForm.vue              # ログインフォーム
+│   │   ├── UpdatePasswordForm.vue     # パスワード更新（recovery / invite フロー）
+│   │   ├── ProfileForm.vue            # プロフィール編集（アバター含む）
+│   │   ├── PostForm.vue               # 投稿作成・編集（兼用）
+│   │   ├── PostList.vue               # 投稿一覧（編集・削除アクション付き）
+│   │   ├── InviteUserForm.vue         # 管理者：ユーザー招待
+│   │   ├── AdminUserList.vue          # 管理者：ユーザー一覧と role 切替
+│   │   └── AdminUsersPanel.vue        # 管理者：上 2 つのラッパー
 │   ├── layouts/
-│   │   ├── Base.astro         # ベースレイアウト
-│   │   ├── Auth.astro         # 認証ページレイアウト
-│   │   └── Member.astro       # 会員ページレイアウト
+│   │   ├── Base.astro                 # ベースレイアウト
+│   │   ├── Auth.astro                 # 認証ページレイアウト
+│   │   ├── Member.astro               # 会員ページレイアウト
+│   │   └── Admin.astro                # 管理者ページレイアウト（admin 視覚的区別 + バッジ）
 │   ├── lib/
-│   │   ├── supabase.ts        # サーバー用Supabaseクライアント
-│   │   ├── supabase-browser.ts # ブラウザ用Supabaseクライアント
-│   │   └── supabase-admin.ts  # Admin用Supabaseクライアント
+│   │   ├── supabase.ts                # サーバー用 Supabase クライアント
+│   │   ├── supabase-browser.ts        # ブラウザ用 Supabase クライアント
+│   │   ├── supabase-admin.ts          # service_role（毎リクエスト生成、セッション漏洩防止）
+│   │   ├── password-schema.ts         # パスワード Zod スキーマ（複雑性要件）
+│   │   ├── pwned-password.ts          # HIBP k-Anonymity による漏洩パスワードチェック
+│   │   ├── safe-redirect.ts           # Open Redirect 対策（next クエリのサニタイズ）
+│   │   ├── security-headers.ts        # CSP / HSTS / X-Frame-Options 等の生成
+│   │   └── avatar-upload.ts           # アバター用 MIME / size 制約 + ファイル名サニタイズ
 │   ├── pages/
-│   │   ├── index.astro        # ランディングページ
+│   │   ├── index.astro                # ランディングページ
 │   │   ├── auth/
-│   │   │   ├── signup.astro   # サインアップ
-│   │   │   ├── signin.astro   # サインイン
-│   │   │   ├── signout.astro  # サインアウト
-│   │   │   ├── reset-password.astro # パスワードリセット
-│   │   │   └── callback.astro # 認証コールバック
-│   │   └── member/
-│   │       ├── dashboard.astro # ダッシュボード
-│   │       ├── profile.astro  # プロフィール
-│   │       └── data.astro     # データ表示
+│   │   │   ├── signup.astro           # サインアップ
+│   │   │   ├── signin.astro           # サインイン
+│   │   │   ├── signout.astro          # サインアウト（GET 405 / POST のみ受理）
+│   │   │   ├── reset-password.astro   # パスワードリセット申請
+│   │   │   ├── confirm.astro          # OTP ランディング（B 案、明示クリックで verify）
+│   │   │   ├── update-password.astro  # 新パスワード入力（recovery セッション必須）
+│   │   │   └── callback.astro         # PKCE 認証コールバック（互換維持）
+│   │   ├── member/
+│   │   │   ├── dashboard.astro        # ダッシュボード
+│   │   │   ├── profile.astro          # プロフィール（SSR 事前取得）
+│   │   │   └── data.astro             # 投稿 CRUD（SSR 事前取得 + Vue Islands）
+│   │   └── admin/
+│   │       └── users.astro            # 管理者：ユーザー一覧・招待・role 切替（admin role 必須）
 │   ├── styles/
-│   │   └── global.css         # グローバルスタイル（Tailwind + @theme）
-│   ├── env.d.ts               # 環境変数型定義
-│   └── middleware.ts          # 認証ミドルウェア
+│   │   └── global.css                 # グローバルスタイル（Tailwind + @theme）
+│   ├── env.d.ts                       # 環境変数・App.Locals 型定義（declare global + export {}）
+│   └── middleware.ts                  # 認証 + role 取得 + セキュリティヘッダ付与
 ├── supabase/
 │   └── migrations/
-│       └── 001_init.sql       # 初期マイグレーション
-├── .env.example               # 環境変数テンプレート
-├── .dev.vars.example          # ローカルシークレットテンプレート
-├── .nvmrc                     # Node.jsバージョン指定
-├── astro.config.mjs           # Astro設定
-├── wrangler.jsonc             # Cloudflare Workers設定
-├── package.json               # 依存関係
-└── tsconfig.json              # TypeScript設定
+│       ├── 000_cleanup.sql            # 開発専用：全テーブル削除（本番では絶対に実行しない）
+│       └── 001_init.sql               # 初期スキーマ + RLS + トリガー + Storage バケット
+├── tests/
+│   ├── README.md                      # テスト実行方法
+│   ├── unit/                          # 単体（schema / middleware / supabase-client 等）
+│   ├── integration/                   # Astro Container API による SSR 検証
+│   ├── workers/                       # @cloudflare/vitest-pool-workers で実ランタイム検証
+│   └── *.test.ts                      # ファイル単位（avatar-upload / safe-redirect / 他）
+├── .githooks/
+│   └── pre-commit                     # gitleaks（秘密情報のコミット防止）
+├── .github/
+│   ├── dependabot.yml                 # 依存 / GitHub Actions の週次更新
+│   └── workflows/
+│       └── npm-audit.yml              # PR + 週次の npm audit
+├── .env.example                       # 公開環境変数テンプレート
+├── .dev.vars.example                  # ローカルシークレットテンプレート
+├── .gitignore
+├── .nvmrc                             # Node.js バージョン（>=22.12.0）
+├── .prettierrc.mjs / .prettierignore  # Prettier（prettier-plugin-tailwindcss でクラス整列）
+├── astro.config.mjs                   # Astro 設定（cloudflare adapter / vue / tailwindcss）
+├── eslint.config.js                   # ESLint Flat Config
+├── package.json                       # 依存（overrides で vite / yaml を固定）
+├── tsconfig.json                      # TypeScript strict
+├── vitest.config.ts                   # unit / integration 用
+├── vitest.workers.config.ts           # Workers 用
+└── wrangler.jsonc                     # Cloudflare Workers 設定
 ```
 
 ---
@@ -194,7 +229,7 @@ Supabase のメール認証には **2 種類のトークン方式** があり、
 
 #### Supabase Dashboard 側のメールテンプレート
 
-**すべてのメールで `{{ .ConfirmationURL }}` は禁止**。必ず `{{ .TokenHash }}` ベースで `/auth/confirm` を経由させる。具体的な文字列は `.claude/deployment.md` の「Supabase Email Templates 設定」節を参照。
+**すべてのメールで `{{ .ConfirmationURL }}` は禁止**。必ず `{{ .TokenHash }}` ベースで `/auth/confirm` を経由させる。具体的な文字列は [.claude/deployment.md「Supabase Auth: Email Templates」](./deployment.md#supabase-auth-email-templates必須--issue-002--002-b) 節を参照。
 
 ---
 
