@@ -7,8 +7,6 @@ Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプ
 **使用者**: テンプレート利用者（開発者および利用企業）
 **方針**: 型安全で公式推奨の実装パターンを厳守し、セキュリティとメンテナンス性を最優先
 
-**現在のフェーズ**: Phase 1（会員サイト本体実装） - ✅ 完了 → [詳細](.claude/phases/current.md)
-
 ---
 
 ## ドキュメント構成
@@ -27,7 +25,6 @@ Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプ
 - **[architecture.md](.claude/architecture.md)** - アーキテクチャ・技術スタック・ディレクトリ構成
 - **[database.md](.claude/database.md)** - データベーススキーマ・テーブル定義・ビュー
 - **[deployment.md](.claude/deployment.md)** - デプロイ手順（Cloudflare Workers）
-- **[phases/](.claude/phases/)** - Phase別開発記録
 
 ---
 
@@ -74,11 +71,11 @@ npm run dev
 
 ### 開発フロー
 
-1. 各Phase開始前にプランを確認
-2. 実装中は[開発ルール](.claude/development.md)に従う
-3. Phase完了時にセキュリティチェック
-4. 完了記録を`.claude/phases/phaseN.md`に残す
-5. コミット・プッシュ
+1. 着手前に Plan mode で実装方針を提示し、合意してから実装に入る
+2. 実装中は development.md / security.md（@import 済み）に従い、サブタスクは TodoWrite で追跡
+3. コミット前に security.md のチェックリストを確認
+4. コミット本文に「なぜそうしたか」を記述（Why は git log に残し、What はコードを読めば分かる前提）
+5. プッシュ
 
 ### 最新情報・不明な情報の確認ルール
 
@@ -112,17 +109,6 @@ npm run dev
 2. 対象なら一次情報を取得（Skill > WebFetch > WebSearch の順）
 3. 取得した情報に基づき実装
 4. ローカルで動作確認
-
----
-
-## 開発フェーズ
-
-| Phase   | 内容                                         | ステータス |
-| ------- | -------------------------------------------- | ---------- |
-| Phase 0 | プロジェクト基盤構築                         | ✅ 完了    |
-| Phase 1 | 会員サイト本体実装（認証・Storage・RLS・UI） | ✅ 完了    |
-| Phase 2 | 品質保証（ESLint, Prettier, Vitest）         | 📋 予定    |
-| Phase 3 | 本番デプロイ                                 | 📋 予定    |
 
 ---
 

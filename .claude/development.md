@@ -89,49 +89,43 @@
 
 ### ブランチ戦略
 
-**Phase別ブランチ運用**（推奨）：
+`main` は常にデプロイ可能な状態を保ち、変更は **作業単位の feature ブランチ** で行う。
 
 ```
 main (本番ブランチ、常にデプロイ可能)
-  ├── phase-1 (機能A)
-  ├── phase-2 (機能B)
-  ├── phase-3 (機能C)
-  └── ...
+  ├── feat/<short-topic>     (新機能)
+  ├── fix/<short-topic>      (バグ修正)
+  ├── chore/<short-topic>    (運用・依存・ドキュメント)
+  └── security/<issue-id>    (セキュリティ Issue 対応)
 ```
 
-**ブランチ作成・マージフロー**:
+**作業フロー**:
 
 ```bash
-# 1. Phase開始時: ブランチ作成
+# 1. 着手時: ブランチ作成
 git checkout main
 git pull origin main
-git checkout -b phase-N
+git checkout -b feat/<short-topic>
 
-# 2. 実装中: こまめにコミット
-git add .
+# 2. 実装中: こまめにコミット（コミット本文に Why を残す）
+git add <files>
 git commit -m "feat: ..."
 
-# 3. Phase完了時: mainにマージ
+# 3. 完了時: main にマージ（履歴をたどりやすく --no-ff を推奨）
 git checkout main
-git merge phase-N --no-ff  # マージコミットを作成
-
-# 4. ブランチ削除（オプション）
-git branch -d phase-N
-
-# 5. プッシュ
+git merge feat/<short-topic> --no-ff
 git push origin main
+
+# 4. 不要ブランチを削除
+git branch -d feat/<short-topic>
 ```
 
 **ルール**:
 
-- **Phase開始前に必ずブランチ作成**
-- Phase完了まで`phase-N`ブランチで作業
-- `main`への直接コミットは禁止
-- マージ時は`--no-ff`でマージコミットを明示的に作成
-
-**個人プロジェクトの場合**:
-ブランチ運用を簡略化する場合は、`main`ブランチのみで運用することも可能です。
-ただし、Phase単位での作業履歴を明確にするため、ブランチ運用を推奨します。
+- 作業前に必ずブランチを作成（`main` への直接コミットは禁止）
+- 1 ブランチ = 1 関心事（機能 / バグ修正 / 依存更新 を混ぜない）
+- マージは `--no-ff` で意図的にマージコミットを残す（後から作業単位で振り返れる）
+- ブランチ名は `<type>/<short-topic>` 形式で、`type` は `feat` / `fix` / `refactor` / `chore` / `security` / `docs` から選ぶ
 
 ### コミットメッセージ
 
