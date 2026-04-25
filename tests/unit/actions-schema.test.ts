@@ -77,7 +77,9 @@ describe("auth.signIn account enumeration defense (Issue #8 / A3)", () => {
     expect(lowered).not.toMatch(/confirm/);
     expect(lowered).not.toMatch(/exists?/);
     expect(lowered).not.toMatch(/registered/);
-    expect(SIGNIN_GENERIC_ERROR_MESSAGE).not.toMatch(/未登録|登録されていません|確認/);
+    expect(SIGNIN_GENERIC_ERROR_MESSAGE).not.toMatch(
+      /未登録|登録されていません|確認/,
+    );
   });
 });
 

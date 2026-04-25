@@ -3,7 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
 import { env } from "cloudflare:workers";
 
-import { SIGNIN_GENERIC_ERROR_MESSAGE } from "../lib/auth-errors";
+import { performSignIn } from "../lib/auth-signin";
 import {
   ALLOWED_AVATAR_MIME,
   MAX_AVATAR_SIZE,
@@ -119,29 +119,16 @@ export const server = {
         email: z.string().email(),
         password: z.string(),
       }),
+      // 本体は `src/lib/auth-signin.ts` の `performSignIn` に分離してある。
+      // Issue #8 (A3): すべての失敗ケースを統一メッセージに正規化することで
+      // アカウント列挙を防ぐ。Timing は Supabase 側の bcrypt 検証が
+      // 概ね吸収する想定。
       handler: async (input, context) => {
         const supabase = createClient({
           request: context.request,
           cookies: context.cookies,
         });
-        const { error } = await supabase.auth.signInWithPassword({
-          email: input.email,
-          password: input.password,
-        });
-        if (error) {
-          // Issue #8 (A3): アカウント列挙対策。
-          // Supabase は「存在しないユーザー」と「間違ったパスワード」を
-          // どちらも `Invalid login credentials` で返すが、
-          // `Email not confirmed` など一部のエラーは登録有無を漏らすため
-          // すべて統一メッセージで応答する。元エラーは Workers Logs に残す。
-          // Timing は Supabase 側の bcrypt 検証が概ね吸収する想定。
-          console.error("auth.signIn error:", error);
-          throw new ActionError({
-            code: "UNAUTHORIZED",
-            message: SIGNIN_GENERIC_ERROR_MESSAGE,
-          });
-        }
-        return { success: true };
+        return performSignIn(supabase, input);
       },
     }),
 
