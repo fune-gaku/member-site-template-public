@@ -35,6 +35,7 @@
       "Bash(gh pr comment:*)",
       "Bash(gh issue view:*)",
       "Bash(gh issue list:*)",
+      "Bash(gh issue create:*)",
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
       "Bash(gh api repos/*/pulls/*/comments:*)",
