@@ -77,16 +77,16 @@
 
 ### 想定する脅威
 
-| 脅威                     | リスクレベル | 対策                                                      |
-| ------------------------ | ------------ | --------------------------------------------------------- |
-| 環境変数の漏洩           | 高           | `.gitignore`、コードレビュー                              |
-| 権限昇格攻撃             | 高           | `revoke update (role)` でカラムレベル権限制御             |
-| XSS攻撃                  | 中           | Vue自動エスケープ、`v-html`禁止                           |
-| SQLインジェクション      | 中           | Supabaseクライアント使用（パラメータ化クエリ）            |
-| 不正ファイルアップロード | 中           | 拡張子・MIME・サイズ制限（5MB）                           |
-| セッションハイジャック   | 中           | Secure Cookie、HTTPS、トークン自動リフレッシュ            |
+| 脅威                     | リスクレベル | 対策                                                                                                                                                                         |
+| ------------------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 環境変数の漏洩           | 高           | `.gitignore`、コードレビュー                                                                                                                                                 |
+| 権限昇格攻撃             | 高           | `revoke update (role)` でカラムレベル権限制御                                                                                                                                |
+| XSS攻撃                  | 中           | Vue自動エスケープ、`v-html`禁止                                                                                                                                              |
+| SQLインジェクション      | 中           | Supabaseクライアント使用（パラメータ化クエリ）                                                                                                                               |
+| 不正ファイルアップロード | 中           | 拡張子・MIME・サイズ制限（5MB）                                                                                                                                              |
+| セッションハイジャック   | 中           | Secure Cookie、HTTPS、トークン自動リフレッシュ                                                                                                                               |
 | CSRF攻撃                 | 低           | SameSite Cookie（`@supabase/ssr`）+ Astro Actions POST 限定 + `security.checkOrigin`（Origin/Referer 照合）。[CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)参照 |
-| RLS バイパス             | 高           | RLS を全テーブルで有効化、service_role キーはサーバーのみ |
+| RLS バイパス             | 高           | RLS を全テーブルで有効化、service_role キーはサーバーのみ                                                                                                                    |
 
 ---
 
@@ -365,42 +365,42 @@ with check (
 
 ### Auth 設定（Authentication > Providers > Email / Settings）
 
-| 項目 | 推奨値 | 理由 |
-| --- | --- | --- |
-| Email confirmation | **ON** | メール到達性を保証、なりすまし登録防止 |
-| OTP 有効期限 | **≤ 3600 秒（1 時間）** | Supabase 公式推奨上限。超えると Security Advisor が警告 |
-| Minimum password length | **8 文字** | `src/lib/auth-schemas.ts` の Zod `passwordSchema` と一致させる |
-| Password requirements | **数字 + 小文字 + 大文字** | アプリ側 Zod と一致させる（Zod で先に弾き、Dashboard で二重防御） |
-| Confirm email change | **ON** | メール変更時の乗っ取り防止 |
-| Secure email change | **ON** | 旧メール側での承認を要求 |
+| 項目                    | 推奨値                     | 理由                                                              |
+| ----------------------- | -------------------------- | ----------------------------------------------------------------- |
+| Email confirmation      | **ON**                     | メール到達性を保証、なりすまし登録防止                            |
+| OTP 有効期限            | **≤ 3600 秒（1 時間）**    | Supabase 公式推奨上限。超えると Security Advisor が警告           |
+| Minimum password length | **8 文字**                 | `src/lib/auth-schemas.ts` の Zod `passwordSchema` と一致させる    |
+| Password requirements   | **数字 + 小文字 + 大文字** | アプリ側 Zod と一致させる（Zod で先に弾き、Dashboard で二重防御） |
+| Confirm email change    | **ON**                     | メール変更時の乗っ取り防止                                        |
+| Secure email change     | **ON**                     | 旧メール側での承認を要求                                          |
 
 ### Sessions 設定（Authentication > Sessions）
 
 本テンプレートの方針は [セッション寿命方針（Remember Me 非採用）](#セッション寿命方針remember-me-非採用) 参照。プロジェクトの要件に応じて以下を設定:
 
-| 項目 | 汎用会員サイト | 管理画面・金融系 |
-| --- | --- | --- |
-| Time-box user sessions | 30 日 | 24 時間以内 |
-| Inactivity timeout | 適度な値 | 短め |
-| Single session per user | OFF | **ON** |
+| 項目                    | 汎用会員サイト | 管理画面・金融系 |
+| ----------------------- | -------------- | ---------------- |
+| Time-box user sessions  | 30 日          | 24 時間以内      |
+| Inactivity timeout      | 適度な値       | 短め             |
+| Single session per user | OFF            | **ON**           |
 
 ### 組織・プロジェクト側（Account > Security / Organization）
 
-| 項目 | 推奨 | 備考 |
-| --- | --- | --- |
-| Supabase アカウントの MFA | **有効** | 乗っ取られるとプロジェクトごと支配される |
-| Organization の複数 owner | **2 名以上** | Bus factor 対策 |
-| GitHub 連携アカウントの 2FA | **有効** | 同上 |
+| 項目                        | 推奨         | 備考                                     |
+| --------------------------- | ------------ | ---------------------------------------- |
+| Supabase アカウントの MFA   | **有効**     | 乗っ取られるとプロジェクトごと支配される |
+| Organization の複数 owner   | **2 名以上** | Bus factor 対策                          |
+| GitHub 連携アカウントの 2FA | **有効**     | 同上                                     |
 
 ### Pro プラン以上で追加で有効化する項目
 
 無料プランでは使えないが、課金後に必ず有効化するもの:
 
-| 項目 | プラン | 用途 |
-| --- | --- | --- |
-| Leaked password protection（HIBP）| **Pro 以上** | 流出済みパスワードを拒否。無料プランではアプリ層の `ENABLE_HIBP_CHECK=true` で代替中 |
-| Point in Time Recovery (PITR) | **Pro 以上（アドオン）** | DB 障害時の任意時点復元 |
-| Network restrictions | **Pro 以上** | DB 接続元 IP 制限 |
+| 項目                               | プラン                   | 用途                                                                                 |
+| ---------------------------------- | ------------------------ | ------------------------------------------------------------------------------------ |
+| Leaked password protection（HIBP） | **Pro 以上**             | 流出済みパスワードを拒否。無料プランではアプリ層の `ENABLE_HIBP_CHECK=true` で代替中 |
+| Point in Time Recovery (PITR)      | **Pro 以上（アドオン）** | DB 障害時の任意時点復元                                                              |
+| Network restrictions               | **Pro 以上**             | DB 接続元 IP 制限                                                                    |
 
 ---
 
@@ -408,13 +408,13 @@ with check (
 
 ### 基本方針
 
-| ルール | 理由 |
-| --- | --- |
+| ルール                                                                                                                  | 理由                                                                |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | [supabase/migrations/000_cleanup.sql](../supabase/migrations/000_cleanup.sql) は **開発専用**、本番では絶対に実行しない | `drop table cascade` が含まれるため実行するとユーザーデータが全消失 |
-| 本番適用は **Supabase SQL Editor で手動実行**、CI から自動適用しない | レビュー機会を確保し、事故時の巻き戻し判断を人間に残す |
-| 既存マイグレーションファイル（`001_init.sql` など）は **基本的に変更しない**、新規ファイル `002_xxx.sql` を追加 | 適用済み環境との差分管理のため |
-| 破壊的変更（`drop column` / `drop table` / `alter type`）は **PR レビュー必須** | データ損失・ダウンタイムに直結 |
-| 本番適用前に **必ずローカル環境で `000_cleanup.sql` → `001_init.sql` + 新規ファイル** の順で再現確認 | 他マイグレーションとの干渉を検出 |
+| 本番適用は **Supabase SQL Editor で手動実行**、CI から自動適用しない                                                    | レビュー機会を確保し、事故時の巻き戻し判断を人間に残す              |
+| 既存マイグレーションファイル（`001_init.sql` など）は **基本的に変更しない**、新規ファイル `002_xxx.sql` を追加         | 適用済み環境との差分管理のため                                      |
+| 破壊的変更（`drop column` / `drop table` / `alter type`）は **PR レビュー必須**                                         | データ損失・ダウンタイムに直結                                      |
+| 本番適用前に **必ずローカル環境で `000_cleanup.sql` → `001_init.sql` + 新規ファイル** の順で再現確認                    | 他マイグレーションとの干渉を検出                                    |
 
 ### 本番適用フロー
 
@@ -499,11 +499,11 @@ Astro の `context.cookies.set()` が自動的に `Set-Cookie` ヘッダーに�
 
 ### 自動化されているチェック
 
-| 層 | 仕組み | タイミング | 対象 |
-| --- | --- | --- | --- |
-| ローカル | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks | コミット時 | staged ファイルの秘密情報 |
-| CI（GitHub Actions）| [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml) | PR（package.json 変更）+ 週次月曜 | 依存パッケージの脆弱性（high 以上で fail）|
-| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST | npm / GitHub Actions の更新 PR 自動生成 |
+| 層                      | 仕組み                                                                  | タイミング                        | 対象                                       |
+| ----------------------- | ----------------------------------------------------------------------- | --------------------------------- | ------------------------------------------ |
+| ローカル                | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks              | コミット時                        | staged ファイルの秘密情報                  |
+| CI（GitHub Actions）    | [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml)   | PR（package.json 変更）+ 週次月曜 | 依存パッケージの脆弱性（high 以上で fail） |
+| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST                | npm / GitHub Actions の更新 PR 自動生成    |
 
 **初回セットアップ**:
 
@@ -521,11 +521,11 @@ Secret scanning / Push protection は Private + Free プランでは使えない
 
 ### 手動で定期実施する項目
 
-| 項目 | 頻度 | 確認場所 |
-| --- | --- | --- |
-| Supabase Security Advisor / Performance Advisor | 月 1 回、マイグレーション適用直後 | Supabase Dashboard > Database > Advisors |
-| [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) でのヘッダ再評価（A 以上維持） | 四半期に 1 回、または本番デプロイ後 | 本番 URL を入力 |
-| CSRF 3 点検（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）| `/auth/signout` 周辺を改修した直後 | [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路) のコマンド参照 |
+| 項目                                                                                                                                         | 頻度                                | 確認場所                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
+| Supabase Security Advisor / Performance Advisor                                                                                              | 月 1 回、マイグレーション適用直後   | Supabase Dashboard > Database > Advisors                                   |
+| [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) でのヘッダ再評価（A 以上維持） | 四半期に 1 回、または本番デプロイ後 | 本番 URL を入力                                                            |
+| CSRF 3 点検（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）                                                                     | `/auth/signout` 周辺を改修した直後  | [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路) のコマンド参照 |
 
 ---
 
@@ -636,14 +636,14 @@ Supabase Auth のセッション寿命は、個々のサインインごとに切
 
 公式が提供する 3 つの制御軸はいずれもプロジェクト設定：
 
-| 設定項目               | 説明                                                       | 設定場所                             |
-| ---------------------- | ---------------------------------------------------------- | ------------------------------------ |
-| Time-box user sessions | サインインから固定時間でセッションを強制失効               | Dashboard > Auth > Sessions          |
-| Inactivity timeout     | 一定時間リフレッシュされなかったセッションを失効           | Dashboard > Auth > Sessions          |
-| Single session per user | 同一ユーザーは最後にサインインしたセッションのみ有効に保つ | Dashboard > Auth > Sessions          |
+| 設定項目                | 説明                                                       | 設定場所                    |
+| ----------------------- | ---------------------------------------------------------- | --------------------------- |
+| Time-box user sessions  | サインインから固定時間でセッションを強制失効               | Dashboard > Auth > Sessions |
+| Inactivity timeout      | 一定時間リフレッシュされなかったセッションを失効           | Dashboard > Auth > Sessions |
+| Single session per user | 同一ユーザーは最後にサインインしたセッションのみ有効に保つ | Dashboard > Auth > Sessions |
 
 > "To make sure that users are required to re-authenticate periodically, you can set a positive value for the Time-box user sessions option in the Auth settings for your project."
-> — Supabase Docs, *Sessions*
+> — Supabase Docs, _Sessions_
 
 つまり **公式は per-login の Remember Me をサポートしていない**。JS クライアントで「長く保つ／保たない」を切り替える手段もない（Cookie は常に `@supabase/ssr` が secure / http-only で管理）。
 
@@ -659,7 +659,7 @@ Supabase Auth のセッション寿命は、個々のサインインごとに切
 
 - UI に「ログイン状態を保持」トグルを追加しないこと（Supabase の API 上、挙動を分岐できず誤解を生むため）。
 - セッションを明示的に終了させたい場合は **サインアウト** を使う（`supabase.auth.signOut()`）。
-- 設定変更は即時反映されない点に注意：公式ドキュメント曰く *"Sessions are not proactively destroyed when you change these settings, but rather the check is enforced whenever a session is refreshed next."* — 変更後も既存セッションは次回リフレッシュ時に評価される。
+- 設定変更は即時反映されない点に注意：公式ドキュメント曰く _"Sessions are not proactively destroyed when you change these settings, but rather the check is enforced whenever a session is refreshed next."_ — 変更後も既存セッションは次回リフレッシュ時に評価される。
 
 ---
 
@@ -727,7 +727,7 @@ curl -i -X POST \
 1. **バケット設定（Supabase Storage）が真の防衛線**
    - `storage.buckets.allowed_mime_types` と `file_size_limit` を必ず設定する
      （→ `supabase/migrations/001_init.sql` の avatars バケット INSERT セクション）
-   - 公式ドキュメントでも *"Upload restrictions like max file size and allowed content types are defined at the bucket level"* と明記されている
+   - 公式ドキュメントでも _"Upload restrictions like max file size and allowed content types are defined at the bucket level"_ と明記されている
 2. **サーバ側（Astro Action の Zod）で早期検証**
    - `.refine()` で MIME タイプとサイズを 400 応答で弾く（UX 向上）
    - `upload()` 呼び出し時に `contentType: input.file.type` を **明示指定**し、クライアントが送ってくる Content-Type を盲信しない

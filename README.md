@@ -8,13 +8,13 @@ Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプ
 
 ## 技術スタック
 
-| レイヤ         | 採用技術                               |
-| -------------- | -------------------------------------- |
-| フレームワーク | Astro 6.x（SSR）+ Vue 3                |
-| スタイル       | Tailwind CSS 4.x                       |
-| バックエンド   | Supabase（Auth / Postgres / Storage）  |
+| レイヤ         | 採用技術                                 |
+| -------------- | ---------------------------------------- |
+| フレームワーク | Astro 6.x（SSR）+ Vue 3                  |
+| スタイル       | Tailwind CSS 4.x                         |
+| バックエンド   | Supabase（Auth / Postgres / Storage）    |
 | ランタイム     | Cloudflare Workers（Static Assets 併用） |
-| アダプター     | `@astrojs/cloudflare`                  |
+| アダプター     | `@astrojs/cloudflare`                    |
 
 ---
 
@@ -42,11 +42,11 @@ cp .dev.vars.example .dev.vars
 
 ### 環境変数
 
-| ファイル      | 変数                              | 用途                                                         |
-| ------------- | --------------------------------- | ------------------------------------------------------------ |
-| `.env`        | `PUBLIC_SUPABASE_URL`             | Supabase Project URL（公開値）                               |
-| `.env`        | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/publishable key（公開値）                      |
-| `.dev.vars`   | `SUPABASE_SERVICE_ROLE_KEY`       | Supabase Service Role Key（ローカル開発時のみ。**秘匿**）    |
+| ファイル    | 変数                              | 用途                                                      |
+| ----------- | --------------------------------- | --------------------------------------------------------- |
+| `.env`      | `PUBLIC_SUPABASE_URL`             | Supabase Project URL（公開値）                            |
+| `.env`      | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/publishable key（公開値）                   |
+| `.dev.vars` | `SUPABASE_SERVICE_ROLE_KEY`       | Supabase Service Role Key（ローカル開発時のみ。**秘匿**） |
 
 取得元は [Supabase Dashboard > Settings > API](https://supabase.com/dashboard) です。
 
@@ -57,9 +57,11 @@ cp .dev.vars.example .dev.vars
 秘密情報の誤コミット検知と依存関係の脆弱性検知を有効化します。
 
 1. gitleaks をローカルにインストール（pre-commit hook 用）:
+
    ```bash
    brew install gitleaks
    ```
+
    `npm install` 実行時に `.githooks/pre-commit` が有効化され、コミット時に staged ファイルから秘密情報を自動検知します。gitleaks 未インストール時はコミットが中断されます。
 
 2. GitHub リポジトリの Settings > Code security で以下を ON:
@@ -87,13 +89,13 @@ npm run preview
 
 その他のコマンド:
 
-| コマンド            | 内容                                       |
-| ------------------- | ------------------------------------------ |
-| `npm run build`     | 本番ビルド（`./dist/`）                    |
-| `npm run typecheck` | `astro check` による型チェック             |
-| `npm run lint`      | ESLint                                     |
-| `npm run format`    | Prettier                                   |
-| `npm run test`      | Vitest（Cloudflare Workers pool 対応）     |
+| コマンド            | 内容                                   |
+| ------------------- | -------------------------------------- |
+| `npm run build`     | 本番ビルド（`./dist/`）                |
+| `npm run typecheck` | `astro check` による型チェック         |
+| `npm run lint`      | ESLint                                 |
+| `npm run format`    | Prettier                               |
+| `npm run test`      | Vitest（Cloudflare Workers pool 対応） |
 
 ---
 
@@ -168,8 +170,8 @@ npx wrangler secret list --name member-site-template
 {
   "vars": {
     "PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
-    "PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_xxx"
-  }
+    "PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_xxx",
+  },
 }
 ```
 
@@ -215,12 +217,12 @@ npm run deploy
 
 ## トラブルシューティング
 
-| 症状                                | 対処                                                                                |
-| ----------------------------------- | ----------------------------------------------------------------------------------- |
-| `npm run dev` で型エラー            | `npm run generate-types`（= `wrangler types`）で `worker-configuration.d.ts` を再生成 |
-| `wrangler deploy` で auth エラー    | `npx wrangler login` を再実行                                                       |
+| 症状                                 | 対処                                                                                                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev` で型エラー             | `npm run generate-types`（= `wrangler types`）で `worker-configuration.d.ts` を再生成                                                                              |
+| `wrangler deploy` で auth エラー     | `npx wrangler login` を再実行                                                                                                                                      |
 | 本番で Service Role Key が undefined | まず `npx wrangler secret list --name member-site-template` で per-Worker Secret に登録されているか確認。空なら下記「Secret が登録したはずなのに undefined」を参照 |
-| SSR でビルドエラー                  | `compatibility_flags` に `nodejs_compat` があるか確認                               |
+| SSR でビルドエラー                   | `compatibility_flags` に `nodejs_compat` があるか確認                                                                                                              |
 
 ### Secret が登録したはずなのに undefined になる
 

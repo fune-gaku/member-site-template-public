@@ -2,63 +2,65 @@
 
 ## デプロイ先
 
-**Cloudflare Workers**
-
-{{DEPLOY_TARGET_DESCRIPTION}}
+**Cloudflare Workers**（エッジランタイム + Workers Static Assets による静的アセット配信を併用）。`@astrojs/cloudflare` v13 アダプターで SSR ハンドラを `@astrojs/cloudflare/entrypoints/server` にビルドし、Wrangler がエントリーポイントとして実行する。
 
 ---
 
 ## 事前準備
 
-{{DEPLOY_PREREQUISITES}}
+[README.md「前提条件」](../README.md#前提条件) を参照（Node.js >= 22.12.0 / Supabase / Cloudflare アカウント / `npx wrangler` ）。
 
 ---
 
 ## 環境変数設定
 
-{{ENV_SETUP_INSTRUCTIONS}}
+[README.md「環境変数」](../README.md#環境変数) を参照。`.env`（公開値）と `.dev.vars`（ローカルの秘密値）の使い分け、本番 Secret の `wrangler secret put` 登録手順は同節に集約されている。
 
 ---
 
 ## ビルド設定
 
-{{BUILD_CONFIG}}
+[README.md「デプロイ設定の要点」](../README.md#デプロイ設定の要点) を参照。`wrangler.jsonc` の `main` / `assets` / `compatibility_flags` / `observability` の意図はそこにまとめてある。
 
 ---
 
 ## デプロイ手順
 
-### 自動デプロイ（推奨）
+[README.md「Cloudflare Workers へのデプロイ」](../README.md#cloudflare-workers-へのデプロイ) の 10 ステップを正とする。要点のみ:
 
-{{AUTO_DEPLOY_INSTRUCTIONS}}
+- 初回: `npx wrangler login` → `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name member-site-template`
+- 通常: `npm run deploy`（= `wrangler types && astro build && wrangler deploy`）
+- 確認: `npx wrangler secret list --name member-site-template` で per-Worker Secret に登録されていること（Secrets Store 側ではない）
 
-### 手動デプロイ
-
-{{MANUAL_DEPLOY_INSTRUCTIONS}}
+> GitHub 連携の自動デプロイ（Workers Builds）は本テンプレートでは採用していない。Secret 管理の混乱を避けるため CLI 経由を推奨する（理由は README 同節の注意書き参照）。
 
 ---
 
 ## デプロイ確認
 
-{{DEPLOY_VERIFICATION}}
+[README.md「10. 動作確認と以降の更新」](../README.md#cloudflare-workers-へのデプロイ) を参照。Cloudflare Dashboard > Workers & Pages > 該当 Worker > **Logs** で起動ログ確認、デプロイ後は [security.md「セキュリティヘッダの動作確認」](./security.md#セキュリティヘッダの動作確認) のヘッダ検証コマンドを必ず流す。
 
 ---
 
 ## カスタムドメイン設定（オプション）
 
-{{CUSTOM_DOMAIN_SETUP}}
+1. Cloudflare Dashboard > Workers & Pages > 該当 Worker > **Settings → Domains & Routes → Add → Custom Domain**
+2. ルート対象ドメイン（例: `members.example.com`）を入力。Cloudflare 管理下のゾーンであれば DNS レコードは自動作成される
+3. SSL/TLS は Cloudflare 側で自動発行（Universal SSL）。完全な HTTPS で配信されるまで数分待つ
+4. デプロイ後、Supabase Dashboard > **Authentication → URL Configuration** の `Site URL` と `Redirect URLs` を新ドメインに更新する（メール内リンクの遷移先が変わるため）
+5. Supabase メールテンプレート（[deployment.md「Supabase Auth: Email Templates」](#supabase-auth-email-templates必須--issue-002--002-b)）の `{{ .SiteURL }}` は自動でこの値を使うので変更不要
 
 ---
 
 ## トラブルシューティング
 
-{{DEPLOY_TROUBLESHOOTING}}
+[README.md「トラブルシューティング」](../README.md#トラブルシューティング) を参照。特に「Secret が登録したはずなのに undefined になる」（per-Worker Secret と Secrets Store の混同）は本テンプレ固有のハマりどころなので必読。
 
 ---
 
 ## パフォーマンス最適化
 
-{{PERFORMANCE_OPTIMIZATION}}
+[architecture.md「パフォーマンス方針」](./architecture.md#パフォーマンス方針) を参照（Astro Islands の最小 JS 配信、`<Image>` の画像最適化、Tailwind の Purge、Cloudflare Edge 配信）。
 
 ---
 
@@ -301,34 +303,83 @@ wrangler secret put ENABLE_HIBP_CHECK
 
 ---
 
-{{SECURITY_SETTINGS}}
-
----
-
 ## ロールバック
 
-{{ROLLBACK_INSTRUCTIONS}}
+Cloudflare Workers は過去のデプロイ履歴をリトルバックエンドとして保持しているため、即時ロールバックが可能。
+
+```bash
+# 過去のデプロイ一覧（直近 10 件）
+npx wrangler deployments list --name member-site-template
+
+# 直前の安定版に即時ロールバック（version-id は上記出力から取得）
+npx wrangler rollback --name member-site-template <version-id>
+```
+
+データベース（Supabase）側のロールバックはアプリ側の rollback とは独立している点に注意:
+
+- スキーマ変更を含むデプロイで問題が出た場合は、まずアプリを Workers でロールバックしつつ、Supabase 側は **Pro プラン以上のみ Point in Time Recovery (PITR)** が利用可能
+- 無料プランの場合は手動の `pg_dump` バックアップに依存する（→ [バックアップ](#バックアップ) 参照）
+- マイグレーションは [security.md「マイグレーション運用ルール」](./security.md#マイグレーション運用ルール) に従って **本番適用前にローカル再現確認** を必ず行うこと
 
 ---
 
 ## モニタリング
 
-{{MONITORING_SETUP}}
+| 対象                           | 確認場所                                                                                                      | 何を見るか                                                                                                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker 起動・リクエスト        | Cloudflare Dashboard > Workers & Pages > 該当 Worker > **Logs**                                               | `wrangler.jsonc` の `observability.enabled: true` で有効化済。リクエストごとの `console.error` / 例外を即時確認                                                                                   |
+| Worker メトリクス              | 同 Worker > **Metrics**                                                                                       | リクエスト数 / CPU 時間 / エラーレート / サブリクエスト数                                                                                                                                         |
+| Supabase Auth ログ             | Supabase Dashboard > **Logs → Auth Logs**                                                                     | サインアップ／サインインの失敗、SMTP 4xx/5xx、OTP 失効                                                                                                                                            |
+| Supabase DB ログ               | Supabase Dashboard > **Logs → Postgres Logs**                                                                 | クエリエラー、RLS 違反                                                                                                                                                                            |
+| Security / Performance Advisor | Supabase Dashboard > **Database → Advisors**                                                                  | RLS 未有効テーブル / インデックス不足等。マイグレーション適用直後に必ず実行（[security.md「マイグレーション適用直後に必ずやること」](./security.md#マイグレーション適用直後に必ずやること) 参照） |
+| 依存パッケージ脆弱性           | GitHub > Security > Dependabot                                                                                | `npm audit --audit-level=high` の CI と Dependabot が週次で監視                                                                                                                                   |
+| セキュリティヘッダ             | [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) | 四半期に 1 回 A 以上を維持                                                                                                                                                                        |
 
 ---
 
 ## 本番環境チェックリスト
 
-{{PRODUCTION_CHECKLIST}}
+`main` マージ → 本番デプロイの直前に以下を確認する。
+
+### コード・テスト
+
+- [ ] `npm run typecheck` が成功
+- [ ] `npm run lint` が成功
+- [ ] `npm run format:check` が成功
+- [ ] `npm run test` が全グリーン
+- [ ] `npm audit --audit-level=high` でヒットなし
+
+### Supabase（Dashboard 設定）
+
+- [ ] [security.md「Supabase Dashboard セキュリティ設定チェックリスト」](./security.md#supabase-dashboard-セキュリティ設定チェックリスト) が完了
+- [ ] [Email Templates](#supabase-auth-email-templates必須--issue-002--002-b) を `{{ .TokenHash }}` + `/auth/confirm` 方式に切替済
+- [ ] [Custom SMTP（Resend）](#supabase-auth-smtp-resend-設定本番必須) を有効化、Sender ドメインが `verified` で SPF / DKIM / DMARC 通過
+- [ ] [パスワードポリシー](#supabase-auth-パスワードポリシー必須) を Dashboard 側でも 8 文字以上＋複雑性で設定
+- [ ] マイグレーション適用後 **Security Advisor / Performance Advisor を Run** し新規違反なし
+
+### Cloudflare Workers（Dashboard / CLI）
+
+- [ ] `npx wrangler secret list --name member-site-template` で `SUPABASE_SERVICE_ROLE_KEY` が **per-Worker Secret** に登録済（Secrets Store 側ではない）
+- [ ] `wrangler.jsonc` の `vars.PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` が本番値
+- [ ] `compatibility_flags` に `nodejs_compat` が含まれている
+- [ ] Custom Domain を使うなら Supabase 側 `Site URL` / `Redirect URLs` を更新済
+
+### デプロイ後の動作確認
+
+- [ ] [security.md「セキュリティヘッダの動作確認」](./security.md#セキュリティヘッダの動作確認) の `curl -sI` を流して全ヘッダ付与を確認
+- [ ] [security.md「CSRF 対策（サインアウト経路）」](./security.md#csrf-対策サインアウト経路) の 3 コマンドが期待通り（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）
+- [ ] サインアップ → 確認メール到達 → 「続行」クリック → `/auth/update-password` 遷移 → サインインの一連が成功
+- [ ] `/admin/users` に admin ロールでアクセス可、member ロールでアクセス不可
 
 ---
 
 ## バックアップ
 
-{{BACKUP_STRATEGY}}
+| 対象                         | 仕組み                                                                                                   | 頻度       |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- | ---------- |
+| Supabase Postgres            | 自動バックアップ（無料: 日次・直近 7 日 / Pro: 日次 + PITR）                                             | プラン依存 |
+| Supabase Storage（avatars）  | 自動バックアップは Postgres と同基準。PITR 対象外なので、重要データはアプリ側で別途エクスポート          | 必要に応じ |
+| Worker 設定                  | `wrangler.jsonc` を Git で管理。Secret は CLI で再投入（[deployment.md「デプロイ手順」](#デプロイ手順)） | 都度       |
+| Cloudflare KV / R2（採用時） | 各サービスの公式バックアップ機構に従う                                                                   | —          |
 
----
-
-## サポート
-
-{{DEPLOY_SUPPORT}}
+無料プランから本番運用に移すときは、最低限 **Pro プランの PITR を有効化**（[security.md「Pro プラン以上で追加で有効化する項目」](./security.md#pro-プラン以上で追加で有効化する項目) 参照）。マイグレーション適用前には、Supabase Dashboard > **Database → Backups** から手動スナップショットを取って巻き戻し可能にしておく。

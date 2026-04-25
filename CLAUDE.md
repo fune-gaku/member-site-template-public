@@ -88,11 +88,11 @@ npm run dev
 
 #### 確認手段の優先順位
 
-| 優先 | 対象技術 | 推奨ツール |
-| ---- | -------- | ---------- |
-| 1    | Astro 6 | `mcp__astro-docs__search_astro_docs` Skill（環境にあれば最優先） |
-| 1    | Supabase / Cloudflare Workers / Tailwind 4 / Vue 3 等 | `WebFetch` で公式ドキュメント URL を直接取得 |
-| 2    | 一般的なベストプラクティス・既知の不具合 | `WebSearch`（公式 issue や stackoverflow を含めて検索） |
+| 優先 | 対象技術                                              | 推奨ツール                                                       |
+| ---- | ----------------------------------------------------- | ---------------------------------------------------------------- |
+| 1    | Astro 6                                               | `mcp__astro-docs__search_astro_docs` Skill（環境にあれば最優先） |
+| 1    | Supabase / Cloudflare Workers / Tailwind 4 / Vue 3 等 | `WebFetch` で公式ドキュメント URL を直接取得                     |
+| 2    | 一般的なベストプラクティス・既知の不具合              | `WebSearch`（公式 issue や stackoverflow を含めて検索）          |
 
 #### 公式ドキュメント主要 URL
 
