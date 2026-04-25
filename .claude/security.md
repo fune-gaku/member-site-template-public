@@ -38,7 +38,7 @@
 - [x] `/member/*` 配下は認証必須（未認証時リダイレクト）
 - [x] `SUPABASE_SERVICE_ROLE_KEY` はサーバーのみで使用
 - [x] Admin クライアントは毎リクエスト生成（セッション漏洩防止）
-- [x] CSRF 対策：状態変更操作は POST のみ、`security.checkOrigin` 有効（→ [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)）
+- [x] CSRF 対策：状態変更操作は POST のみ、`security.checkOrigin` 有効、`/auth/signout` GET 405 ガード + クロスオリジン POST 403 を自動テストでカバー（`tests/integration/signout-csrf.test.ts` / `tests/workers/csrf.test.ts`、→ [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)）
 - [x] OTP / PKCE の適切な分離：メールリンクは `/auth/confirm` のランディング経由でスキャナ GET 耐性を確保（→ [メール経由の認証フロー](./architecture.md#メール経由の認証フロー-issue-002--002-b)）
 - [x] Open Redirect 対策：`next` クエリは `safeNextPath` でサニタイズ（`src/lib/safe-redirect.ts`）
 - [x] Supabase メールテンプレートで `{{ .ConfirmationURL }}` は禁止、`{{ .TokenHash }}` + `/auth/confirm` 経由に統一
@@ -166,11 +166,12 @@
 
 ### 自動化されているチェック
 
-| 層                      | 仕組み                                                                  | タイミング                        | 対象                                       |
-| ----------------------- | ----------------------------------------------------------------------- | --------------------------------- | ------------------------------------------ |
-| ローカル                | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks              | コミット時                        | staged ファイルの秘密情報                  |
-| CI（GitHub Actions）    | [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml)   | PR（package.json 変更）+ 週次月曜 | 依存パッケージの脆弱性（high 以上で fail） |
-| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST                | npm / GitHub Actions の更新 PR 自動生成    |
+| 層                      | 仕組み                                                                  | タイミング                        | 対象                                                                   |
+| ----------------------- | ----------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------- |
+| ローカル                | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks              | コミット時                        | staged ファイルの秘密情報                                              |
+| CI（GitHub Actions）    | [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml)   | PR（package.json 変更）+ 週次月曜 | 依存パッケージの脆弱性（high 以上で fail）                             |
+| CI（GitHub Actions）    | [.github/workflows/test.yml](../.github/workflows/test.yml)             | 全 PR + main への push            | unit / integration / workers テスト全件（CSRF 405 / 403 ガードを含む） |
+| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST                | npm / GitHub Actions の更新 PR 自動生成                                |
 
 **初回セットアップ**:
 
@@ -188,11 +189,11 @@ Secret scanning / Push protection は Private + Free プランでは使えない
 
 ### 手動で定期実施する項目
 
-| 項目                                                                                                                                         | 頻度                                | 確認場所                                                                   |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
-| Supabase Security Advisor / Performance Advisor                                                                                              | 月 1 回、マイグレーション適用直後   | Supabase Dashboard > Database > Advisors                                   |
-| [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) でのヘッダ再評価（A 以上維持） | 四半期に 1 回、または本番デプロイ後 | 本番 URL を入力                                                            |
-| CSRF 3 点検（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）                                                                     | `/auth/signout` 周辺を改修した直後  | [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路) のコマンド参照 |
+| 項目                                                                                                                                         | 頻度                                | 確認場所                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supabase Security Advisor / Performance Advisor                                                                                              | 月 1 回、マイグレーション適用直後   | Supabase Dashboard > Database > Advisors                                                                                                                |
+| [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) でのヘッダ再評価（A 以上維持） | 四半期に 1 回、または本番デプロイ後 | 本番 URL を入力                                                                                                                                         |
+| CSRF 本番 sanity check（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）                                                          | 本番デプロイ後                      | [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路) のコマンド参照（回帰検出は自動テスト `npm run test` / `npm run test:workers` でカバー済み） |
 
 ---
 
@@ -442,9 +443,22 @@ curl -sI https://member-site-template.fune-gaku.workers.dev/ \
 3. `astro.config.mjs` の `security.checkOrigin` を **既定値 `true` のまま維持**。これで Astro がクロスオリジン POST を自動的に 403 で拒否する。
 4. ナビゲーションヘッダ（`Member.astro` / `Admin.astro`）やダッシュボードの「サインアウト」ボタンは全て form POST（Action 呼び出し）に統一する。`<a href="/auth/signout">` は作らない。
 
-### 手動 CSRF 検証手順
+### CSRF 検証（自動テスト + 本番デプロイ後の最終確認）
 
-本番デプロイ直後、または `/auth/signout` や `auth.signOut` Action を改修した場合は、必ず以下 3 コマンドを実行して挙動を確認する。
+**回帰検出は自動テストでカバー済み**（Issue #16）。`/auth/signout` や `auth.signOut` Action、`security.checkOrigin` 周辺を改修した場合は以下のコマンドで両系統を回す:
+
+```bash
+npm run test           # GET 405 ガード（tests/integration/signout-csrf.test.ts）
+npm run test:workers   # クロスオリジン POST 403（tests/workers/csrf.test.ts、実 workerd ランタイム）
+```
+
+| #   | 観点                                                  | 自動テスト                                                                          | 本番 curl |
+| --- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- | --------- |
+| 1   | GET / HEAD / その他 safe method → 405 + `Allow: POST` | [tests/integration/signout-csrf.test.ts](../tests/integration/signout-csrf.test.ts) | 下記 1    |
+| 2   | クロスオリジン POST → 403（`security.checkOrigin`）   | [tests/workers/csrf.test.ts](../tests/workers/csrf.test.ts)                         | 下記 2    |
+| 3   | 同一オリジン POST → 403 でない（CSRF を通過）         | 同上                                                                                | 下記 3    |
+
+**本番デプロイ直後**は、自動テストが通った前提で、デプロイされた実環境が同じ挙動を示すことだけを最終確認する（Cloudflare 側の CDN / WAF / Rate Limiting で挙動が変わっていないかの sanity check）:
 
 ```bash
 # 1) 攻撃者視点: クロスオリジン GET（リンク踏ませ・メーラー URL プリフェッチを模擬）
@@ -468,13 +482,12 @@ curl -i -X POST \
 # 期待: HTTP/2 200 / Set-Cookie: sb-...=; Max-Age=0 （セッション Cookie 削除）
 ```
 
-ローカル（`npm run dev` + `npm run preview`）でも同じ 3 パターンを `http://localhost:4321` に対して流し、**GET が 405** かつ **クロスオリジン POST が 403** になることを確認する。
-
 ### 受け入れ基準
 
-- [x] `curl -X GET /auth/signout` が **405 Method Not Allowed** を返す
-- [x] クロスオリジン POST が **403** で拒否される（`security.checkOrigin` の動作）
-- [x] スパムメールの URL スキャナーが GET しても Cookie 削除が走らない（curl で確認）
+- [x] GET / HEAD / その他 safe method の `/auth/signout` が **405 Method Not Allowed** + `Allow: POST` を返す（自動: `tests/integration/signout-csrf.test.ts`）
+- [x] クロスオリジン POST が **403** で拒否される（自動: `tests/workers/csrf.test.ts`、`security.checkOrigin` の動作）
+- [x] 同一オリジン POST は **403 にならない**（CSRF を通過する。自動: `tests/workers/csrf.test.ts`）
+- [x] スパムメールの URL スキャナーが GET しても Cookie 削除が走らない（本番デプロイ直後に curl で確認）
 - [x] ダッシュボード・ナビゲーションヘッダのサインアウトがクリック 1 回で従来どおり動作する
 
 ---

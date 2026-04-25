@@ -20,6 +20,7 @@
     "test": "VITEST=true vitest run",
     "test:watch": "VITEST=true vitest",
     "test:ui": "VITEST=true vitest --ui",
+    "test:workers": "npm run build && vitest run --config vitest.workers.config.ts",
     "typecheck": "astro check",
     "prepare": "git config core.hooksPath .githooks"
   },
