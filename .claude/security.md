@@ -86,7 +86,8 @@
 - [x] HTTPS 強制（Cloudflare Workers が自動管理）
 - [x] セキュアな Cookie 設定（`@supabase/ssr` が自動管理）
 - [x] マイグレーション運用ルールを定義（→ [database.md「新規マイグレーション時のセルフチェックリスト」](./database.md#新規マイグレーション時のセルフチェックリスト)）
-- [ ] **未実装（将来課題）**: Astro Actions のレートリミット（書き込み系: `posts.create` / `auth.signUp` / `admin.inviteUser` 等）。当面は Supabase Auth 側の組込みレートと Cloudflare の DDoS 自動軽減に依存。本格運用時は Cloudflare Rate Limiting Rules で `/_actions/*` を制限する
+- [x] Astro Actions のリクエストボディサイズ上限（一般 100KB / アップロード 6MB）を `src/middleware.ts` で `Content-Length` 検査し、超過時 413 / 欠損時 411 を返す（Issue #9）。`src/lib/request-size-limits.ts` の `UPLOAD_ACTION_PATHS` でアップロード Action を明示列挙
+- [ ] **未実装（将来課題）**: Astro Actions のレートリミット（書き込み系: `posts.create` / `auth.signUp` / `admin.inviteUser` 等）。当面は Supabase Auth 側の組込みレートと Cloudflare の DDoS 自動軽減に依存。本格運用時は Cloudflare Rate Limiting Rules で `/_actions/*` を制限する。なおボディサイズ上限は Issue #9 で実装済（CL ガード）
 - [ ] **未実装（将来課題）**: Storage `avatars` のユーザー別クォータ。1 ユーザーが履歴蓄積で容量を圧迫する可能性あり。当面は [運用: 既存オブジェクトの棚卸し](#運用-既存オブジェクトの棚卸し) のクエリで手動管理
 
 ---
@@ -105,6 +106,7 @@
 - [ ] 自分自身に対する破壊的操作は handler 側でも明示的に拒否（例: `admin.updateUserRole` の self-demotion 禁止）
 - [ ] エラー時は内部詳細を返さず、ユーザー向けの簡潔な日本語メッセージを `ActionError.message` に詰める。詳細は `console.error("<context>:", error)` で残す
 - [ ] 入力の各フィールドに合理的な上限を Zod の `.max()` で設ける（DoS 抑止 / 多層防御）
+- [ ] ファイルアップロードを伴う Action なら、`src/lib/request-size-limits.ts` の `UPLOAD_ACTION_PATHS` にパス（例: `/_actions/storage.uploadAvatar`）を追加する。追加しないと一般 Action の 100KB 上限が当たって multipart リクエストが 413 になる（Issue #9）
 - [ ] テスト: 認証失敗 / バリデーション失敗 / 認可失敗 / 正常系の少なくとも 4 ケースを `tests/unit/actions-schema.test.ts` などに追加
 - [ ] 高頻度な書き込み系（投稿作成・招待送信等）は将来 Cloudflare Rate Limiting で制限する想定。重要な Action は GitHub Issue として記録しておく
 

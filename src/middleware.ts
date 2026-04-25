@@ -1,10 +1,26 @@
 import { defineMiddleware } from "astro:middleware";
 
+import { checkActionBodySize } from "./lib/request-size-limits";
 import { safeNextPath } from "./lib/safe-redirect";
 import { applySecurityHeaders } from "./lib/security-headers";
 import { createClient } from "./lib/supabase";
 
 export const onRequest = defineMiddleware(async (context, next) => {
+  // Issue #9: Astro Actions（/_actions/*）への入口で Content-Length を検査し、
+  // 用途別の上限を超えるリクエストは Supabase クライアント生成より前に弾く。
+  // これにより巨大ボディ攻撃で getUser() / cookie 解析の費用を負担しない。
+  const sizeCheck = checkActionBodySize(
+    context.url.pathname,
+    context.request.headers.get("content-length"),
+  );
+  if (!sizeCheck.ok) {
+    const response = new Response(sizeCheck.message, {
+      status: sizeCheck.status,
+    });
+    applySecurityHeaders(response);
+    return response;
+  }
+
   // 全ページで Supabase クライアントを生成し getUser() を呼ぶ。
   // これにより期限切れトークンのサイレントリフレッシュが走り、
   // createServerClient 内の setAll 経由で新しい Cookie が

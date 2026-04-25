@@ -181,6 +181,118 @@ describe("posts.update schema", () => {
   });
 });
 
+describe("Issue #9: 文字列フィールドの .max() 多層防御", () => {
+  // actions/index.ts と同じ形を再宣言（Astro context 不要のため）
+  const signInSchema = z.object({
+    email: z.string().email().max(254),
+    password: z.string().max(200),
+  });
+  const signUpSchema = z.object({
+    email: z.string().email().max(254),
+    password: z.string().min(8),
+  });
+  const resetPasswordSchema = z.object({
+    email: z.string().email().max(254),
+  });
+  const confirmOtpSchema = z.object({
+    token_hash: z.string().min(1).max(512),
+    type: z.enum([
+      "invite",
+      "recovery",
+      "email_change",
+      "email",
+      "signup",
+      "magiclink",
+    ]),
+  });
+  const getSignedUrlSchema = z.object({ path: z.string().max(512) });
+  const adminCreateUserSchema = z.object({
+    email: z.string().email().max(254),
+    password: z.string().min(8),
+    displayName: z.string().max(100).optional(),
+  });
+  const adminInviteUserSchema = z.object({
+    email: z.string().email().max(254),
+  });
+
+  it("email は 254 文字超で拒否（RFC 5321）", () => {
+    const longEmail = `${"a".repeat(250)}@b.co`; // 256 chars
+    expect(
+      signInSchema.safeParse({ email: longEmail, password: "x" }).success,
+    ).toBe(false);
+    expect(
+      signUpSchema.safeParse({ email: longEmail, password: "abcdefgh" })
+        .success,
+    ).toBe(false);
+    expect(resetPasswordSchema.safeParse({ email: longEmail }).success).toBe(
+      false,
+    );
+    expect(
+      adminCreateUserSchema.safeParse({
+        email: longEmail,
+        password: "abcdefgh",
+      }).success,
+    ).toBe(false);
+    expect(adminInviteUserSchema.safeParse({ email: longEmail }).success).toBe(
+      false,
+    );
+  });
+
+  it("signIn の password は 201 文字以上で拒否", () => {
+    const result = signInSchema.safeParse({
+      email: "ok@example.com",
+      password: "p".repeat(201),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("admin.createUser の displayName は 101 文字以上で拒否", () => {
+    const result = adminCreateUserSchema.safeParse({
+      email: "ok@example.com",
+      password: "abcdefgh",
+      displayName: "a".repeat(101),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("auth.confirmOtp の token_hash は 513 文字以上で拒否", () => {
+    const result = confirmOtpSchema.safeParse({
+      token_hash: "t".repeat(513),
+      type: "recovery",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("storage.getSignedUrl の path は 513 文字以上で拒否", () => {
+    expect(
+      getSignedUrlSchema.safeParse({ path: "x".repeat(513) }).success,
+    ).toBe(false);
+  });
+
+  it("各上限ピッタリは通る（境界）", () => {
+    const exactly254 = `${"a".repeat(248)}@b.co`; // 254 chars
+    expect(
+      signInSchema.safeParse({ email: exactly254, password: "x" }).success,
+    ).toBe(true);
+    expect(
+      adminCreateUserSchema.safeParse({
+        email: exactly254,
+        password: "abcdefgh",
+        displayName: "a".repeat(100),
+      }).success,
+    ).toBe(true);
+    expect(
+      confirmOtpSchema.safeParse({
+        token_hash: "t".repeat(512),
+        type: "recovery",
+      }).success,
+    ).toBe(true);
+    expect(
+      getSignedUrlSchema.safeParse({ path: "x".repeat(512) }).success,
+    ).toBe(true);
+  });
+});
+
 describe("admin.updateUserRole schema", () => {
   const schema = z.object({
     userId: z.string().uuid(),
