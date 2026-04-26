@@ -154,6 +154,8 @@ npx wrangler secret list --name member-site-template
 # → [{ "name": "SUPABASE_SERVICE_ROLE_KEY", "type": "secret_text" }] が出れば OK
 ```
 
+Turnstile (CAPTCHA) を有効化する場合は同様に `TURNSTILE_SECRET_KEY` を登録します。詳細手順は [.claude/deployment.md「Cloudflare Turnstile（任意 / bot 対策）」](.claude/deployment.md#cloudflare-turnstile任意--bot-対策) を参照。
+
 > **⚠️ Cloudflare の Secret には 2 系統あります**
 >
 > Cloudflare には **per-Worker Secret**（従来方式）と **Secrets Store**（Open Beta、アカウント全体で共有）の 2 つがあり、Dashboard UI では別セクションに表示されます。このプロジェクトのコード（[src/lib/supabase-admin.ts](src/lib/supabase-admin.ts)）は `env.SUPABASE_SERVICE_ROLE_KEY` として**同期アクセス**しているため、**per-Worker Secret を使う必要があります**（Secrets Store は `await env.X.get()` の非同期アクセスになる）。
@@ -171,6 +173,9 @@ npx wrangler secret list --name member-site-template
   "vars": {
     "PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
     "PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_xxx",
+    // Turnstile を有効化する場合のみ追加（site key は公開値）。
+    // 詳細は .claude/deployment.md#cloudflare-turnstile任意--bot-対策
+    // "PUBLIC_TURNSTILE_SITE_KEY": "<your turnstile site key>",
   },
 }
 ```

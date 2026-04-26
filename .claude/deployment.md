@@ -303,6 +303,74 @@ wrangler secret put ENABLE_HIBP_CHECK
 
 ---
 
+### Cloudflare Turnstile（任意 / bot 対策）
+
+signup フォームに CAPTCHA を入れる場合のみ実施する opt-in 機能。両 env が空なら従来挙動（CAPTCHA なし）で何も起きない。実装は [src/lib/turnstile.ts](../src/lib/turnstile.ts) と [src/components/SignupForm.vue](../src/components/SignupForm.vue) を参照。
+
+#### 1. Cloudflare Dashboard で Turnstile サイトを発行
+
+1. **Cloudflare Dashboard > Turnstile > Add Site**
+2. **Site name**: 任意（例: `member-site-template`）
+3. **Domain**: 本番ドメイン（例: `member-site-template.fune-gaku.workers.dev`）。複数登録可
+4. **Widget mode**: **Managed**（推奨。難易度を Cloudflare が自動判定）
+5. 発行された **Site Key**（公開）と **Secret Key**（秘密）を控える
+
+> `.env.example` には Cloudflare 公式の常時 pass テストキーが既定で入っているため、**ローカル開発はこの手順をスキップしても動く**。本番ドメインで実 bot 対策を有効化する時のみ実キーを発行する。
+
+#### 2. ローカル開発環境
+
+`.env.example` の既定（テストキー）で動作するが、実キーで挙動確認したい場合は `.dev.vars` に上書き:
+
+```bash
+PUBLIC_TURNSTILE_SITE_KEY=<step 1 の site key>
+TURNSTILE_SECRET_KEY=<step 1 の secret key>
+```
+
+#### 3. 本番（Cloudflare Workers）
+
+`PUBLIC_*` の登録方針は [README.md Step 7 / Step 8](../README.md#7-本番シークレットの登録) と同じ規約に従う:
+
+```bash
+# 秘密値: per-Worker Secret として登録（Cloudflare 公式推奨）
+npx wrangler secret put TURNSTILE_SECRET_KEY --name member-site-template
+# プロンプトで Step 1 の secret key を貼り付け
+```
+
+```jsonc
+// wrangler.jsonc に追記（公開値なので vars でリポジトリ管理 OK）
+{
+  "vars": {
+    "PUBLIC_SUPABASE_URL": "...",
+    "PUBLIC_SUPABASE_PUBLISHABLE_KEY": "...",
+    "PUBLIC_TURNSTILE_SITE_KEY": "<step 1 の site key>",
+  },
+}
+```
+
+> **公式の根拠** —
+> - [Workers env vars](https://developers.cloudflare.com/workers/configuration/environment-variables/): _"Public values—even if they're 'keys'—should go in `vars`. Do not use plaintext environment variables to store sensitive information. Use secrets instead."_
+> - [Turnstile server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/): _"Only call the Siteverify API in your backend environment. If you expose the secret key in the front-end client code, attackers can bypass the security check."_
+
+#### 4. 確認
+
+```bash
+# Secret が per-Worker Secret に登録されていること
+npx wrangler secret list --name member-site-template | grep TURNSTILE_SECRET_KEY
+# → { "name": "TURNSTILE_SECRET_KEY", "type": "secret_text" }
+```
+
+デプロイ後の動作確認:
+
+- [ ] 本番 `/auth/signup` を開いて Turnstile widget が表示される
+- [ ] widget が pass せずに submit → BAD_REQUEST + 「ボット対策の検証に失敗しました」が出る
+- [ ] widget pass 後 → 通常通りサインアップできる
+
+#### Turnstile を後から無効化する
+
+`PUBLIC_TURNSTILE_SITE_KEY` を `wrangler.jsonc` から削除し、Secret も `npx wrangler secret delete TURNSTILE_SECRET_KEY --name member-site-template` で消す。`isTurnstileEnabled` が両方の存在を要求するため、片方欠落で自動的に opt-out される。
+
+---
+
 ## ロールバック
 
 Cloudflare Workers は過去のデプロイ履歴をリトルバックエンドとして保持しているため、即時ロールバックが可能。
@@ -363,6 +431,7 @@ npx wrangler rollback --name member-site-template <version-id>
 - [ ] `wrangler.jsonc` の `vars.PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` が本番値
 - [ ] `compatibility_flags` に `nodejs_compat` が含まれている
 - [ ] Custom Domain を使うなら Supabase 側 `Site URL` / `Redirect URLs` を更新済
+- [ ] **Turnstile を有効化する場合のみ**: [Cloudflare Turnstile（任意）](#cloudflare-turnstile任意--bot-対策) の手順で `TURNSTILE_SECRET_KEY` を per-Worker Secret に、`PUBLIC_TURNSTILE_SITE_KEY` を `vars` に登録
 
 ### デプロイ後の動作確認
 
