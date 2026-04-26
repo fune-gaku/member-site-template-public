@@ -64,11 +64,9 @@ GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token) \
   codex exec --sandbox workspace-write \
   "あなたは PR #<N> （https://github.com/<owner>/<repo>/pull/<N>）をレビューします。
 
-   gh CLI で diff を読み取り、行単位の指摘は
-     gh api repos/<owner>/<repo>/pulls/<N>/comments
-   全体への指摘は
-     gh pr comment <N>
-   で投稿してください。
+   gh CLI で diff を読み取ってください。投稿は Claude が代行するため、
+   レビュー本文と verdict 行を stdout に出力するだけにしてください
+   （`gh pr comment` / `gh api` は呼ばない — sandbox の network 制限で失敗する）。
 
    重点観点:
    - 正しさ・エッジケース
@@ -83,30 +81,30 @@ GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token) \
    会員サイトテンプレ。.claude/security.md / .claude/development.md /
    .claude/database.md のチェックリストに照らして判定してください。
 
-   作業の最後に、必ず単独行で始まる verdict マーカーを 1 件だけ
-   トップレベル comment に投稿してください:
+   stdout の最後に、必ず単独行で始まる verdict マーカーを 1 件だけ
+   出力してください:
      - 指摘なし → 'CODEX VERDICT: LGTM'
      - 指摘あり → 'CODEX VERDICT: CHANGES REQUESTED' に続けて
        未解決事項の bullet サマリ
 
-   修正は絶対にしないこと。レビューと指摘投稿のみ。"
+   修正は絶対にしないこと。レビュー本文の出力のみ。"
 ```
 
 `codex exec` がエラーで落ちた場合は記録してループを止め、ユーザーに手動再実行を依頼。
 
-### B. 今回イテレーションで Codex が投稿した内容を取得
+### B. Codex の stdout から本文と verdict を抽出して PR に代理投稿
+
+`codex exec` の stdout を保存し、そこから verdict 行 (`CODEX VERDICT: ...`) を
+抽出する。レビュー本文 (verdict より前のレビュー内容) は **Claude が** PR に
+1 件のトップレベルコメントとして投稿する:
 
 ```bash
-gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate \
-  --jq "[.[] | select(.user.login | test(\"codex\"; \"i\")) | select(.created_at > \"$ITER_START\")]" \
-  > /tmp/codex-cross-review-<N>/inline-<k>.json
-
-gh api "repos/<owner>/<repo>/issues/<N>/comments" --paginate \
-  --jq "[.[] | select(.user.login | test(\"codex\"; \"i\")) | select(.created_at > \"$ITER_START\")]" \
-  > /tmp/codex-cross-review-<N>/top-<k>.json
+gh pr comment <N> --body-file /tmp/codex-cross-review-<N>/iter-<k>-body.md
 ```
 
-トップレベルコメントから `CODEX VERDICT:` 行を探す。これが機械可読の停止条件。
+verdict 行は機械可読な停止条件として使う (`CODEX VERDICT: LGTM` /
+`CODEX VERDICT: CHANGES REQUESTED`)。Codex 自身は PR に直接投稿しない設計
+(sandbox の network 制限を前提とした正規 protocol)。
 
 ### C. 各指摘を **あなたが** 評価
 
