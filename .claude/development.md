@@ -253,7 +253,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 - カバーされていない観点だけを手動検証プランに残す
 - ギャップが見つかったら、手動検証で済ませず **テスト追加 Issue を切る**（手動検証は再発防止にならない）
 
-例: security headers は [tests/security-headers.test.ts](../tests/security-headers.test.ts)、`/member` `/admin` 配下の認可は [tests/unit/middleware.test.ts](../tests/unit/middleware.test.ts) でカバー済みなので、curl での再確認は冗長。一方 `/auth/signout` GET 405 / CSRF cross-origin POST 403 は未カバー（Issue #16）。
+例: security headers は [tests/security-headers.test.ts](../tests/security-headers.test.ts)、`/member` `/admin` 配下の認可は [tests/unit/middleware.test.ts](../tests/unit/middleware.test.ts)、`/auth/signout` の GET/HEAD/PUT/DELETE/PATCH 405 ガードは [tests/integration/signout-csrf.test.ts](../tests/integration/signout-csrf.test.ts)、CSRF cross-origin POST 403 は [tests/workers/csrf.test.ts](../tests/workers/csrf.test.ts) でそれぞれカバー済み。これらの観点はすべて `npm test` で検証されるので、curl での再確認は冗長。
 
 ---
 
