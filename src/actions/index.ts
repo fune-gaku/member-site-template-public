@@ -3,6 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
 import { env } from "cloudflare:workers";
 
+import { performChangePassword } from "../lib/auth-change-password";
 import { getAuthUser } from "../lib/auth-claims";
 import { performResetPassword } from "../lib/auth-reset-password";
 import { performSignIn } from "../lib/auth-signin";
@@ -360,6 +361,49 @@ export const server = {
         // 新パスワードでの再ログインを強制する。
         await supabase.auth.signOut();
         return { success: true };
+      },
+    }),
+
+    /**
+     * Issue #19: ログイン中ユーザー自身による日常的なパスワード変更経路。
+     *
+     * `auth.updatePassword` (recovery / invite フロー) との分離理由:
+     *   - recovery はメール所有が認証要素なので「現パスワード再認証」は概念上不要
+     *   - 日常変更は盗難 Cookie / 共有 PC 攻撃を抑止するため再認証が必須
+     *     (OWASP Authentication Cheat Sheet / NIST SP 800-63B §5.2.10)
+     *
+     * 振る舞いは `src/lib/auth-change-password.ts` の `performChangePassword` に
+     * 分離してテスト可能にしている。
+     */
+    changePassword: defineAction({
+      accept: "form",
+      input: z.object({
+        currentPassword: z.string().min(1).max(72),
+        newPassword: passwordSchema,
+      }),
+      handler: async (input, context) => {
+        const supabase = createClient({
+          request: context.request,
+          cookies: context.cookies,
+        });
+        const user = await getAuthUser(supabase);
+        if (!user || !user.email) {
+          throw new ActionError({
+            code: "UNAUTHORIZED",
+            message: "ログインしてください",
+          });
+        }
+
+        // HIBP 漏洩パスワードチェック（ENABLE_HIBP_CHECK=true の場合のみ）。
+        // 再認証より前に実行することで、現パスワードを Auth サーバに送る前に
+        // 弱い新パスワードを弾ける（Auth ラウンドトリップ削減）。
+        await assertNotPwned(input.newPassword);
+
+        return performChangePassword(supabase, {
+          email: user.email,
+          currentPassword: input.currentPassword,
+          newPassword: input.newPassword,
+        });
       },
     }),
   },
