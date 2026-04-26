@@ -22,6 +22,13 @@
     "test:ui": "VITEST=true vitest --ui",
     "test:workers": "npm run build && vitest run --config vitest.workers.config.ts",
     "typecheck": "astro check",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff --linked",
+    "db:lint": "supabase db lint",
+    "db:test": "supabase test db",
+    "db:push:dry-run": "supabase db push --dry-run",
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {

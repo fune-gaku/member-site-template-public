@@ -502,7 +502,7 @@ curl -i -X POST \
 
 `avatars` バケットのようなユーザーアップロードは多層防御を徹底する。重要度の高い順:
 
-1. **バケット設定（Supabase Storage）が真の防衛線** — `storage.buckets.allowed_mime_types` と `file_size_limit` を `001_init.sql` で必ず設定。Supabase 公式: _"Upload restrictions ... are defined at the bucket level"_
+1. **バケット設定（Supabase Storage）が真の防衛線** — `storage.buckets.allowed_mime_types` と `file_size_limit` を初期マイグレーション (`supabase/migrations/20260420205000_init.sql`) で必ず設定。Supabase 公式: _"Upload restrictions ... are defined at the bucket level"_
 2. **サーバ側（Astro Action の Zod）で早期検証** — `.refine()` で MIME / サイズを 400 応答で弾く。`upload()` 呼び出し時は `contentType: input.file.type` を明示し、クライアント送出を盲信しない
 3. **クライアント側検証は UX 目的のみ** — `<input accept="...">` と `file.type` は DevTools で迂回可能、単独でセキュリティ対策にしない
 

@@ -3,7 +3,9 @@
 ## 概要
 
 - **DBMS**: PostgreSQL (Supabase)
-- **スキーマ管理**: `supabase/migrations/001_init.sql` 1 ファイルに全テーブル・RLS・Storage バケット・トリガーを統合。本番/新規環境ともこの 1 ファイルを SQL Editor で実行すれば完成。開発環境のリセットは `000_cleanup.sql` → `001_init.sql` の順に実行
+- **スキーマ管理**: Supabase CLI ベース (`supabase init` で生成された `supabase/config.toml` + `supabase/migrations/<14桁タイムスタンプ>_<topic>.sql`)。Issue #34 で CLI 運用に移行（旧: `001_init.sql` を SQL Editor 手動実行）
+- **ローカル**: `npm run db:start` (Supabase Docker stack 起動) → `npm run db:reset` (全マイグレーション適用)
+- **本番**: `supabase db push` (新規プロジェクト) / `supabase migration repair --status applied <version>` (既存 fork の同期)
 - **RLS（Row Level Security）**: 全テーブルで有効化、ユーザーは自分のデータのみアクセス可能
 
 ---
@@ -216,19 +218,70 @@ avatars/
 
 ---
 
-## マイグレーション適用手順
+## マイグレーション運用
+
+### 前提
+
+- **Docker Desktop** が起動していること
+- **Supabase CLI v2 以上** (`supabase --version`)
+- ローカルポート 54321 (API) / 54322 (DB) / 54323 (Studio) / 54324 (inbucket) が空いていること
 
 ### ローカル開発環境
 
-1. Supabase ダッシュボード（https://supabase.com/dashboard）にログイン
-2. プロジェクトを選択
-3. 左メニューから「SQL Editor」を選択
-4. `supabase/migrations/001_init.sql` の内容をコピー＆ペースト
-5. 「Run」ボタンをクリック
+```bash
+# 1. 初回 / 再立ち上げ
+npm run db:start          # supabase start ─ Docker stack を起動
+npm run db:reset          # supabase db reset ─ 全マイグレーション適用 + (任意の) seed 投入
 
-### 本番環境
+# 2. 新規マイグレーション作成
+supabase migration new <topic>
+# → supabase/migrations/<14桁タイムスタンプ>_<topic>.sql が生成される
 
-同様の手順で本番環境の Supabase プロジェクトにマイグレーションを適用。
+# 3. 編集後、再度 reset で全件適用し直し
+npm run db:reset
+
+# 4. セルフチェック (reset → lint → test)
+/db-check                 # Claude Code slash command
+# または個別に:
+npm run db:lint           # plpgsql_check で SQL 静的解析
+npm run db:test           # pgTAP テスト (Issue #35 で整備予定)
+```
+
+### 本番適用
+
+#### A. 新規プロジェクト（CLI 運用前提で立ち上げた場合）
+
+```bash
+# 一度だけ: ローカル repo を本番 Supabase プロジェクトにリンク
+supabase login
+supabase link --project-ref <your-project-ref>
+
+# 適用前に差分を確認 (破壊的変更が混じっていないか)
+npm run db:push:dry-run
+
+# 本番適用
+supabase db push
+```
+
+`supabase_migrations.schema_migrations` テーブルが本番側に作られ、適用済みバージョンが記録される。以降の差分は `supabase db push` で自動同期。
+
+#### B. 既存 fork（旧 `001_init.sql` を SQL Editor で適用済みのケース）
+
+旧運用で適用したスキーマと、新運用のマイグレーションファイル (`20260420205000_init.sql`) は内容が同じだが、`supabase_migrations.schema_migrations` には履歴が残っていない。CLI に「これは既に適用済み」と教える必要がある。
+
+```bash
+# 1. リンク (新規と同じ)
+supabase login
+supabase link --project-ref <your-project-ref>
+
+# 2. 既存の init マイグレーションを「適用済み」とマーク (本番 DB は変更しない)
+supabase migration repair --status applied 20260420205000
+
+# 3. 以降の新規マイグレーションだけが push 対象になる
+npm run db:push:dry-run   # → 「Local migrations are up to date」を確認
+```
+
+`migration repair` は **本番 DB のスキーマ自体は触らない**。`schema_migrations` の同期だけが目的なので安全。
 
 ---
 
@@ -264,19 +317,18 @@ avatars/
 
 ### マイグレーション管理
 
-- **テンプレート方針**: 本テンプレートは `001_init.sql` 1 ファイルに全初期化をまとめている
-  （インクリメンタル migration ではなく、新規プロジェクトが 1 回実行するだけで構成が完成する形）
-- 将来的にスキーマを変更する場合は、`002_xxx.sql` のように追加ファイルを作るか、
-  `001_init.sql` を更新して既存ユーザーは `000_cleanup.sql` → `001_init.sql` で再初期化する
-- 本番適用前に必ずローカルでテスト
-- 破壊的変更（テーブル削除など）は慎重に行う
+- **テンプレート方針**: Supabase CLI 規約に準拠 (Issue #34)。新規マイグレーションは必ず `supabase migration new <topic>` で 14 桁タイムスタンプを採番する。手動で `<連番>_<topic>.sql` 形式で作るのは禁止（CLI が認識できなくなる）
+- 1 マイグレーション = 1 関心事。新規テーブル + 既存テーブル変更を同じファイルに混ぜない
+- 既存マイグレーションファイル (`20260420205000_init.sql`) は本番に適用済みなので **直接編集禁止**。スキーマ変更は新しいタイムスタンプのファイルで追加 / 変更する
+- 本番適用前に必ず `/db-check`（ローカル reset + lint + test）を通す
+- 破壊的変更（`drop table` 等）は `supabase db push --dry-run` で diff を二重確認してから実行
 - 運用フロー・Advisor 実行タイミングは [.claude/security.md](./security.md#マイグレーション運用ルール) を参照
 
 ---
 
 ## 新規マイグレーション時のセルフチェックリスト
 
-新規テーブル・ポリシー・関数を `002_xxx.sql` 以降で追加する際、以下を順にチェックする。**1 つでも未チェックなら本番適用しない**。既存実装（`001_init.sql`）がすべての項目を満たしているため、これに倣う。
+新規テーブル・ポリシー・関数を **`supabase migration new <topic>` で生成した新規マイグレーション** に追加する際、以下を順にチェックする。**1 つでも未チェックなら本番適用しない**。既存実装（`20260420205000_init.sql`）がすべての項目を満たしているため、これに倣う。
 
 ### 新規テーブル
 
@@ -309,6 +361,7 @@ avatars/
 
 ### 適用前・適用後の検証
 
-- [ ] ローカル Supabase で `000_cleanup.sql` → `001_init.sql` → 新規 `002_xxx.sql` を流して**全てエラーなく通る**
+- [ ] `/db-check` (= `npm run db:reset` → `db:lint` → `db:test`) がローカルで全 green / skip
+- [ ] `npm run db:push:dry-run` で適用予定の差分を目視確認（破壊的変更が混じっていないか）
 - [ ] 本番適用直後に **Supabase Dashboard > Database > Advisors** を Run し、新規違反が出ていないことを確認
 - [ ] アプリをデプロイし、該当テーブル/ポリシーが期待通り動作することを確認（サインアップ、自分のデータ参照、他ユーザーのデータ参照不可、等）

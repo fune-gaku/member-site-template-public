@@ -81,9 +81,12 @@ member-site-template/
 │   ├── env.d.ts                       # 環境変数・App.Locals 型定義（declare global + export {}）
 │   └── middleware.ts                  # 認証 + role 取得 + セキュリティヘッダ付与
 ├── supabase/
+│   ├── config.toml                    # Supabase CLI 設定（Issue #34、site_url / password requirements 等）
+│   ├── .gitignore                     # supabase init 生成（.temp / .branches を除外）
 │   └── migrations/
-│       ├── 000_cleanup.sql            # 開発専用：全テーブル削除（本番では絶対に実行しない）
-│       └── 001_init.sql               # 初期スキーマ + RLS + トリガー + Storage バケット
+│       └── 20260420205000_init.sql    # 初期スキーマ + RLS + トリガー + Storage バケット
+│                                      #   ファイル名は Supabase CLI 規約 (`supabase migration new <topic>` の自動採番)
+│                                      #   reset / cleanup は `supabase db reset` で代替（旧 000_cleanup.sql は不要）
 ├── tests/
 │   ├── README.md                      # テスト実行方法
 │   ├── unit/                          # 単体（schema / middleware / supabase-client 等）

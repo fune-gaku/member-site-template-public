@@ -20,10 +20,14 @@ Astro + Vue + Supabase + Cloudflare Workers を使った会員サイトテンプ
 
 ## 前提条件
 
-- Node.js `>=22.12.0`（[.nvmrc](.nvmrc) 参照）
+- **Node.js** `>=22.12.0`（[.nvmrc](.nvmrc) 参照）
+- **Docker Desktop**（ローカル DB / `supabase start` 用、[公式](https://www.docker.com/products/docker-desktop/)）
+- **Supabase CLI v2 以上**（`brew install supabase/tap/supabase` または [公式インストール手順](https://supabase.com/docs/guides/local-development/cli/getting-started)）
 - [Supabase](https://supabase.com/) プロジェクト
 - [Cloudflare](https://dash.cloudflare.com/) アカウント
 - `wrangler` CLI は `devDependencies` に含まれるため、`npx wrangler` で実行できます
+
+> Docker と Supabase CLI は **必須**。`supabase/migrations/*.sql` は `supabase db push` 経由で本番に同期する設計のため、CLI なしでは新規マイグレーションの本番適用ができません（Issue #34 で SQL Editor 手動コピペ運用から CLI 運用に移行）。
 
 ---
 
@@ -73,6 +77,32 @@ cp .dev.vars.example .dev.vars
 ---
 
 ## ローカル開発
+
+### Supabase ローカル stack
+
+`supabase start` で Docker 上に Postgres / Auth / Storage / Studio (54323) / inbucket (54324) を起動します。
+
+```bash
+npm run db:start          # supabase start ─ 初回は Docker image の取得で 1〜3 分
+npm run db:reset          # supabase db reset ─ 全マイグレーション (supabase/migrations/*.sql) を空 DB に適用
+```
+
+`db:reset` 後の `.env` は **ローカル Supabase の値** に書き換えます（`supabase status` で表示される `API URL` / `anon key` を参照）。
+
+| コマンド                  | 内容                                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `npm run db:start`        | Supabase Docker stack を起動                                                                   |
+| `npm run db:stop`         | 起動中の stack を停止                                                                          |
+| `npm run db:reset`        | 全マイグレーション再適用（破壊的: ローカル DB の中身は消える）                                 |
+| `npm run db:lint`         | plpgsql_check による SQL 静的解析                                                              |
+| `npm run db:test`         | pgTAP テスト（Issue #35 で整備予定）                                                           |
+| `npm run db:diff`         | リンク済み本番 DB との差分を出力（要 `supabase link`）                                         |
+| `npm run db:push:dry-run` | 本番適用予定の差分を事前確認                                                                   |
+| `/db-check` (slash cmd)   | reset → lint → test を一気通貫（[.claude/commands/db-check.md](.claude/commands/db-check.md)） |
+
+詳細な運用フロー（新規マイグレーション作成・本番適用・既存 fork 向け `migration repair`）は [.claude/database.md「マイグレーション運用」](.claude/database.md#マイグレーション運用) を参照。
+
+### Astro dev サーバー
 
 ```bash
 npm run dev
@@ -223,6 +253,19 @@ npm run deploy
 - [.claude/security.md](.claude/security.md) — セキュリティチェックリスト
 - [.claude/development.md](.claude/development.md) — 開発ルール・命名規則
 - [.claude/deployment.md](.claude/deployment.md) — デプロイ詳細
+
+---
+
+## 推奨 Claude Code skill / plugin
+
+このテンプレートを Claude Code で扱う際、以下の plugin / skill を入れておくと開発体験がよくなります（任意）。
+
+| 名称                      | 用途                                                                                          | インストール                                                      |
+| ------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `postgres-best-practices` | Supabase 公式の Postgres ベストプラクティス（インデックス・RLS パフォーマンス・スキーマ設計） | Claude Code marketplace から `postgres-best-practices` を install |
+| `astro-docs` (MCP)        | Astro 6 の公式 docs を MCP サーバ経由で検索（`mcp__astro-docs__search_astro_docs`）           | `mcp.json` に登録（[Astro 公式手順](https://docs.astro.build/)）  |
+
+`/db-check` slash command は本リポに同梱されており、`.claude/commands/db-check.md` を Claude Code が自動認識します（追加インストール不要）。
 
 ---
 
