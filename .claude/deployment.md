@@ -464,7 +464,7 @@ npx wrangler rollback --name member-site-template <version-id>
 ### Cloudflare Workers（Dashboard / CLI）
 
 - [ ] `npx wrangler secret list --name member-site-template` で `SUPABASE_SERVICE_ROLE_KEY` が **per-Worker Secret** に登録済（Secrets Store 側ではない）
-- [ ] `wrangler.jsonc` の `vars.PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` が本番値
+- [ ] 公開値 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` が **ビルド時の `.env`（または `.env.production`）** に本番値で入っている。`wrangler.jsonc` の `vars` に書いても効かないので注意（[README「8. 本番公開値の供給」](../README.md#8-本番公開値の供給ビルド時-inline) 参照）
 - [ ] `compatibility_flags` に `nodejs_compat` が含まれている
 - [ ] Custom Domain を使うなら Supabase 側 `Site URL` / `Redirect URLs` を更新済
 - [ ] **Turnstile を有効化する場合のみ**: [Cloudflare Turnstile（任意）](#cloudflare-turnstile任意--bot-対策) の手順で `TURNSTILE_SECRET_KEY` を per-Worker Secret に登録、`PUBLIC_TURNSTILE_SITE_KEY` を build 環境の `.env` に設定

@@ -164,18 +164,27 @@ Turnstile (CAPTCHA) を有効化する場合は同様に `TURNSTILE_SECRET_KEY` 
 >
 > 参考: [Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/) / [Secrets Store](https://developers.cloudflare.com/secrets-store/)
 
-### 8. 本番公開値の登録
+### 8. 本番公開値の供給（ビルド時 inline）
 
-公開値（`PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY`）は [wrangler.jsonc](wrangler.jsonc) の `vars` フィールド、または Dashboard の Variables に登録します。
+公開値（`PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY`）はコードから `import.meta.env.PUBLIC_*` で参照されており、**Vite が `astro build` の時点で `.env*` から読み取ってバンドルに inline します**（クライアント JS からも参照されるため）。供給経路を選びます。
 
-```jsonc
-{
-  "vars": {
-    "PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
-    "PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_xxx",
-  },
-}
+(a) **同一 Supabase プロジェクトを開発と本番で使う場合**: Step 2 で作成した [.env](.env.example) の値がそのまま本番ビルドにも使われるため、追加作業は不要です。
+
+(b) **本番だけ別 Supabase プロジェクトを使う場合**: ローカル機からデプロイするなら `.env.production` を作成して上書きします（Vite は production build 時に `.env` の上に `.env.production` を重ね読みします。`.env.production` は `.gitignore` 済）。
+
+```bash
+# .env.production
+PUBLIC_SUPABASE_URL=https://your-prod-project.supabase.co
+PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
 ```
+
+CI からデプロイするならビルドコマンドに環境変数を直接渡す形でも可:
+
+```bash
+PUBLIC_SUPABASE_URL=... PUBLIC_SUPABASE_PUBLISHABLE_KEY=... npm run deploy
+```
+
+> **`wrangler.jsonc` の `vars` には `PUBLIC_*` を書かないこと。** `vars` は Workers ランタイム env (`env.X` / `cloudflare:workers`) のみに反映され、`import.meta.env.PUBLIC_*` には届きません。書いても無害ですが効きません（コード側がそちらを参照していないため）。本テンプレートで `vars` 経由で読む値は現状ありません（秘密値は `wrangler secret`、公開値は `.env*`）。
 
 ### 9. 初回デプロイ
 
