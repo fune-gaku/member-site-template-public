@@ -45,6 +45,7 @@
 - [x] Supabase Dashboard のセキュリティ設定を完了（→ [Supabase Dashboard セキュリティ設定チェックリスト](#supabase-dashboard-セキュリティ設定チェックリスト)）
 - [x] アカウント列挙対策：`auth.signIn` / `auth.signUp` / `auth.resetPassword` の全失敗ケースを統一応答（成功扱い or `UNAUTHORIZED` + 同一文言）に正規化し、メールアドレスの登録有無を判別不能にする（実装は `src/lib/auth-signin.ts` / `auth-signup.ts` / `auth-reset-password.ts`、テストで bytewise 同一を検証 — Issue #8 / #14）
 - [x] CAPTCHA (Cloudflare Turnstile) ：`auth.signUp` / `auth.signIn` / `auth.resetPassword` の 3 経路すべてで `TURNSTILE_SECRET_KEY` 設定時に opt-in で有効化。bot による credential stuffing / 自動アカウント作成 / spam reset を抑止（`src/components/TurnstileWidget.vue` を 3 フォーム共通で使用 — Issue #21）
+- [x] ログイン中のパスワード変更時に現在のパスワード再認証を要求：`auth.changePassword` Action は `signInWithPassword` で現パスワードを検証してから `updateUser` を呼ぶ。recovery 用 `auth.updatePassword` とは分離。盗難セッション Cookie 単独 / 共有 PC 攻撃での account takeover を抑止（OWASP Authentication Cheat Sheet / NIST SP 800-63B §5.2.10、実装は `src/lib/auth-change-password.ts` — Issue #19）
 - [ ] **未実装（将来課題）**: admin role への MFA / TOTP 必須化。Supabase Auth は MFA factor をサポートしているため、admin が増えるタイミングで導入を検討する
 
 ### ✅ インジェクション対策

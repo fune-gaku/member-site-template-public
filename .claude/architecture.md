@@ -222,6 +222,17 @@ Supabase のメール認証には **2 種類のトークン方式** があり、
 5. /auth/signin?reset=done に遷移し、新パスワードでの再ログインを促す
 ```
 
+#### ログイン中ユーザーによるパスワード変更フロー（Issue #19）
+
+recovery 用 `/auth/update-password` とは別経路。プロフィール画面 (`/member/profile`) の `ChangePasswordForm.vue` から呼ぶ `auth.changePassword` Action が担当する。設計差分:
+
+- 現在のパスワードによる **再認証 (`signInWithPassword`)** を要求してから `updateUser` を呼ぶ。盗難セッション Cookie 単独 / 共有 PC 攻撃での account takeover を抑止 (OWASP Authentication Cheat Sheet / NIST SP 800-63B §5.2.10)
+- 成功後の `signOut` は **行わない**（recovery と異なり、本人による日常変更では現セッションを維持したいため）
+- `currentPassword === newPassword` を拒否（運用上の利便性 + ポリシーローテーション意図の明示）
+- HIBP 漏洩チェック (`ENABLE_HIBP_CHECK=true` 時) を再認証より前に実行し、Auth サーバラウンドトリップを最小化
+
+実装本体は `src/lib/auth-change-password.ts` の `performChangePassword` に分離してテスト可能 (`tests/unit/auth-change-password.test.ts`)。
+
 #### `/auth/callback` フロー（PKCE 専用、互換維持）
 
 - `?code=...` 付きで来れば `exchangeCodeForSession(code)` を自動実行（PKCE 耐性あり）

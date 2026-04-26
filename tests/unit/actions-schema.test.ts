@@ -200,6 +200,71 @@ describe("auth.signUp / auth.resetPassword account enumeration defense (Issue #1
   });
 });
 
+describe("auth.changePassword schema (Issue #19)", () => {
+  // actions/index.ts の changePassword input と同じ形を再宣言
+  // (Astro context 不要のため schema レベルで境界値を検証)
+  const schema = z.object({
+    currentPassword: z.string().min(1).max(72),
+    newPassword: z
+      .string()
+      .min(8)
+      .max(72)
+      .refine(
+        (pw) => /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /\d/.test(pw),
+        "英大文字・英小文字・数字を各1文字以上含めてください",
+      ),
+  });
+
+  it("正常な入力を受け入れる", () => {
+    const result = schema.safeParse({
+      currentPassword: "OldPassword123",
+      newPassword: "NewPassword456",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("currentPassword 空文字を拒否する", () => {
+    const result = schema.safeParse({
+      currentPassword: "",
+      newPassword: "NewPassword456",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("newPassword が 8 文字未満は拒否する", () => {
+    const result = schema.safeParse({
+      currentPassword: "OldPassword123",
+      newPassword: "Short1",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("newPassword が複雑性要件を満たさない場合は拒否する", () => {
+    // 数字無し
+    const result = schema.safeParse({
+      currentPassword: "OldPassword123",
+      newPassword: "NoDigitsHere",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("newPassword が 72 文字超は拒否する (bcrypt 仕様)", () => {
+    const result = schema.safeParse({
+      currentPassword: "OldPassword123",
+      newPassword: `${"A1bcdefg".repeat(9)}X`, // 73 文字
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("currentPassword が 72 文字超は拒否する", () => {
+    const result = schema.safeParse({
+      currentPassword: "x".repeat(73),
+      newPassword: "NewPassword456",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("admin.createUser schema", () => {
   const schema = z.object({
     email: z.string().email(),
