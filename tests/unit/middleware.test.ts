@@ -5,6 +5,7 @@ vi.mock("../../src/lib/supabase", () => ({
   createClient: vi.fn(() => ({
     auth: {
       getClaims: vi.fn(),
+      getUser: vi.fn(),
     },
   })),
 }));
@@ -14,8 +15,11 @@ import { onRequest } from "../../src/middleware";
 
 /**
  * createClient のモックを構築するヘルパー。
- * - user: getAuthUser (= auth.getClaims) が返すユーザー（null 可）
+ * - user: 認証されたユーザー (null = 未認証)
  * - role: profiles テーブルの role 列の値（指定時のみ from をモック）
+ *
+ * middleware は /admin/* では getAuthUserFresh (= auth.getUser、強制サーバ検証) を
+ * 呼び、それ以外では getAuthUser (= auth.getClaims) を呼ぶ。両経路をモックする。
  */
 function buildSupabaseMock(options: {
   user: { id: string; email: string } | null;
@@ -33,9 +37,7 @@ function buildSupabaseMock(options: {
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
 
-  // getAuthUser は内部で getClaims を呼び、claims.sub と claims.email を
-  // 取り出して { id, email } を組み立てる。テストでは getClaims の戻りを
-  // その形に合わせて模倣する。
+  // getAuthUser (claims) と getAuthUserFresh (user) の両方の経路を模倣。
   const claims = options.user
     ? { sub: options.user.id, email: options.user.email }
     : null;
@@ -43,12 +45,16 @@ function buildSupabaseMock(options: {
     data: claims ? { claims } : null,
     error: null,
   });
+  const getUser = vi.fn().mockResolvedValue({
+    data: { user: options.user },
+    error: null,
+  });
 
   return {
-    auth: { getClaims },
+    auth: { getClaims, getUser },
     from,
     // 参照しやすいように内部 mock も露出
-    __mocks: { from, select, eq, single, getClaims },
+    __mocks: { from, select, eq, single, getClaims, getUser },
   };
 }
 
@@ -94,11 +100,12 @@ describe("middleware: /member 配下の認可", () => {
   it("認証済みユーザーは /member 配下にアクセスできる", async () => {
     const mockUser = { id: "user-123", email: "test@example.com" };
 
+    const sbMock = buildSupabaseMock({
+      user: mockUser,
+      role: "member",
+    });
     vi.mocked(createClient).mockReturnValue(
-      buildSupabaseMock({
-        user: mockUser,
-        role: "member",
-      }) as unknown as ReturnType<typeof createClient>,
+      sbMock as unknown as ReturnType<typeof createClient>,
     );
 
     const context = {
@@ -117,6 +124,9 @@ describe("middleware: /member 配下の認可", () => {
     expect(next).toHaveBeenCalled();
     expect(context.locals.user).toEqual(mockUser);
     expect(context.locals.profile).toEqual({ role: "member" });
+    // /member/* は claims fast path (失効ラグ許容、Auth サーバ往復回避)
+    expect(sbMock.__mocks.getClaims).toHaveBeenCalledTimes(1);
+    expect(sbMock.__mocks.getUser).not.toHaveBeenCalled();
   });
 
   it("/member 以外のパスでは未認証でもリダイレクトしない（ただし getClaims は全ページで呼ばれる）", async () => {
@@ -219,11 +229,12 @@ describe("middleware: /admin 配下の認可", () => {
   it("admin ロールは /admin 配下にアクセスできる", async () => {
     const mockUser = { id: "admin-1", email: "admin@example.com" };
 
+    const sbMock = buildSupabaseMock({
+      user: mockUser,
+      role: "admin",
+    });
     vi.mocked(createClient).mockReturnValue(
-      buildSupabaseMock({
-        user: mockUser,
-        role: "admin",
-      }) as unknown as ReturnType<typeof createClient>,
+      sbMock as unknown as ReturnType<typeof createClient>,
     );
 
     const context = {
@@ -241,6 +252,9 @@ describe("middleware: /admin 配下の認可", () => {
     expect(context.redirect).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalled();
     expect(context.locals.profile).toEqual({ role: "admin" });
+    // /admin/* では強制サーバ検証 (getUser) が呼ばれ、claims fast path は使われない
+    expect(sbMock.__mocks.getUser).toHaveBeenCalledTimes(1);
+    expect(sbMock.__mocks.getClaims).not.toHaveBeenCalled();
   });
 });
 

@@ -1,6 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
 
-import { getAuthUser } from "./lib/auth-claims";
+import { getAuthUser, getAuthUserFresh } from "./lib/auth-claims";
 import { checkActionBodySize } from "./lib/request-size-limits";
 import { safeNextPath } from "./lib/safe-redirect";
 import { applySecurityHeaders } from "./lib/security-headers";
@@ -22,23 +22,31 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return response;
   }
 
-  // 全ページで Supabase クライアントを生成し getAuthUser (= getClaims) を呼ぶ。
+  const pathname = context.url.pathname;
+  const isMemberArea = pathname.startsWith("/member");
+  const isAdminArea = pathname.startsWith("/admin");
+
+  // 全ページで Supabase クライアントを生成し JWT を検証する。
   // これにより期限切れトークンのサイレントリフレッシュが走り、
   // createServerClient 内の setAll 経由で新しい Cookie が
   // context.cookies.set() される（Astro が自動で response に反映）。
-  // 非対称署名鍵設定時は WebCrypto によるローカル検証で Auth サーバ往復が消える。
+  //
+  // /admin/* だけは getAuthUserFresh (= auth.getUser、強制サーバ検証) を使う。
+  // 一般経路で使う getAuthUser (= getClaims) は asymmetric signing key 設定時に
+  // ローカル JWT 検証になりサーバ側のセッション失効・アカウント停止・強制
+  // ログアウトを最大 JWT 寿命 (≒1h) まで反映できないため、admin 経路で盗難
+  // JWT による横移動を許してしまう退行を避ける。一般 member 経路では失効ラグは
+  // 許容して getClaims の高速化メリットを取る。
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
   });
-  const user = await getAuthUser(supabase);
+  const user = isAdminArea
+    ? await getAuthUserFresh(supabase)
+    : await getAuthUser(supabase);
 
   context.locals.user = user;
   context.locals.profile = null;
-
-  const pathname = context.url.pathname;
-  const isMemberArea = pathname.startsWith("/member");
-  const isAdminArea = pathname.startsWith("/admin");
 
   // 認証必須エリア: 未認証なら /auth/signin にリダイレクト
   if ((isMemberArea || isAdminArea) && !user) {

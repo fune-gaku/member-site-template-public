@@ -3,7 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
 import { env } from "cloudflare:workers";
 
-import { getAuthUser } from "../lib/auth-claims";
+import { getAuthUser, getAuthUserFresh } from "../lib/auth-claims";
 import { performSignIn } from "../lib/auth-signin";
 import {
   ALLOWED_AVATAR_MIME,
@@ -87,13 +87,20 @@ async function assertTurnstilePassed(
 /**
  * 認証済みユーザー + profile.role === "admin" を検証するヘルパー。
  * 成功時は caller の User を返す。失敗時は ActionError を throw。
+ *
+ * admin Action は **getAuthUserFresh** (= auth.getUser、強制サーバ検証) を
+ * 使う。一般経路で使う getAuthUser (= getClaims) は asymmetric signing key 設定時に
+ * ローカル JWT 検証になりサーバ側のセッション失効・アカウント停止・強制ログアウトを
+ * 即時反映できないため、admin 経路で盗難 admin JWT による横移動を許す退行を避ける。
+ * 1 リクエストあたり Auth サーバへの往復が 1 回増えるが、admin 操作は頻度が低く
+ * 許容できるコスト。
  */
 async function requireAdmin(context: ActionAPIContext) {
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
   });
-  const user = await getAuthUser(supabase);
+  const user = await getAuthUserFresh(supabase);
   if (!user) {
     throw new ActionError({ code: "UNAUTHORIZED", message: "認証が必要です" });
   }
