@@ -2,9 +2,11 @@
  * Cloudflare Turnstile (CAPTCHA) のサーバ側検証。
  *
  * 設計方針:
- * - HIBP (`pwned-password.ts`) と同じく env による opt-in。
- *   `PUBLIC_TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET_KEY` の両方が
- *   設定されているときのみ有効化する。片方欠落は無効扱い。
+ * - HIBP (`pwned-password.ts`) と同じく env による opt-in。サーバは
+ *   `TURNSTILE_SECRET_KEY` (秘密) のみを判定材料にする。site key は
+ *   public 値でクライアント識別子に過ぎず、サーバ側で読む必然性が無い
+ *   (= wrangler.jsonc vars への登録も不要)。secret が設定されていれば
+ *   検証必須、未設定なら opt-out。
  * - HIBP と違って **フェイルクローズ**: siteverify が失敗 / 応答異常の場合は
  *   bot を素通しさせないため `false` を返し caller 側で 400 を返す。
  *   (Turnstile は bot 対策が目的なので可用性より厳密性を優先)
@@ -21,19 +23,6 @@ const TURNSTILE_VERIFY_ENDPOINT =
  * SignupForm が submit に含める hidden input の name (Turnstile 規約)。
  */
 export const TURNSTILE_RESPONSE_FIELD = "cf-turnstile-response";
-
-/**
- * Turnstile が両 key 揃って有効化されているかを判定する。
- *
- * site key だけ設定 / secret だけ設定 のような中途半端な状態を
- * 「無効」として扱う方が運用ミスに気付きやすい。
- */
-export function isTurnstileEnabled(
-  siteKey: string | undefined,
-  secret: string | undefined,
-): boolean {
-  return Boolean(siteKey && secret);
-}
 
 interface SiteVerifyResponse {
   success: boolean;

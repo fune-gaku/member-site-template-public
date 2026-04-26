@@ -173,9 +173,6 @@ Turnstile (CAPTCHA) を有効化する場合は同様に `TURNSTILE_SECRET_KEY` 
   "vars": {
     "PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
     "PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_xxx",
-    // Turnstile を有効化する場合のみ追加（site key は公開値）。
-    // 詳細は .claude/deployment.md#cloudflare-turnstile任意--bot-対策
-    // "PUBLIC_TURNSTILE_SITE_KEY": "<your turnstile site key>",
   },
 }
 ```

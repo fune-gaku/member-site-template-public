@@ -16,7 +16,6 @@ import { createClient } from "../lib/supabase";
 import { createAdminClient } from "../lib/supabase-admin";
 import {
   TURNSTILE_RESPONSE_FIELD,
-  isTurnstileEnabled,
   verifyTurnstileToken,
 } from "../lib/turnstile";
 
@@ -52,30 +51,30 @@ async function assertNotPwned(password: string): Promise<void> {
 /**
  * Turnstile (CAPTCHA) 検証。
  *
- * `PUBLIC_TURNSTILE_SITE_KEY` (公開) と `TURNSTILE_SECRET_KEY` (秘密) の
- * 両方が設定されているときだけ有効化する opt-in 方式。検証失敗は fail-closed
- * で BAD_REQUEST。トークンは Cloudflare Workers の `CF-Connecting-IP` で
- * 縛り、token の使い回しを抑制する。
+ * `TURNSTILE_SECRET_KEY` (秘密) が設定されているときのみ有効化する opt-in 方式。
+ * 検証失敗は fail-closed で BAD_REQUEST。トークンは Cloudflare Workers の
+ * `CF-Connecting-IP` で縛り、token の使い回しを抑制する。
+ *
+ * site key (`PUBLIC_TURNSTILE_SITE_KEY`) はクライアントが widget 表示用に
+ * `import.meta.env` 経由で読むだけ。サーバが site key を読まないことで
+ * wrangler.jsonc vars への登録が不要になり、site key を入れ忘れても
+ * サーバ検証だけは secret 起点で動き続ける (silent fail を防ぐ)。
  */
 async function assertTurnstilePassed(
   token: string | undefined,
   request: Request,
 ): Promise<void> {
-  let siteKey: string | undefined;
   let secret: string | undefined;
   try {
-    const e = env as unknown as Record<string, string | undefined>;
-    siteKey = e.PUBLIC_TURNSTILE_SITE_KEY;
-    secret = e.TURNSTILE_SECRET_KEY;
+    secret = (env as unknown as Record<string, string | undefined>)
+      .TURNSTILE_SECRET_KEY;
   } catch {
-    siteKey = undefined;
     secret = undefined;
   }
-  if (!isTurnstileEnabled(siteKey, secret)) return;
+  if (!secret) return;
 
-  // 上の guard で secret は string 確定
   const remoteIp = request.headers.get("CF-Connecting-IP") ?? undefined;
-  const ok = await verifyTurnstileToken(token, secret as string, remoteIp);
+  const ok = await verifyTurnstileToken(token, secret, remoteIp);
   if (!ok) {
     throw new ActionError({
       code: "BAD_REQUEST",

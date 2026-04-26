@@ -2,23 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   TURNSTILE_RESPONSE_FIELD,
-  isTurnstileEnabled,
   verifyTurnstileToken,
 } from "../../src/lib/turnstile";
-
-describe("isTurnstileEnabled", () => {
-  it("両方の env が設定されているときだけ有効", () => {
-    expect(isTurnstileEnabled("site", "secret")).toBe(true);
-  });
-
-  it("片方欠落 / undefined / 空文字列はすべて無効", () => {
-    expect(isTurnstileEnabled(undefined, "secret")).toBe(false);
-    expect(isTurnstileEnabled("site", undefined)).toBe(false);
-    expect(isTurnstileEnabled(undefined, undefined)).toBe(false);
-    expect(isTurnstileEnabled("", "secret")).toBe(false);
-    expect(isTurnstileEnabled("site", "")).toBe(false);
-  });
-});
 
 describe("verifyTurnstileToken (fail-closed)", () => {
   const fetchSpy = vi.spyOn(globalThis, "fetch");
