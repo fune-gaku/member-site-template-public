@@ -29,7 +29,7 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
    npm i -g @openai/codex   # または brew install --cask codex
    codex login              # ChatGPT Pro/Plus でサインイン
    ```
-2. **gh CLI**: `command -v gh` ＋ `gh auth status`（このリポは既に gh 利用中なので通常 OK）
+2. **gh CLI**: `command -v gh` ＋ `env -u GH_TOKEN -u GITHUB_TOKEN gh auth status`（このリポは既に gh 利用中なので通常 OK）。`env -u` を付けるのは step 3 と同じ理由で、親 shell に stale な `GH_TOKEN` / `GITHUB_TOKEN` が残っていても keyring 経由で sanity check できるようにするため。これがないと step 3 の修正に到達する前に preflight が落ちて、本来の修正効果が無効化される
 3. **gh auth token を export（Codex sandbox 用）**: `GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token)` で keyring 値を取得して保持。Codex CLI の sandbox は macOS Keychain にアクセスできず、sandbox 内から `gh` を叩くと `The token in default is invalid` で失敗する（Issue #28）。`GH_TOKEN` env が設定されていれば gh は keyring を引かずに env を使うため、これで回避する。**重要**: `gh auth token` 単体では公式仕様 (`gh help environment`) により親 shell の `GH_TOKEN` / `GITHUB_TOKEN` env が stored credentials より優先されるため、親に stale な値が残っていると古い token を Codex に再注入してしまう。`env -u` で env を一旦剥がしてから取得することで keyring の真値を確実に取り出せる
 4. **PR が OPEN かつ非 draft**: `gh pr view <N> --json state,isDraft,headRefName,baseRefName,mergeable,statusCheckRollup` で確認
 5. **クリーンな working tree**: `git status --short` が空。コミットされていない変更があれば停止
