@@ -6,20 +6,13 @@ import { TURNSTILE_RESPONSE_FIELD } from "../lib/turnstile";
 
 import TurnstileWidget from "./TurnstileWidget.vue";
 
-// `next` は signin.astro 側で safeNextPath() による検証済みの値を受け取る。
-// クライアント側で window.location.search から直接読むと Open Redirect
-// （CWE-601）を踏むため、必ず props 経由で受け取ること。
-const props = withDefaults(defineProps<{ next?: string }>(), {
-  next: "/member/dashboard",
-});
-
-// 公開 site key。未設定なら Turnstile を表示しない (opt-in)。
 const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
 const email = ref("");
-const password = ref("");
 const isLoading = ref(false);
 const error = ref("");
+const success = ref(false);
+const successMessage = ref("");
 const turnstileToken = ref("");
 const turnstileWidget = ref<InstanceType<typeof TurnstileWidget> | null>(null);
 
@@ -37,24 +30,24 @@ async function handleSubmit() {
   try {
     const formData = new FormData();
     formData.append("email", email.value);
-    formData.append("password", password.value);
     if (turnstileToken.value) {
       formData.append(TURNSTILE_RESPONSE_FIELD, turnstileToken.value);
     }
 
-    const { data: _data, error: actionError } =
-      await actions.auth.signIn(formData);
+    const { data, error: actionError } =
+      await actions.auth.resetPassword(formData);
 
     if (actionError) {
       error.value = actionError.message;
-      // 失敗時は token を捨てて widget を再要求 (token は 1 回限り)
       turnstileWidget.value?.reset();
-    } else {
-      // ログイン成功時、サーバ検証済みの next へリダイレクト
-      window.location.href = props.next;
+    } else if (data) {
+      // performResetPassword は失敗 (内部 SMTP / レート / 未登録) でも
+      // success: true + 統一メッセージを返すため、UI からは登録有無を判別できない。
+      success.value = true;
+      successMessage.value = data.message;
     }
   } catch (e) {
-    console.error("Login error:", e);
+    console.error("Reset password error:", e);
     error.value = "予期しないエラーが発生しました";
     turnstileWidget.value?.reset();
   } finally {
@@ -65,7 +58,22 @@ async function handleSubmit() {
 
 <template>
   <div>
-    <form class="space-y-6" @submit.prevent="handleSubmit">
+    <div
+      v-if="success"
+      class="rounded-lg border border-green-200 bg-green-50 p-4"
+    >
+      <p class="text-sm text-green-800">{{ successMessage }}</p>
+      <div class="mt-4 text-center">
+        <a
+          href="/auth/signin"
+          class="text-brand-600 hover:text-brand-700 text-sm font-medium"
+        >
+          サインインに戻る
+        </a>
+      </div>
+    </div>
+
+    <form v-else class="space-y-6" @submit.prevent="handleSubmit">
       <div v-if="error" class="rounded-lg border border-red-200 bg-red-50 p-4">
         <p class="text-sm text-red-800">{{ error }}</p>
       </div>
@@ -86,25 +94,6 @@ async function handleSubmit() {
         />
       </div>
 
-      <div>
-        <label
-          for="password"
-          class="mb-2 block text-sm font-medium text-gray-700"
-        >
-          パスワード
-        </label>
-        <input
-          id="password"
-          v-model="password"
-          type="password"
-          required
-          autocomplete="current-password"
-          class="focus:ring-brand-500 focus:border-brand-500 w-full rounded-lg border border-gray-300 px-4 py-2 transition outline-none focus:ring-2"
-          placeholder="パスワードを入力"
-          :disabled="isLoading"
-        />
-      </div>
-
       <div v-if="turnstileSiteKey" class="flex justify-center">
         <TurnstileWidget
           ref="turnstileWidget"
@@ -113,30 +102,20 @@ async function handleSubmit() {
         />
       </div>
 
-      <div class="flex justify-end text-sm">
-        <a
-          href="/auth/reset-password"
-          class="text-brand-600 hover:text-brand-700 font-medium"
-        >
-          パスワードを忘れた
-        </a>
-      </div>
-
       <button
         type="submit"
         :disabled="isLoading"
         class="bg-brand-600 hover:bg-brand-700 focus:ring-brand-200 w-full rounded-lg px-4 py-3 font-medium text-white transition focus:ring-4 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {{ isLoading ? "サインイン中..." : "サインイン" }}
+        {{ isLoading ? "送信中..." : "リセットメールを送信" }}
       </button>
 
       <div class="text-center text-sm text-gray-600">
-        アカウントをお持ちでない方は
         <a
-          href="/auth/signup"
+          href="/auth/signin"
           class="text-brand-600 hover:text-brand-700 font-medium"
         >
-          新規登録
+          サインインに戻る
         </a>
       </div>
     </form>

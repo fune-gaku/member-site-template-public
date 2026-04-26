@@ -4,7 +4,9 @@ import type { ActionAPIContext } from "astro:actions";
 import { env } from "cloudflare:workers";
 
 import { getAuthUser } from "../lib/auth-claims";
+import { performResetPassword } from "../lib/auth-reset-password";
 import { performSignIn } from "../lib/auth-signin";
+import { performSignUp } from "../lib/auth-signup";
 import {
   ALLOWED_AVATAR_MIME,
   MAX_AVATAR_SIZE,
@@ -144,6 +146,11 @@ export const server = {
         // 有効化されている場合は assertTurnstilePassed が空文字列を弾く。
         [TURNSTILE_RESPONSE_FIELD]: z.string().max(2048).optional(),
       }),
+      // 本体は `src/lib/auth-signup.ts` の `performSignUp` に分離してある。
+      // Issue #14 (A3 follow-up): Supabase が返す `User already registered`
+      // を含む全失敗ケースを統一成功メッセージに正規化し、メール存在判定を
+      // 防ぐ。Turnstile / HIBP の事前検証 BAD_REQUEST はバリデーション失敗
+      // (enumeration vector ではない) なので通常通りユーザに返す。
       handler: async (input, context) => {
         // CAPTCHA (Turnstile) — 環境変数で opt-in。無効時は noop。
         await assertTurnstilePassed(
@@ -158,20 +165,13 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const { error } = await supabase.auth.signUp({
+        return performSignUp(supabase, {
           email: input.email,
           password: input.password,
           options: {
             emailRedirectTo: `${context.url.origin}/auth/callback`,
           },
         });
-        if (error) {
-          throw new ActionError({
-            code: "BAD_REQUEST",
-            message: error.message,
-          });
-        }
-        return { success: true };
       },
     }),
 
@@ -180,17 +180,29 @@ export const server = {
       input: z.object({
         email: z.string().email().max(254),
         password: z.string().max(200),
+        // Issue #21: signin にも Turnstile を適用（credential stuffing 抑止）。
+        // Turnstile が無効化されている環境では未送信なので optional。
+        [TURNSTILE_RESPONSE_FIELD]: z.string().max(2048).optional(),
       }),
       // 本体は `src/lib/auth-signin.ts` の `performSignIn` に分離してある。
       // Issue #8 (A3): すべての失敗ケースを統一メッセージに正規化することで
       // アカウント列挙を防ぐ。Timing は Supabase 側の bcrypt 検証が
       // 概ね吸収する想定。
       handler: async (input, context) => {
+        // Issue #21: CAPTCHA (Turnstile) を signin にも適用（credential stuffing 抑止）。
+        await assertTurnstilePassed(
+          input[TURNSTILE_RESPONSE_FIELD],
+          context.request,
+        );
+
         const supabase = createClient({
           request: context.request,
           cookies: context.cookies,
         });
-        return performSignIn(supabase, input);
+        return performSignIn(supabase, {
+          email: input.email,
+          password: input.password,
+        });
       },
     }),
 
@@ -214,8 +226,22 @@ export const server = {
 
     resetPassword: defineAction({
       accept: "form",
-      input: z.object({ email: z.string().email().max(254) }),
+      input: z.object({
+        email: z.string().email().max(254),
+        // Issue #21: reset-password にも Turnstile を適用（spam reset 抑止）。
+        [TURNSTILE_RESPONSE_FIELD]: z.string().max(2048).optional(),
+      }),
+      // 本体は `src/lib/auth-reset-password.ts` の `performResetPassword` に分離してある。
+      // Issue #14 (A3 follow-up): 未登録メール / SMTP 失敗 / レート超過の各失敗ケースを
+      // 統一成功メッセージに正規化し、登録有無を判定不能にする。
+      // Turnstile 事前検証の BAD_REQUEST はバリデーション失敗のため通常通り返す。
       handler: async (input, context) => {
+        // Issue #21: CAPTCHA (Turnstile) を reset-password にも適用（spam reset 抑止）。
+        await assertTurnstilePassed(
+          input[TURNSTILE_RESPONSE_FIELD],
+          context.request,
+        );
+
         const supabase = createClient({
           request: context.request,
           cookies: context.cookies,
@@ -224,19 +250,12 @@ export const server = {
         // Dashboard のテンプレート (例: `{{ .SiteURL }}/auth/confirm?token_hash=...&type=recovery&next=/auth/update-password`)
         // がリンクを生成するため、本 redirectTo は Dashboard 側でテンプレートが未設定の場合の
         // フォールバックとしてのみ機能する。詳細は .claude/deployment.md 参照（Issue #002 / #002-B）。
-        const { error } = await supabase.auth.resetPasswordForEmail(
-          input.email,
-          {
+        return performResetPassword(supabase, {
+          email: input.email,
+          options: {
             redirectTo: `${context.url.origin}/auth/confirm?next=/auth/update-password`,
           },
-        );
-        if (error) {
-          throw new ActionError({
-            code: "BAD_REQUEST",
-            message: error.message,
-          });
-        }
-        return { success: true };
+        });
       },
     }),
 

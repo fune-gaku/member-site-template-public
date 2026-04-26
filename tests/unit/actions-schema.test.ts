@@ -1,7 +1,11 @@
 import { z } from "astro/zod";
 import { describe, it, expect } from "vitest";
 
-import { SIGNIN_GENERIC_ERROR_MESSAGE } from "../../src/lib/auth-errors";
+import {
+  RESET_PASSWORD_GENERIC_SUCCESS_MESSAGE,
+  SIGNIN_GENERIC_ERROR_MESSAGE,
+  SIGNUP_GENERIC_SUCCESS_MESSAGE,
+} from "../../src/lib/auth-errors";
 
 // src/actions/index.ts から schema だけを再定義してテスト
 // （実際の actions は Astro コンテキストが必要なため）
@@ -55,11 +59,12 @@ describe("auth.signUp schema", () => {
   });
 });
 
-describe("auth.signIn schema (Issue #8 / A3)", () => {
-  // actions/index.ts の signIn input と同じ形
+describe("auth.signIn schema (Issue #8 / A3, Issue #21 Turnstile follow-up)", () => {
+  // actions/index.ts の signIn input と同じ形 (Issue #21 で Turnstile field を追加)
   const schema = z.object({
     email: z.string().email(),
     password: z.string(),
+    "cf-turnstile-response": z.string().max(2048).optional(),
   });
 
   it("有効なメール + パスワードを受け入れる", () => {
@@ -74,6 +79,32 @@ describe("auth.signIn schema (Issue #8 / A3)", () => {
     const result = schema.safeParse({
       email: "not-an-email",
       password: "anything",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("Turnstile token は optional (Turnstile 無効環境でも通る)", () => {
+    const result = schema.safeParse({
+      email: "user@example.com",
+      password: "anything",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("Turnstile token 付きでも通る (Turnstile 有効環境)", () => {
+    const result = schema.safeParse({
+      email: "user@example.com",
+      password: "anything",
+      "cf-turnstile-response": "valid-token",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
+    const result = schema.safeParse({
+      email: "user@example.com",
+      password: "anything",
+      "cf-turnstile-response": "x".repeat(2049),
     });
     expect(result.success).toBe(false);
   });
@@ -101,8 +132,12 @@ describe("auth.signIn account enumeration defense (Issue #8 / A3)", () => {
   });
 });
 
-describe("auth.resetPassword schema", () => {
-  const schema = z.object({ email: z.string().email() });
+describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
+  // actions/index.ts の resetPassword input と同じ形
+  const schema = z.object({
+    email: z.string().email(),
+    "cf-turnstile-response": z.string().max(2048).optional(),
+  });
 
   it("有効なメールアドレスを受け入れる", () => {
     const result = schema.safeParse({ email: "redacted@example.com" });
@@ -112,6 +147,56 @@ describe("auth.resetPassword schema", () => {
   it("メールアドレス以外を拒否する", () => {
     const result = schema.safeParse({ email: "invalid" });
     expect(result.success).toBe(false);
+  });
+
+  it("Turnstile token は optional (Turnstile 無効環境でも通る)", () => {
+    const result = schema.safeParse({ email: "redacted@example.com" });
+    expect(result.success).toBe(true);
+  });
+
+  it("Turnstile token 付きでも通る", () => {
+    const result = schema.safeParse({
+      email: "redacted@example.com",
+      "cf-turnstile-response": "valid-token",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
+    const result = schema.safeParse({
+      email: "redacted@example.com",
+      "cf-turnstile-response": "x".repeat(2049),
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("auth.signUp / auth.resetPassword account enumeration defense (Issue #14)", () => {
+  it("signUp 統一成功メッセージは登録有無を区別しない", () => {
+    // 既登録 / 未登録いずれの場合も同一文言を返すことが攻撃者から判別不能の前提
+    expect(SIGNUP_GENERIC_SUCCESS_MESSAGE).toBeTypeOf("string");
+    expect(SIGNUP_GENERIC_SUCCESS_MESSAGE.length).toBeGreaterThan(0);
+  });
+
+  it("signUp 統一成功メッセージにメール存在判定の語が含まれていない", () => {
+    const lowered = SIGNUP_GENERIC_SUCCESS_MESSAGE.toLowerCase();
+    expect(lowered).not.toMatch(/already\s*registered/);
+    expect(lowered).not.toMatch(/email\s*exists/);
+    expect(SIGNUP_GENERIC_SUCCESS_MESSAGE).not.toMatch(
+      /既に登録されています|登録済みです|別のメール/,
+    );
+  });
+
+  it("resetPassword 統一成功メッセージは登録有無を区別しない", () => {
+    expect(RESET_PASSWORD_GENERIC_SUCCESS_MESSAGE).toBeTypeOf("string");
+    expect(RESET_PASSWORD_GENERIC_SUCCESS_MESSAGE.length).toBeGreaterThan(0);
+  });
+
+  it("resetPassword 統一成功メッセージにアカウント不存在を断定する語が含まれていない", () => {
+    // 「未登録」のような断定はせず、可能性の表現にとどめる前提
+    const message = RESET_PASSWORD_GENERIC_SUCCESS_MESSAGE;
+    expect(message).not.toMatch(/このメールは登録されていません/);
+    expect(message).not.toMatch(/account\s*not\s*found/i);
   });
 });
 
@@ -204,13 +289,16 @@ describe("Issue #9: 文字列フィールドの .max() 多層防御", () => {
   const signInSchema = z.object({
     email: z.string().email().max(254),
     password: z.string().max(200),
+    "cf-turnstile-response": z.string().max(2048).optional(),
   });
   const signUpSchema = z.object({
     email: z.string().email().max(254),
     password: z.string().min(8),
+    "cf-turnstile-response": z.string().max(2048).optional(),
   });
   const resetPasswordSchema = z.object({
     email: z.string().email().max(254),
+    "cf-turnstile-response": z.string().max(2048).optional(),
   });
   const confirmOtpSchema = z.object({
     token_hash: z.string().min(1).max(512),
