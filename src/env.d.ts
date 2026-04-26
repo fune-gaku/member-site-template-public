@@ -6,6 +6,11 @@ declare global {
   interface ImportMetaEnv {
     readonly PUBLIC_SUPABASE_URL: string;
     readonly PUBLIC_SUPABASE_PUBLISHABLE_KEY: string;
+    /**
+     * Cloudflare Turnstile site key (公開可、なければ Turnstile 無効)。
+     * 対の secret は Cloudflare Workers の環境変数 TURNSTILE_SECRET_KEY。
+     */
+    readonly PUBLIC_TURNSTILE_SITE_KEY?: string;
   }
 
   interface ImportMeta {

@@ -50,8 +50,19 @@ export default defineConfig({
         "font-src 'self' data:",
         // Supabase Auth / REST / Realtime
         "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+        // Cloudflare Turnstile (CAPTCHA): widget は iframe で描画される
+        "frame-src https://challenges.cloudflare.com",
         'upgrade-insecure-requests',
       ],
+      // Turnstile の外部 script (challenges.cloudflare.com/turnstile/v0/api.js) は
+      // Astro が自動 hash 化できないため scriptDirective.resources で明示許可する。
+      // 当該 script を実際に注入するのは PUBLIC_TURNSTILE_SITE_KEY が
+      // 設定されているときの SignupForm のみ (opt-in)。
+      // 'self' は Astro の既定だが resources を指定すると上書きされてしまうため
+      // 明示的に並べて Astro バンドル script (将来 chunk 分割した場合) も許可。
+      scriptDirective: {
+        resources: ["'self'", 'https://challenges.cloudflare.com'],
+      },
     },
   },
 

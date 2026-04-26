@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { actions } from "astro:actions";
-import { ref } from "vue";
+import { onMounted, onBeforeUnmount, ref } from "vue";
 
 import {
   PASSWORD_POLICY_HINT,
   validatePasswordStrength,
 } from "../lib/password-schema";
+
+const TURNSTILE_RESPONSE_FIELD = "cf-turnstile-response";
+
+// 公開 site key。未設定なら Turnstile を表示しない (opt-in)。
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
 const email = ref("");
 const password = ref("");
@@ -13,6 +18,77 @@ const confirmPassword = ref("");
 const isLoading = ref(false);
 const error = ref("");
 const success = ref(false);
+const turnstileToken = ref("");
+const turnstileWidgetEl = ref<HTMLDivElement | null>(null);
+let turnstileWidgetId: string | undefined;
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: HTMLElement | string,
+        opts: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "error-callback"?: () => void;
+          "expired-callback"?: () => void;
+        },
+      ) => string;
+      remove: (id: string) => void;
+      reset: (id?: string) => void;
+    };
+    onTurnstileReady?: () => void;
+  }
+}
+
+function renderTurnstile() {
+  if (!turnstileSiteKey || !turnstileWidgetEl.value || !window.turnstile) {
+    return;
+  }
+  turnstileWidgetId = window.turnstile.render(turnstileWidgetEl.value, {
+    sitekey: turnstileSiteKey,
+    callback: (token: string) => {
+      turnstileToken.value = token;
+    },
+    "expired-callback": () => {
+      turnstileToken.value = "";
+    },
+    "error-callback": () => {
+      turnstileToken.value = "";
+    },
+  });
+}
+
+onMounted(() => {
+  if (!turnstileSiteKey) return;
+
+  // すでに script があるなら直接 render、無ければ動的注入。
+  if (window.turnstile) {
+    renderTurnstile();
+    return;
+  }
+  const existing = document.querySelector<HTMLScriptElement>(
+    'script[data-turnstile-loader="true"]',
+  );
+  if (existing) {
+    window.onTurnstileReady = renderTurnstile;
+    return;
+  }
+  window.onTurnstileReady = renderTurnstile;
+  const s = document.createElement("script");
+  s.src =
+    "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileReady";
+  s.async = true;
+  s.defer = true;
+  s.dataset.turnstileLoader = "true";
+  document.head.appendChild(s);
+});
+
+onBeforeUnmount(() => {
+  if (turnstileWidgetId && window.turnstile) {
+    window.turnstile.remove(turnstileWidgetId);
+  }
+});
 
 async function handleSubmit() {
   error.value = "";
@@ -28,6 +104,12 @@ async function handleSubmit() {
     return;
   }
 
+  if (turnstileSiteKey && !turnstileToken.value) {
+    error.value =
+      "ボット対策のチェックを完了してください (チェックボックスをタップ)";
+    return;
+  }
+
   isLoading.value = true;
 
   try {
@@ -35,12 +117,20 @@ async function handleSubmit() {
     const formData = new FormData();
     formData.append("email", email.value);
     formData.append("password", password.value);
+    if (turnstileToken.value) {
+      formData.append(TURNSTILE_RESPONSE_FIELD, turnstileToken.value);
+    }
 
     const { data: _data, error: actionError } =
       await actions.auth.signUp(formData);
 
     if (actionError) {
       error.value = actionError.message;
+      // 失敗時は token を捨てて widget を再要求 (token は 1 回限り)
+      if (turnstileWidgetId && window.turnstile) {
+        window.turnstile.reset(turnstileWidgetId);
+        turnstileToken.value = "";
+      }
     } else {
       success.value = true;
     }
@@ -124,6 +214,10 @@ async function handleSubmit() {
           placeholder="パスワードを再入力"
           :disabled="isLoading"
         />
+      </div>
+
+      <div v-if="turnstileSiteKey" class="flex justify-center">
+        <div ref="turnstileWidgetEl" />
       </div>
 
       <button

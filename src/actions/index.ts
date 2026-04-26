@@ -13,6 +13,11 @@ import { passwordSchema } from "../lib/password-schema";
 import { isHibpCheckEnabled, isPasswordPwned } from "../lib/pwned-password";
 import { createClient } from "../lib/supabase";
 import { createAdminClient } from "../lib/supabase-admin";
+import {
+  TURNSTILE_RESPONSE_FIELD,
+  isTurnstileEnabled,
+  verifyTurnstileToken,
+} from "../lib/turnstile";
 
 /**
  * 環境変数 `ENABLE_HIBP_CHECK=true` のときのみ HIBP 漏洩チェックを実行する。
@@ -39,6 +44,42 @@ async function assertNotPwned(password: string): Promise<void> {
       code: "BAD_REQUEST",
       message:
         "このパスワードは過去の漏洩データに含まれています。別のパスワードを使用してください。",
+    });
+  }
+}
+
+/**
+ * Turnstile (CAPTCHA) 検証。
+ *
+ * `PUBLIC_TURNSTILE_SITE_KEY` (公開) と `TURNSTILE_SECRET_KEY` (秘密) の
+ * 両方が設定されているときだけ有効化する opt-in 方式。検証失敗は fail-closed
+ * で BAD_REQUEST。トークンは Cloudflare Workers の `CF-Connecting-IP` で
+ * 縛り、token の使い回しを抑制する。
+ */
+async function assertTurnstilePassed(
+  token: string | undefined,
+  request: Request,
+): Promise<void> {
+  let siteKey: string | undefined;
+  let secret: string | undefined;
+  try {
+    const e = env as unknown as Record<string, string | undefined>;
+    siteKey = e.PUBLIC_TURNSTILE_SITE_KEY;
+    secret = e.TURNSTILE_SECRET_KEY;
+  } catch {
+    siteKey = undefined;
+    secret = undefined;
+  }
+  if (!isTurnstileEnabled(siteKey, secret)) return;
+
+  // 上の guard で secret は string 確定
+  const remoteIp = request.headers.get("CF-Connecting-IP") ?? undefined;
+  const ok = await verifyTurnstileToken(token, secret as string, remoteIp);
+  if (!ok) {
+    throw new ActionError({
+      code: "BAD_REQUEST",
+      message:
+        "ボット対策の検証に失敗しました。ページを再読み込みしてもう一度お試しください。",
     });
   }
 }
@@ -87,8 +128,18 @@ export const server = {
       input: z.object({
         email: z.string().email().max(254),
         password: passwordSchema,
+        // Turnstile widget が submit に含める hidden field。
+        // Turnstile が無効化されている環境では未送信なので optional。
+        // 有効化されている場合は assertTurnstilePassed が空文字列を弾く。
+        [TURNSTILE_RESPONSE_FIELD]: z.string().max(2048).optional(),
       }),
       handler: async (input, context) => {
+        // CAPTCHA (Turnstile) — 環境変数で opt-in。無効時は noop。
+        await assertTurnstilePassed(
+          input[TURNSTILE_RESPONSE_FIELD],
+          context.request,
+        );
+
         // 漏洩パスワードチェック（ENABLE_HIBP_CHECK=true の場合のみ）
         await assertNotPwned(input.password);
 
