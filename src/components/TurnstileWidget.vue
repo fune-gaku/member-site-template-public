@@ -13,7 +13,12 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<(e: "update:token", token: string) => void>();
+const emit = defineEmits<{
+  (e: "update:token", token: string): void;
+  // Issue #30: loader script の取得失敗 (ad blocker / CSP / network) を
+  // 親フォームに伝播し、ユーザに actionable な instruction を出せるようにする。
+  (e: "loader-error", error: Error): void;
+}>();
 
 const widgetEl = ref<HTMLDivElement | null>(null);
 let widgetId: string | undefined;
@@ -62,8 +67,15 @@ onMounted(async () => {
   // 同一ページに複数 TurnstileWidget が mount されても script は 1 回だけ
   // 注入され、すべてのインスタンスが安全に render される (PR #29 codex
   // review で発覚した silent fail の対策)。
-  await ensureTurnstileLoaded();
-  render();
+  // Issue #30: loader script 取得失敗 (ad blocker / CSP / network) は
+  // singleton の reject として伝播するため、ここで catch して親に通知する。
+  try {
+    await ensureTurnstileLoaded();
+    render();
+  } catch (e) {
+    console.error("Turnstile loader failed:", e);
+    emit("loader-error", e instanceof Error ? e : new Error(String(e)));
+  }
 });
 
 onBeforeUnmount(() => {
