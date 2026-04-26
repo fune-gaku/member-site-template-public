@@ -29,10 +29,10 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
    npm i -g @openai/codex   # または brew install --cask codex
    codex login              # ChatGPT Pro/Plus でサインイン
    ```
-2. **gh CLI**: `command -v gh` ＋ `gh auth status`（このリポは既に gh 利用中なので通常 OK）
-3. **PR が OPEN かつ非 draft**: `gh pr view <N> --json state,isDraft,headRefName,baseRefName,mergeable,statusCheckRollup` で確認
-4. **クリーンな working tree**: `git status --short` が空。コミットされていない変更があれば停止
-5. 反復ごとの新規コメントを時刻でフィルタするため、**ループ開始時刻** を `date -u +%Y-%m-%dT%H:%M:%SZ` で取得して保持
+2. **gh CLI**: `command -v gh` ＋ `env -u GH_TOKEN -u GITHUB_TOKEN gh auth status`（このリポは既に gh 利用中なので通常 OK）。`env -u` を付けるのは step 3 と同じ理由で、親 shell に stale な `GH_TOKEN` / `GITHUB_TOKEN` が残っていても keyring 経由で sanity check できるようにするため。これがないと step 3 の修正に到達する前に preflight が落ちて、本来の修正効果が無効化される
+3. **gh auth token を export（Codex sandbox 用）**: `GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token)` で keyring 値を取得して保持。Codex CLI の sandbox は macOS Keychain にアクセスできず、sandbox 内から `gh` を叩くと `The token in default is invalid` で失敗する（Issue #28）。`GH_TOKEN` env が設定されていれば gh は keyring を引かずに env を使うため、これで回避する。**重要**: `gh auth token` 単体では公式仕様 (`gh help environment`) により親 shell の `GH_TOKEN` / `GITHUB_TOKEN` env が stored credentials より優先されるため、親に stale な値が残っていると古い token を Codex に再注入してしまう。`env -u` で env を一旦剥がしてから取得することで keyring の真値を確実に取り出せる
+4. **PR が OPEN かつ非 draft**: `gh pr view <N> --json state,isDraft,headRefName,baseRefName,mergeable,statusCheckRollup` で確認
+5. **クリーンな working tree**: `git status --short` が空。コミットされていない変更があれば停止
 
 ---
 
@@ -42,27 +42,34 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
 gh pr checkout <N>
 BASE_BRANCH=$(gh pr view <N> --json baseRefName --jq .baseRefName)   # 通常 main
 LAST_KNOWN_MAIN=$(git rev-parse origin/$BASE_BRANCH)
+mkdir -p /tmp/codex-cross-review-<N>   # log / body の保存先を先に作る (Section A の tee が失敗しないように)
 ```
 
-ループ中の中間 state は `/tmp/codex-cross-review-<N>/iteration-<k>.json` に保存（事後レビュー用）。
+ループ中の中間 state は `/tmp/codex-cross-review-<N>/iter-<k>.log` (codex stdout) と
+`/tmp/codex-cross-review-<N>/iter-<k>-body.md` (PR 投稿用本文) に保存（事後レビュー用）。
 
 ---
 
 ## 収束ループ（最大 5 反復）
 
-### A. Codex にレビューを依頼
+### A. Codex にレビューを依頼（stdout を `tee` で保存）
 
 ```bash
-ITER_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+set -o pipefail   # `codex exec | tee` で codex 失敗が tee の status に隠されないように
+LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
 
-codex exec --sandbox workspace-write \
+# GH_TOKEN を明示注入（Codex sandbox は macOS Keychain を引けないため）。Issue #28 参照。
+# `env -u GH_TOKEN -u GITHUB_TOKEN` で親 shell の env token を一旦剥がしてから取得することで、
+# 親に stale な GH_TOKEN が残っていても keyring の真値を確実に渡せる
+# (`gh auth token` は公式仕様で env token を stored credentials より優先する)。
+GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token) \
+  codex exec --sandbox workspace-write \
   "あなたは PR #<N> （https://github.com/<owner>/<repo>/pull/<N>）をレビューします。
 
-   gh CLI で diff を読み取り、行単位の指摘は
-     gh api repos/<owner>/<repo>/pulls/<N>/comments
-   全体への指摘は
-     gh pr comment <N>
-   で投稿してください。
+   diff は \`git diff origin/<base>...HEAD\` で読み取ってください
+   （\`gh pr diff\` / \`gh pr view\` は sandbox の network 制限で失敗します）。
+   投稿は Claude が代行するため、レビュー本文と verdict 行を stdout に
+   出力するだけにしてください（\`gh pr comment\` / \`gh api\` は呼ばない）。
 
    重点観点:
    - 正しさ・エッジケース
@@ -77,30 +84,42 @@ codex exec --sandbox workspace-write \
    会員サイトテンプレ。.claude/security.md / .claude/development.md /
    .claude/database.md のチェックリストに照らして判定してください。
 
-   作業の最後に、必ず単独行で始まる verdict マーカーを 1 件だけ
-   トップレベル comment に投稿してください:
+   stdout の最後に、必ず単独行で始まる verdict マーカーを 1 件だけ
+   出力してください:
      - 指摘なし → 'CODEX VERDICT: LGTM'
      - 指摘あり → 'CODEX VERDICT: CHANGES REQUESTED' に続けて
        未解決事項の bullet サマリ
 
-   修正は絶対にしないこと。レビューと指摘投稿のみ。"
+   修正は絶対にしないこと。レビュー本文の出力のみ。" \
+  2>&1 | tee "$LOG"
 ```
 
 `codex exec` がエラーで落ちた場合は記録してループを止め、ユーザーに手動再実行を依頼。
 
-### B. 今回イテレーションで Codex が投稿した内容を取得
+### B. Codex の stdout から本文と verdict を抽出して PR に代理投稿
+
+`$LOG` を **そのまま** PR に投稿し、verdict 行は別途 grep で停止判定に使う。
+`CODEX VERDICT: CHANGES REQUESTED` の後ろの bullet summary も PR に届かせる
+ため、本文と verdict を分離せずに 1 件のトップレベルコメントとして残す:
 
 ```bash
-gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate \
-  --jq "[.[] | select(.user.login | test(\"codex\"; \"i\")) | select(.created_at > \"$ITER_START\")]" \
-  > /tmp/codex-cross-review-<N>/inline-<k>.json
+LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
+BODY=/tmp/codex-cross-review-<N>/iter-<k>-body.md
 
-gh api "repos/<owner>/<repo>/issues/<N>/comments" --paginate \
-  --jq "[.[] | select(.user.login | test(\"codex\"; \"i\")) | select(.created_at > \"$ITER_START\")]" \
-  > /tmp/codex-cross-review-<N>/top-<k>.json
+# 本文 = $LOG 全体 (verdict と bullet summary もそのまま含む)。
+# codex CLI 末尾の noise (tokens used 等) も含まれるが audit trail 上は問題なし。
+cp "$LOG" "$BODY"
+
+# verdict 行を抽出 (機械可読な停止条件)
+VERDICT=$(grep -m1 -E '^CODEX VERDICT:' "$LOG")
+
+gh pr comment <N> --body-file "$BODY"
+echo "$VERDICT"
 ```
 
-トップレベルコメントから `CODEX VERDICT:` 行を探す。これが機械可読の停止条件。
+verdict 行は機械可読な停止条件として使う (`CODEX VERDICT: LGTM` /
+`CODEX VERDICT: CHANGES REQUESTED`)。Codex 自身は PR に直接投稿しない設計
+(sandbox の network 制限を前提とした正規 protocol)。
 
 ### C. 各指摘を **あなたが** 評価
 
