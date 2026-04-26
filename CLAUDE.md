@@ -69,9 +69,22 @@ npm run dev
 ### データベース
 
 - **RLS（Row Level Security）を必ず有効化**すること
-- マイグレーションファイルは `supabase/migrations/` に配置
-- 本番適用はSupabase SQL Editorから手動実行
-- `profiles`, `member_posts` テーブルとStorage `avatars` バケットを使用
+- マイグレーションファイルは `supabase/migrations/<14桁タイムスタンプ>_<topic>.sql` 形式で配置（Supabase CLI 規約）
+- 本番適用は `supabase db push`（既存 fork は `supabase migration repair --status applied <version>` で同期）
+- ローカルは `npm run db:start` → `npm run db:reset` で全マイグレーション適用済みの DB を立ち上げる
+- `profiles`, `member_posts` テーブルと Storage `avatars` バケットを使用
+
+### DB 変更時の 7 ステップ（Issue #34 で確立）
+
+DB スキーマ・RLS・トリガー・Storage 設定を変更するときは、以下を順に実行する。**1〜4 はローカル、5〜7 は PR/本番**。
+
+1. **既存資産を Read** — `.claude/database.md`（テーブル定義・RLS の全 SQL）と該当マイグレーションを開いて差分の影響範囲を把握
+2. **`supabase migration new <topic>`** — 新規マイグレーションファイルを CLI に作らせる（タイムスタンプ自動採番）
+3. **SQL を編集** — 1 マイグレーション = 1 関心事を原則に、新規テーブルは必ず `enable row level security` + RLS policy を同ファイルで定義
+4. **`/db-check`** — `db:reset` → `db:lint` → `db:test` を一気通貫で検証（pgTAP は #35 整備後）
+5. **`npm run db:push:dry-run`** — 本番適用時の差分を事前確認（破壊的変更が混じっていないか）
+6. **PR 作成 → `/codex-cross-review`** — Codex × Claude Code 収束レビューで RLS 漏れ・権限昇格経路を二重チェック
+7. **マージ後、本番適用** — `supabase db push`（新規）または `supabase migration repair --status applied <version>`（旧 SQL Editor 直接適用済みの fork）
 
 ### 開発フロー
 

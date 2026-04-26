@@ -37,6 +37,11 @@ coverage
 # Claude Code per-user local settings (do NOT commit)
 .claude/settings.local.json
 
+# Supabase CLI ローカル状態 (supabase init が supabase/.gitignore にも同じ記述を生成するが、
+# ルートに防御的に重ねる: 誤って supabase/.gitignore を消してもコミットを防ぐ)
+supabase/.temp/
+supabase/.branches/
+
 # Design mock-up HTML / archives (Phase 1 design reference, kept locally only)
 # 実装は src/ にあり、これらは参照用。コミットせずローカル保持のみ。
 mocks/

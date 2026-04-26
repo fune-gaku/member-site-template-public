@@ -2,9 +2,12 @@
 -- 初期セットアップ: 全テーブル・RLS・Storage バケット・トリガー
 -- ========================================
 --
--- このファイル 1 つを Supabase SQL Editor で実行すれば、テンプレートに必要な
--- DB 構造が全て揃います。新規プロジェクトではこれを最初に流してください。
--- 既存環境を初期化する場合は先に 000_cleanup.sql を実行します。
+-- Supabase CLI 管理下のマイグレーション (Issue #34 で CLI 運用に移行)。
+-- ローカル: `supabase db reset` で全マイグレーションを順次適用。
+-- 本番:
+--   - 新規プロジェクト: `supabase link` 後に `supabase db push`
+--   - 既存 fork (旧 001_init.sql 適用済み): `supabase migration repair --status applied 20260420205000` でこのマイグレーションを適用済みとマーク
+--   詳細手順は .claude/database.md「マイグレーション運用」を参照。
 --
 -- 含まれる設定:
 --   - public.profiles (display_name 100 文字 CHECK 制約含む) + RLS + 権限昇格防止 + service_role grant
@@ -16,6 +19,7 @@
 --   - #001 日本語ファイル名対応 (アプリ層: src/lib/avatar-upload.ts)
 --   - #007 display_name サーバ検証 (DB 側の CHECK をここに統合)
 --   - #008 avatars バケット MIME/サイズ制限 (バケット作成時に直接設定)
+--   - #034 Supabase CLI workflow 採用 (このファイルのリネーム + 000_cleanup.sql 削除)
 
 -- ----------------------------------------
 -- profiles テーブル
