@@ -8,7 +8,10 @@ import {
 describe("verifyTurnstileToken (fail-closed)", () => {
   const fetchSpy = vi.spyOn(globalThis, "fetch");
   // siteverify がエラーログを吐いてもテスト出力を汚さない
-  const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  // (空 arrow `() => {}` は @typescript-eslint/no-empty-function に抵触するため undefined を明示)
+  const errorSpy = vi
+    .spyOn(console, "error")
+    .mockImplementation(() => undefined);
 
   beforeEach(() => {
     fetchSpy.mockReset();
@@ -35,7 +38,10 @@ describe("verifyTurnstileToken (fail-closed)", () => {
   it("success:false は false (fail-closed)", async () => {
     fetchSpy.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ success: false, "error-codes": ["invalid-input-response"] }),
+        JSON.stringify({
+          success: false,
+          "error-codes": ["invalid-input-response"],
+        }),
         { status: 200 },
       ),
     );

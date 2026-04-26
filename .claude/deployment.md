@@ -342,6 +342,7 @@ npx wrangler secret put TURNSTILE_SECRET_KEY --name member-site-template
 site key (公開値) は **build 時にクライアント bundle へ inline** されるため、ビルド環境の `.env` に置くか、CI 上で `PUBLIC_TURNSTILE_SITE_KEY=xxx npm run deploy` の形で渡す。`wrangler.jsonc` の `vars` への追記は **不要**（サーバが読まないため）。
 
 > **公式の根拠** —
+>
 > - [Workers env vars](https://developers.cloudflare.com/workers/configuration/environment-variables/): _"Do not use plaintext environment variables to store sensitive information. Use secrets instead."_ → secret 側
 > - [Turnstile server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/): _"Only call the Siteverify API in your backend environment. If you expose the secret key in the front-end client code, attackers can bypass the security check."_
 
