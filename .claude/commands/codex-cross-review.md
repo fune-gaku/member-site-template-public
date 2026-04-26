@@ -33,7 +33,6 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
 3. **gh auth token を export（Codex sandbox 用）**: `GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token)` で keyring 値を取得して保持。Codex CLI の sandbox は macOS Keychain にアクセスできず、sandbox 内から `gh` を叩くと `The token in default is invalid` で失敗する（Issue #28）。`GH_TOKEN` env が設定されていれば gh は keyring を引かずに env を使うため、これで回避する。**重要**: `gh auth token` 単体では公式仕様 (`gh help environment`) により親 shell の `GH_TOKEN` / `GITHUB_TOKEN` env が stored credentials より優先されるため、親に stale な値が残っていると古い token を Codex に再注入してしまう。`env -u` で env を一旦剥がしてから取得することで keyring の真値を確実に取り出せる
 4. **PR が OPEN かつ非 draft**: `gh pr view <N> --json state,isDraft,headRefName,baseRefName,mergeable,statusCheckRollup` で確認
 5. **クリーンな working tree**: `git status --short` が空。コミットされていない変更があれば停止
-6. 反復ごとの新規コメントを時刻でフィルタするため、**ループ開始時刻** を `date -u +%Y-%m-%dT%H:%M:%SZ` で取得して保持
 
 ---
 
@@ -51,10 +50,10 @@ LAST_KNOWN_MAIN=$(git rev-parse origin/$BASE_BRANCH)
 
 ## 収束ループ（最大 5 反復）
 
-### A. Codex にレビューを依頼
+### A. Codex にレビューを依頼（stdout を `tee` で保存）
 
 ```bash
-ITER_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
 
 # GH_TOKEN を明示注入（Codex sandbox は macOS Keychain を引けないため）。Issue #28 参照。
 # `env -u GH_TOKEN -u GITHUB_TOKEN` で親 shell の env token を一旦剥がしてから取得することで、
@@ -64,9 +63,10 @@ GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token) \
   codex exec --sandbox workspace-write \
   "あなたは PR #<N> （https://github.com/<owner>/<repo>/pull/<N>）をレビューします。
 
-   gh CLI で diff を読み取ってください。投稿は Claude が代行するため、
-   レビュー本文と verdict 行を stdout に出力するだけにしてください
-   （`gh pr comment` / `gh api` は呼ばない — sandbox の network 制限で失敗する）。
+   diff は \`git diff origin/<base>...HEAD\` で読み取ってください
+   （\`gh pr diff\` / \`gh pr view\` は sandbox の network 制限で失敗します）。
+   投稿は Claude が代行するため、レビュー本文と verdict 行を stdout に
+   出力するだけにしてください（\`gh pr comment\` / \`gh api\` は呼ばない）。
 
    重点観点:
    - 正しさ・エッジケース
@@ -87,19 +87,29 @@ GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token) \
      - 指摘あり → 'CODEX VERDICT: CHANGES REQUESTED' に続けて
        未解決事項の bullet サマリ
 
-   修正は絶対にしないこと。レビュー本文の出力のみ。"
+   修正は絶対にしないこと。レビュー本文の出力のみ。" \
+  2>&1 | tee "$LOG"
 ```
 
 `codex exec` がエラーで落ちた場合は記録してループを止め、ユーザーに手動再実行を依頼。
 
 ### B. Codex の stdout から本文と verdict を抽出して PR に代理投稿
 
-`codex exec` の stdout を保存し、そこから verdict 行 (`CODEX VERDICT: ...`) を
-抽出する。レビュー本文 (verdict より前のレビュー内容) は **Claude が** PR に
-1 件のトップレベルコメントとして投稿する:
+`$LOG` から (1) verdict より前のレビュー本文 (2) `CODEX VERDICT:` 行を分離し、
+本文を Claude が PR に 1 件のトップレベルコメントとして代理投稿する:
 
 ```bash
-gh pr comment <N> --body-file /tmp/codex-cross-review-<N>/iter-<k>-body.md
+LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
+BODY=/tmp/codex-cross-review-<N>/iter-<k>-body.md
+
+# CODEX VERDICT 行より前を本文として抽出
+sed '/^CODEX VERDICT:/,$d' "$LOG" > "$BODY"
+
+# verdict 行を抽出 (停止判定に使う)
+VERDICT=$(grep -m1 -E '^CODEX VERDICT:' "$LOG")
+
+gh pr comment <N> --body-file "$BODY"
+echo "$VERDICT"
 ```
 
 verdict 行は機械可読な停止条件として使う (`CODEX VERDICT: LGTM` /
