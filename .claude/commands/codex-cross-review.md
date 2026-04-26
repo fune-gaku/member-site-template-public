@@ -3,9 +3,22 @@ description: GitHub PR に対する Codex × Claude Code のデュアルレビ�
 argument-hint: <PR URL or number>
 ---
 
-`$ARGUMENTS` で指定された PR に対して、**Codex（OpenAI）× Claude Code の二人レビュー収束ループ** を実行してください。Codex が指摘 → あなた（Claude Code）が full context で評価・修正・追加チェック → 再 Codex → 双方合意で停止。CI green を待ってからユーザー承認のもとマージ。
+`$ARGUMENTS` で指定された PR に対し、**Codex（OpenAI）× Claude Code の二人レビュー収束ループ** を実行する。Codex の指摘 → Claude が full context で評価 + 公式 docs 照合 → 結果を **3 段の構造化コメント** で PR に残す → 双方合意で停止 → CI green → ユーザー承認でマージ。
 
-これは [security.md「セキュリティレビュー手順（必須）」](../security.md#セキュリティレビュー手順必須) の **Step 1〜3 を 1 つの自動収束ループに統合した実装** です。
+これは [security.md「セキュリティレビュー手順（必須）」](../security.md#セキュリティレビュー手順必須) の Step 1〜3 を 1 つの自動収束ループに統合した実装です。
+
+---
+
+## このスキルの責務（変更しない監査項目）
+
+Codex に依頼するレビュー観点は以下を **すべて含める**。これらは [security.md](../security.md) と [database.md](../database.md) のチェックリストに連動した「セキュリティ監査の真実の源」であり、フロー改修でスコープを狭めない:
+
+- 正しさ・エッジケース
+- セキュリティ（XSS / SSRF / Open Redirect / CSRF / IDOR / SQLi / prompt injection / RLS バイパス / Mass Assignment）
+- アクセシビリティ（キーボード / ARIA / WCAG AA）
+- i18n（多言語辞書のロックステップ違反）
+- テスト網羅（happy path + 境界値）
+- リポ全体の一貫性
 
 ---
 
@@ -22,17 +35,16 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
 
 ## 前提条件チェック（実行前に 1 回）
 
-以下を順に確認し、欠けていれば**ユーザーに案内して停止**:
+順に確認し、欠けていれば**ユーザーに案内して停止**:
 
 1. **Codex CLI**: `command -v codex` で確認。無ければ:
    ```
    npm i -g @openai/codex   # または brew install --cask codex
    codex login              # ChatGPT Pro/Plus でサインイン
    ```
-2. **gh CLI**: `command -v gh` ＋ `env -u GH_TOKEN -u GITHUB_TOKEN gh auth status`（このリポは既に gh 利用中なので通常 OK）。`env -u` を付けるのは step 3 と同じ理由で、親 shell に stale な `GH_TOKEN` / `GITHUB_TOKEN` が残っていても keyring 経由で sanity check できるようにするため。これがないと step 3 の修正に到達する前に preflight が落ちて、本来の修正効果が無効化される
-3. **gh auth token を export（Codex sandbox 用）**: `GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token)` で keyring 値を取得して保持。Codex CLI の sandbox は macOS Keychain にアクセスできず、sandbox 内から `gh` を叩くと `The token in default is invalid` で失敗する（Issue #28）。`GH_TOKEN` env が設定されていれば gh は keyring を引かずに env を使うため、これで回避する。**重要**: `gh auth token` 単体では公式仕様 (`gh help environment`) により親 shell の `GH_TOKEN` / `GITHUB_TOKEN` env が stored credentials より優先されるため、親に stale な値が残っていると古い token を Codex に再注入してしまう。`env -u` で env を一旦剥がしてから取得することで keyring の真値を確実に取り出せる
-4. **PR が OPEN かつ非 draft**: `gh pr view <N> --json state,isDraft,headRefName,baseRefName,mergeable,statusCheckRollup` で確認
-5. **クリーンな working tree**: `git status --short` が空。コミットされていない変更があれば停止
+2. **gh CLI**: `command -v gh` ＋ `gh auth status`。`gh` は Claude が proxy 投稿に使う。Codex sandbox は `gh` を呼ばない設計（本ループでは Codex に GitHub 書き込み capability を持たせない = least privilege）
+3. **PR が OPEN かつ非 draft**: `gh pr view <N> --json state,isDraft,headRefName,baseRefName,mergeable,statusCheckRollup`
+4. **クリーンな working tree**: `git status --short` が空。コミットされていない変更があれば停止
 
 ---
 
@@ -42,36 +54,49 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
 gh pr checkout <N>
 BASE_BRANCH=$(gh pr view <N> --json baseRefName --jq .baseRefName)   # 通常 main
 LAST_KNOWN_MAIN=$(git rev-parse origin/$BASE_BRANCH)
-mkdir -p /tmp/codex-cross-review-<N>   # log / body の保存先を先に作る (Section A の tee が失敗しないように)
+mkdir -p /tmp/codex-cross-review-<N>
 ```
 
-ループ中の中間 state は `/tmp/codex-cross-review-<N>/iter-<k>.log` (codex stdout) と
-`/tmp/codex-cross-review-<N>/iter-<k>-body.md` (PR 投稿用本文) に保存（事後レビュー用）。
+各イテレーションの artifacts は `/tmp/codex-cross-review-<N>/iter-<k>-*` に保存:
+
+| ファイル | 用途 | 投稿可否 |
+|--|--|--|
+| `iter-<k>.log` | codex CLI の生 stdout（CLI ノイズ・tool trace 含む） | 投稿しない（audit 用 / fallback 用） |
+| `iter-<k>-review.md` | Codex が書く review 本文 | **コメント 1 として投稿** |
+| `iter-<k>-evaluation.md` | Claude が書く評価テーブル（findings 有り時のみ） | **コメント 2 として投稿** |
+| `iter-<k>-docs-check.md` | 公式 docs 照合レポート（C-2 トリガ成立時のみ） | **コメント 3 として投稿** |
 
 ---
 
 ## 収束ループ（最大 5 反復）
 
-### A. Codex にレビューを依頼（stdout を `tee` で保存）
+各イテレーションは A → G の 7 段階で進む。投稿条件は上の artifacts 表の通り（B = 常時、E = findings 有り時のみ、F = C-2 トリガ成立時のみ）。
+
+### A. Codex にレビューを依頼（ファイル受け渡し方式）
+
+Codex は review 本文を **ファイルに書き** + **stdout には verdict 行のみ** 出す。Claude が後で proxy 投稿する。`workspace-write` sandbox はファイル書き込みを許可するため動作する。
 
 ```bash
-set -o pipefail   # `codex exec | tee` で codex 失敗が tee の status に隠されないように
+set -o pipefail   # codex 失敗が tee の status に隠されないように
 LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
+REVIEW=/tmp/codex-cross-review-<N>/iter-<k>-review.md
 
-# GH_TOKEN を明示注入（Codex sandbox は macOS Keychain を引けないため）。Issue #28 参照。
-# `env -u GH_TOKEN -u GITHUB_TOKEN` で親 shell の env token を一旦剥がしてから取得することで、
-# 親に stale な GH_TOKEN が残っていても keyring の真値を確実に渡せる
-# (`gh auth token` は公式仕様で env token を stored credentials より優先する)。
-GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token) \
-  codex exec --sandbox workspace-write \
+codex exec --sandbox workspace-write \
   "あなたは PR #<N> （https://github.com/<owner>/<repo>/pull/<N>）をレビューします。
 
    diff は \`git diff origin/<base>...HEAD\` で読み取ってください
    （\`gh pr diff\` / \`gh pr view\` は sandbox の network 制限で失敗します）。
-   投稿は Claude が代行するため、レビュー本文と verdict 行を stdout に
-   出力するだけにしてください（\`gh pr comment\` / \`gh api\` は呼ばない）。
 
-   重点観点:
+   レビュー本文は **以下のファイルに書いてください**:
+     $REVIEW
+   stdout には review 本文を echo せず、最後に **verdict 行 1 件だけ**
+   出力してください:
+     - 指摘なし → 'CODEX VERDICT: LGTM'
+     - 指摘あり → 'CODEX VERDICT: CHANGES REQUESTED'
+   review ファイルの末尾にも同じ verdict 行を含めてください
+   （PR コメントとして単独で完結するため）。
+
+   重点観点（必須・スコープを狭めない）:
    - 正しさ・エッジケース
    - セキュリティ（XSS / SSRF / Open Redirect / CSRF / IDOR / SQLi /
      prompt injection / RLS バイパス / Mass Assignment）
@@ -84,85 +109,73 @@ GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token) \
    会員サイトテンプレ。.claude/security.md / .claude/development.md /
    .claude/database.md のチェックリストに照らして判定してください。
 
-   stdout の最後に、必ず単独行で始まる verdict マーカーを 1 件だけ
-   出力してください:
-     - 指摘なし → 'CODEX VERDICT: LGTM'
-     - 指摘あり → 'CODEX VERDICT: CHANGES REQUESTED' に続けて
-       未解決事項の bullet サマリ
-
-   修正は絶対にしないこと。レビュー本文の出力のみ。" \
+   修正は絶対にしないこと。レビュー本文のファイル書き出しと verdict のみ。" \
   2>&1 | tee "$LOG"
 ```
 
 `codex exec` がエラーで落ちた場合は記録してループを止め、ユーザーに手動再実行を依頼。
 
-### B. Codex の stdout から本文と verdict を抽出して PR に代理投稿
-
-`$LOG` を **そのまま** PR に投稿し、verdict 行は別途 grep で停止判定に使う。
-`CODEX VERDICT: CHANGES REQUESTED` の後ろの bullet summary も PR に届かせる
-ため、本文と verdict を分離せずに 1 件のトップレベルコメントとして残す:
+review ファイルが書かれなかった場合の fallback（protocol 違反として記録、LOG 全体を投稿に回して可視化）:
 
 ```bash
-LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
-BODY=/tmp/codex-cross-review-<N>/iter-<k>-body.md
+if [ ! -s "$REVIEW" ]; then
+  echo "[warn] Codex did not write $REVIEW, falling back to full LOG" >&2
+  cp "$LOG" "$REVIEW"
+fi
+VERDICT=$(grep -m1 -E '^CODEX VERDICT:' "$REVIEW" || grep -m1 -E '^CODEX VERDICT:' "$LOG")
+```
 
-# 本文 = $LOG 全体 (verdict と bullet summary もそのまま含む)。
-# codex CLI 末尾の noise (tokens used 等) も含まれるが audit trail 上は問題なし。
-cp "$LOG" "$BODY"
+### B. コメント 1 投稿: Codex review（代理投稿）
 
-# verdict 行を抽出 (機械可読な停止条件)
-VERDICT=$(grep -m1 -E '^CODEX VERDICT:' "$LOG")
-
-gh pr comment <N> --body-file "$BODY"
+```bash
+gh pr comment <N> --body-file "$REVIEW"
 echo "$VERDICT"
 ```
 
-verdict 行は機械可読な停止条件として使う (`CODEX VERDICT: LGTM` /
-`CODEX VERDICT: CHANGES REQUESTED`)。Codex 自身は PR に直接投稿しない設計
-(sandbox の network 制限を前提とした正規 protocol)。
+### C. Claude による評価（あなた自身の責務）
 
-### C. 各指摘を **あなたが** 評価
+これは受動的な apply ではない。Codex の各指摘について:
 
-これは受動的な apply ではない。Codex の指摘ごとに:
-
-1. **必要性** — 本当のバグか、スタイル好みか、false positive か。同等パターンを実コードで再現／grep して確認してから受け入れる
+1. **必要性** — 本当のバグか、スタイル好みか、false positive か。同等パターンを実コードで再現／grep で確認してから受け入れる
 2. **影響範囲** — 1 箇所の指摘でも、`grep` で同パターンが他に何箇所あるか調べる。1 箇所修正で他 3 箇所が壊れたまま、は最悪
 3. **副作用** — 提案修正がコール元 / 既存テスト / 規約を壊さないか
 4. **Codex が見落とした点** — diff を新鮮な目で読み直し、**Codex の指摘は出発点であって天井ではない**
-5. **公式 docs 照合 (フレームワーク / ライブラリ挙動主張があるとき必須)** — 後述の C-2 を参照
+5. **公式 docs 照合（library / framework 挙動主張があれば必須）** — 後述の C-2
 
 カテゴリ分け: `MUST-FIX` / `VALID-NIT` / `FALSE-POSITIVE` / `DEFER-TO-FOLLOWUP`
 
-`MUST-FIX` と `VALID-NIT` は**このイテレーションで適用**。`FALSE-POSITIVE` と `DEFER` は **PR にトップレベル返信** で「適用しない理由」を投稿（次の Codex 評価が考慮できるように）。
+`MUST-FIX` と `VALID-NIT` は **このイテレーションで適用** する。`FALSE-POSITIVE` と `DEFER` は **コメント 2** で論拠を残す（次の Codex iteration が考慮できるように）。
 
 ### C-2. 公式 docs 照合（library / framework 挙動が前提の指摘では必須）
 
 Codex の指摘が **「ライブラリ X の挙動 Y」「フレームワーク F の API Z」を前提にした recommendation** を含む場合、accept する前に **必ず公式 docs を一次情報として読んで突き合わせる**。Codex も Claude も学習時点の知識でしかないため、以下のような誤りが混入しうる:
 
-- ライブラリの挙動を勘違いしている (例: `getUser()` で session 失効が即時反映される、と暗に仮定)
-- 公式が逆の guidance を出している (例: 公式は "Most apps don't need such strong guarantees" と言っているのに、Codex は強い保証を要求)
-- 公式推奨パターンと違う方法を提案している (例: 公式は X.sessions テーブル直接 query を推奨だが Codex は別 API 提案)
+- ライブラリの挙動を勘違いしている（例: `getUser()` で session 失効が即時反映される、と暗に仮定）
+- 公式が逆の guidance を出している（例: 公式は "Most apps don't need such strong guarantees" と言っているのに、Codex は強い保証を要求）
+- 公式推奨パターンと違う方法を提案している（例: 公式は X.sessions テーブル直接 query を推奨だが Codex は別 API 提案）
 
 **手順** (CLAUDE.md「最新情報・不明な情報の確認ルール」の優先順位に従う):
 
-1. 指摘の中で **挙動主張の核**を抽出 (例: 「getUser() を使えば session 失効が即時反映される」)
+1. 指摘の中で **挙動主張の核**を抽出（例: 「getUser() を使えば session 失効が即時反映される」）
 2. 一次情報を取得:
-   - Astro: `mcp__astro-docs__search_astro_docs` skill (環境にあれば最優先)
+   - Astro: `mcp__astro-docs__search_astro_docs` skill（環境にあれば最優先）
    - Supabase / Cloudflare Workers / Tailwind / Vue 等: `WebFetch` で公式 docs URL を直接取得
-   - 一般ベストプラクティス: `WebSearch` (公式 issue / RFC を含めて検索)
-3. **公式の文言を verbatim で引用してメモ**。コミットメッセージや PR コメントに残せる形に
+   - 一般ベストプラクティス: `WebSearch`（公式 issue / RFC を含めて検索）
+3. **公式の文言を verbatim で引用してメモ**（コミットメッセージ + コメント 3 に残せる形に）
 4. 公式と Codex 主張を突き合わせ:
    - 完全一致 → MUST-FIX として受け入れ可
-   - 部分一致 (改善はあるが完全ではない) → MUST-FIX で受け入れつつ、docstring / コメントで **保証の限界を正確に明記**。受け入れ範囲を超えた完全パターンは別 Issue で追跡
-   - 不一致 (Codex が誤り) → FALSE-POSITIVE として PR コメントで論拠 (公式引用) と共に拒否
-   - 公式は別の推奨パターン → 公式パターンを優先採用 (Codex 提案ではなく)。複雑度トレードオフが大きいなら Issue 化して defer
-5. 受け入れる場合、コミットメッセージに **公式 docs URL と引用** を含める。後続 reviewer が同じ照合をやり直さなくて済むように
+   - 部分一致（改善はあるが完全ではない）→ MUST-FIX で受け入れつつ、docstring / コメントで **保証の限界を正確に明記**。完全パターンは別 Issue で defer
+   - 不一致（Codex が誤り）→ FALSE-POSITIVE として論拠（公式引用）と共に拒否
+   - 公式が別の推奨パターン → 公式パターンを優先採用（Codex 提案ではなく）。複雑度トレードオフが大きいなら Issue 化して defer
+5. 受け入れる場合、**コミットメッセージに公式 docs URL と verbatim 引用** を含める。**さらにコメント 3（後述 F）で PR レベルにも可視化** する
 
 **公式が「ほとんどのアプリには不要」「ベストエフォート」「許容できるトレードオフ」と書いている領域には、code 複雑性を入れない**。テンプレートでは特に、defaults を simple に保ち、必要な人は opt-in or 別 Issue で対応の方針を取る。
 
-**この照合を skip した過去事例** (反面教師): PR #22 iteration 2 で Codex が「admin 経路で `getClaims()` だと session 失効が遅れるので `getUser()` を使え」と指摘 → 公式照合せず accept → 後で公式は "Most applications rarely need such strong guarantees. Consider adjusting the JWT expiry time" と書いていることが判明し、commit を revert する手戻りが発生 (commit 4f5e9ea)。**最初に C-2 を回していれば防げた**。
+**この照合を skip した過去事例**（反面教師）: PR #22 iteration 2 で Codex が「admin 経路で `getClaims()` だと session 失効が遅れるので `getUser()` を使え」と指摘 → 公式照合せず accept → 後で公式は "Most applications rarely need such strong guarantees. Consider adjusting the JWT expiry time" と書いていることが判明し、commit を revert する手戻りが発生（commit 4f5e9ea）。**最初に C-2 を回していれば防げた**。
 
-### D. ローカルチェック（コード変更後）
+### D. ローカル変更適用 → checks → main 同期 → commit + push
+
+`MUST-FIX` と `VALID-NIT` を実コードに適用したら、push 前に必ずローカルチェックを通す:
 
 ```bash
 npm run lint
@@ -171,9 +184,9 @@ npm run typecheck
 npm run test
 ```
 
-いずれか fail なら**修正してから再実行**。**赤を push しない**（共有 state を壊す）。`npm run build` は時間がかかるので skip し CI に委譲（Cloudflare 関連の build は `wrangler types` 等含めて重い）。
+いずれか fail なら **修正してから再実行**。**赤を push しない**（共有 state を壊す）。`npm run build` は時間がかかるので skip し CI に委譲（Cloudflare 関連の build は `wrangler types` 等含めて重い）。
 
-### E. main 同期（push 前に毎回）
+main 同期（push 前に毎回）:
 
 ```bash
 git fetch origin $BASE_BRANCH
@@ -189,12 +202,66 @@ if [ "$NEW_MAIN" != "$LAST_KNOWN_MAIN" ]; then
 fi
 ```
 
-### F. コミット + push
+コミット + push:
 
 - `git add` は **意図的に触ったファイルのみ**。`git add -A` / `git add .` は禁止
 - コミットメッセージ: `fix: address codex review (iteration-<k>)` の本文で、受け入れた指摘を順に列挙
+- **C-2 で受け入れた指摘は、公式 docs URL + verbatim 引用をコミット本文に含める**（後続 reviewer が同じ照合をやり直さなくて済むように）
 - 末尾に必ず `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`
 - 通常 push（`--force` 禁止）
+
+push 完了後に commit SHA を控えておく（コメント 2 / 3 で参照する）。
+
+### E. コメント 2 投稿: Claude の評価テーブル（findings 有り時のみ）
+
+Codex が LGTM を返し、かつ あなたの自発検出も無い iteration では **skip**。findings がある場合は `iter-<k>-evaluation.md` を作成して投稿:
+
+```markdown
+## Claude's evaluation of iteration <k>
+
+| # | Finding (source) | Category | Action | Reasoning |
+|--|--|--|--|--|
+| 1 | <Codex 指摘 1 の要約> (Codex) | MUST-FIX | Fixed in <SHA> | <根拠 / grep 結果 / 影響範囲> |
+| 2 | <Codex 指摘 2 の要約> (Codex) | VALID-NIT | Fixed in <SHA> | <スタイル改善の根拠> |
+| 3 | <Codex 指摘 3 の要約> (Codex) | FALSE-POSITIVE | Rejected | <論拠（既存実装で対処済み / 公式が別 guidance / 等）> |
+| 4 | <Codex 指摘 4 の要約> (Codex) | DEFER | Issue #<N> | <スコープ外の理由> |
+| 5 | <Claude 独自検出 1> (Claude) | MUST-FIX | Fixed in <SHA> | observed during Claude review, not flagged by Codex; <根拠> |
+
+### Notes
+- <iteration 全体の総括 / 次 iteration への申し送り事項があれば>
+```
+
+```bash
+gh pr comment <N> --body-file /tmp/codex-cross-review-<N>/iter-<k>-evaluation.md
+```
+
+### F. コメント 3 投稿: 公式 docs 照合レポート（C-2 トリガ成立時のみ）
+
+C-2 を実行した findings がある場合のみ `iter-<k>-docs-check.md` を作成して投稿。トリガ条件は「accept した findings に library / framework 挙動主張が含まれる」。Codex が typo / a11y / テスト不足だけ指摘した iteration では **skip**:
+
+```markdown
+## Official docs verification (iteration <k>)
+
+### Finding #<m>: <Codex 主張の要約>
+
+**Codex assertion**: "<原文>"
+
+**Official source**: [<doc title>](<URL>)
+> <verbatim 引用>
+
+**Verdict**: <Accepted / Partial accept / Rejected>
+**Rationale**: <突き合わせ結果。部分一致なら保証の限界を明記>
+**Commit**: <SHA>（公式 URL + 引用を含む）
+
+---
+
+### Finding #<m+1>: ...
+（同様）
+```
+
+```bash
+gh pr comment <N> --body-file /tmp/codex-cross-review-<N>/iter-<k>-docs-check.md
+```
 
 ### G. ループ継続判定
 
@@ -221,7 +288,7 @@ CI 失敗時:
 2. ログ取得: `gh run view <run-id> --log-failed`
 3. 可能ならローカル再現、無理ならログを精読
 4. 修正 → ローカルチェック → コミット（`fix: CI <job-name> <短い理由>`）→ push
-5. push 前は必ず main 同期（E）
+5. push 前は必ず main 同期（D の merge ロジック）
 
 **自分の変更と無関係に見える failure でも無視しない**。pre-existing failure を merge した時点でそれはあなたの責任。明らかにスコープ外（infra / secrets）と判断したらユーザーに escalate。
 
@@ -247,12 +314,12 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 
 - **ローカルチェックを skip しない。** `--no-verify` / `--no-gpg-sign` / `--force` は禁止
 - **Codex の提案を盲信しない。** すべての修正はあなた自身のレビューを通す
-- **library / framework 挙動主張を含む Codex 指摘は accept 前に必ず公式 docs を一次情報で照合** (C-2 参照)。これを skip すると後で revert する手戻りが発生する
-- **Codex に異議があれば、返信コメントで論拠を示す**（沈黙の disagreement は収束 protocol を壊す）
+- **library / framework 挙動主張を含む Codex 指摘は accept 前に必ず公式 docs を一次情報で照合**（C-2）。skip すると後で revert する手戻りが発生する
+- **Codex に異議があれば、コメント 2（評価テーブル）で論拠を示す**（沈黙の disagreement は収束 protocol を壊す）
 - **公式が「ほとんどのアプリには不要」と書く領域に code 複雑性を追加しない**。defaults は simple に、強化は opt-in or 別 Issue
 - **push 前に必ず main 同期。** stale ブランチは人工的なコンフリクトを生み両 reviewer を混乱させる
 - **secret は絶対にコミットしない。** `.env` / `.dev.vars` / credential ファイルを diff に入れない（gitleaks pre-commit で検出されるが事前確認）
-- **Codex が見落とした指摘は honestly 帰属表示**。「Codex が指摘した」ように装わない。コミット本文で「observed during Claude review, not flagged by Codex」と明示
+- **Codex が見落とした指摘は honestly 帰属表示**。コメント 2 の "(Claude)" 行とコミット本文で「observed during Claude review, not flagged by Codex」と明示
 - **CLAUDE.md の規約を尊重**（@import で常時ロード済の `.claude/security.md` / `.claude/development.md` のチェックリスト）
 
 ---
@@ -262,8 +329,8 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 「Codex が黙った」だけでは不十分。あなた自身の OK には以下が必要:
 
 - `MUST-FIX` 残ゼロ（Codex 指摘 / あなた自身の発見の両方）
-- **library / framework 挙動主張を含む受け入れ済 MUST-FIX について、公式 docs で照合し引用をコミット本文に残してある** (C-2)
-- 隣接コードに **「diff が誘発するが直してない明らかな関連 issue」が残っていない**（意図的に defer したものは PR コメントで理由付きで明示済）
+- **library / framework 挙動主張を含む受け入れ済 MUST-FIX について、公式 docs で照合し、引用をコミット本文 + コメント 3 の両方に残してある**（C-2）
+- 隣接コードに **「diff が誘発するが直してない明らかな関連 issue」が残っていない**（意図的に defer したものはコメント 2 の DEFER 行に理由付きで明示済）
 - ローカルチェック全 green
 - 変更形状に **テスト追加が伴っている**（新規ロジックには最低 1 つ振る舞いを assert するテスト）
 - `.claude/security.md` のチェックリスト（i18n / a11y / セキュリティ規約）に違反していない
@@ -274,12 +341,13 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 
 ## ユーザーへの報告
 
-各イテレーション完了時に 3〜4 行で:
+各イテレーション完了時に 4-5 行で:
 
 ```
 イテレーション <k> / 5
 Codex verdict: LGTM / CHANGES REQUESTED (<N> issues)
-今回の変更: <1 行サマリ>
+投稿コメント: review #<id1> [/ evaluation #<id2>] [/ docs-check #<id3>]
+今回の変更: <1 行サマリ + commit SHA>
 CI status: <現状>
 ```
 
