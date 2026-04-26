@@ -14,6 +14,7 @@ const error = ref("");
 const success = ref(false);
 const successMessage = ref("");
 const turnstileToken = ref("");
+const turnstileLoaderError = ref(false);
 const turnstileWidget = ref<InstanceType<typeof TurnstileWidget> | null>(null);
 
 async function handleSubmit() {
@@ -94,12 +95,22 @@ async function handleSubmit() {
         />
       </div>
 
-      <div v-if="turnstileSiteKey" class="flex justify-center">
-        <TurnstileWidget
-          ref="turnstileWidget"
-          :site-key="turnstileSiteKey"
-          @update:token="turnstileToken = $event"
-        />
+      <div v-if="turnstileSiteKey" class="space-y-2">
+        <div class="flex justify-center">
+          <TurnstileWidget
+            ref="turnstileWidget"
+            :site-key="turnstileSiteKey"
+            @update:token="turnstileToken = $event"
+            @loader-error="turnstileLoaderError = true"
+          />
+        </div>
+        <p
+          v-if="turnstileLoaderError"
+          role="alert"
+          class="text-center text-xs text-red-700"
+        >
+          ボット対策の読み込みに失敗しました。広告ブロッカーや拡張機能を一時的に無効にして、ページを再読み込みしてください。
+        </p>
       </div>
 
       <button

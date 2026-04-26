@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   __resetTurnstileLoaderForTests,
   ensureTurnstileLoaded,
+  TURNSTILE_LOADER_TIMEOUT_MS,
 } from "../../src/lib/turnstile-loader";
 
 /**
@@ -17,6 +18,41 @@ import {
  * を検証する。
  */
 
+/**
+ * happy-dom は `disableJavaScriptFileLoading: true` の既定動作として、
+ * script element の appendChild 時点で同期的に `error` event を dispatch する。
+ * Issue #30 で `script.onerror` を hook したことにより、この自動 error が
+ * 我々の handler に届いて script が即時除去され、テストが壊れるため、
+ * **document の capture phase で `error` event を吸収** する。capture 段階
+ * リスナーは target phase より先に走るので `stopImmediatePropagation()` で
+ * `script.onerror` 呼出を抑止できる。
+ *
+ * 個別テストで意図的に error を発火したい場合は `script.onerror?.(new Event("error"))`
+ * を直接呼ぶことで dispatchEvent path をバイパスできる。
+ */
+let autoErrorSuppressor: ((e: Event) => void) | undefined;
+
+function suppressAutoOnerror() {
+  autoErrorSuppressor = function (e: Event) {
+    if (
+      e.target instanceof HTMLScriptElement &&
+      e.target.dataset.turnstileLoader === "true"
+    ) {
+      e.stopImmediatePropagation();
+    }
+  };
+  document.addEventListener("error", autoErrorSuppressor, true);
+  window.addEventListener("error", autoErrorSuppressor, true);
+}
+
+function restoreAutoOnerror() {
+  if (autoErrorSuppressor) {
+    document.removeEventListener("error", autoErrorSuppressor, true);
+    window.removeEventListener("error", autoErrorSuppressor, true);
+    autoErrorSuppressor = undefined;
+  }
+}
+
 describe("ensureTurnstileLoaded (PR #29 multi-widget safety)", () => {
   beforeEach(() => {
     __resetTurnstileLoaderForTests();
@@ -25,9 +61,12 @@ describe("ensureTurnstileLoaded (PR #29 multi-widget safety)", () => {
     delete (window as unknown as { turnstile?: unknown }).turnstile;
     delete (window as unknown as { onTurnstileReady?: () => void })
       .onTurnstileReady;
+    suppressAutoOnerror();
   });
 
   afterEach(() => {
+    restoreAutoOnerror();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -125,6 +164,101 @@ describe("ensureTurnstileLoaded (PR #29 multi-widget safety)", () => {
     // onload 発火を simulate
     (window as unknown as { turnstile: unknown }).turnstile = {};
     window.onTurnstileReady?.();
+    await expect(p).resolves.toBeUndefined();
+  });
+});
+
+describe("ensureTurnstileLoaded loader-error handling (Issue #30)", () => {
+  beforeEach(() => {
+    __resetTurnstileLoaderForTests();
+    document.head.innerHTML = "";
+    delete (window as unknown as { turnstile?: unknown }).turnstile;
+    delete (window as unknown as { onTurnstileReady?: () => void })
+      .onTurnstileReady;
+    suppressAutoOnerror();
+  });
+
+  afterEach(() => {
+    restoreAutoOnerror();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("script.onerror 発火で Promise が reject され、失敗 script は DOM から除去される", async () => {
+    const p = ensureTurnstileLoaded();
+    const script = document.head.querySelector<HTMLScriptElement>(
+      'script[data-turnstile-loader="true"]',
+    );
+    expect(script).not.toBeNull();
+
+    // ad blocker / CSP / network 失敗を simulate
+    script!.onerror?.(new Event("error"));
+
+    await expect(p).rejects.toThrow(/failed to load/i);
+
+    // 失敗 script は次回 retry を阻害しないよう DOM から除去される
+    expect(
+      document.head.querySelectorAll('script[data-turnstile-loader="true"]')
+        .length,
+    ).toBe(0);
+  });
+
+  it("reject 後の再 call は singleton リセットにより新しい注入を試みる", async () => {
+    const p1 = ensureTurnstileLoaded();
+    const script1 = document.head.querySelector<HTMLScriptElement>(
+      'script[data-turnstile-loader="true"]',
+    );
+    script1!.onerror?.(new Event("error"));
+    await expect(p1).rejects.toThrow();
+
+    // 2 回目の call で新しい script tag が注入されること (singleton 解除)
+    const p2 = ensureTurnstileLoaded();
+    expect(p2).not.toBe(p1);
+    const script2 = document.head.querySelector<HTMLScriptElement>(
+      'script[data-turnstile-loader="true"]',
+    );
+    expect(script2).not.toBeNull();
+    expect(script2).not.toBe(script1);
+
+    // クリーンアップ: ぶら下がる Promise を意図的に rejection 化して
+    // unhandled rejection 警告を抑止
+    script2!.onerror?.(new Event("error"));
+    await expect(p2).rejects.toThrow();
+  });
+
+  it("timeout (TURNSTILE_LOADER_TIMEOUT_MS) 経過で reject される (onerror 不発の保険)", async () => {
+    vi.useFakeTimers();
+    const p = ensureTurnstileLoaded();
+
+    // timeout 直前は pending
+    vi.advanceTimersByTime(TURNSTILE_LOADER_TIMEOUT_MS - 1);
+    // microtask を flush しても resolve / reject していない
+    let settled = false;
+    void p.then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    // timeout を超えると reject
+    vi.advanceTimersByTime(2);
+    await expect(p).rejects.toThrow(/timed out/i);
+  });
+
+  it("onload (onTurnstileReady) が timeout 前に発火すれば timeout は無効化される", async () => {
+    vi.useFakeTimers();
+    const p = ensureTurnstileLoaded();
+
+    // onload を simulate
+    (window as unknown as { turnstile: unknown }).turnstile = {};
+    window.onTurnstileReady?.();
+
+    await expect(p).resolves.toBeUndefined();
+
+    // timeout 経過後も追加 reject が起きないこと (settled flag が機能している)
+    vi.advanceTimersByTime(TURNSTILE_LOADER_TIMEOUT_MS + 1000);
+    // 既に resolve 済の Promise は変化しないため、再度 await しても OK
     await expect(p).resolves.toBeUndefined();
   });
 });
