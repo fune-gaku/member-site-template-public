@@ -3,6 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
 import { env } from "cloudflare:workers";
 
+import { getAuthUser } from "../lib/auth-claims";
 import { performSignIn } from "../lib/auth-signin";
 import {
   ALLOWED_AVATAR_MIME,
@@ -93,9 +94,7 @@ async function requireAdmin(context: ActionAPIContext) {
     request: context.request,
     cookies: context.cookies,
   });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) {
     throw new ActionError({ code: "UNAUTHORIZED", message: "認証が必要です" });
   }
@@ -306,9 +305,7 @@ export const server = {
 
         // recovery / invite フローでは verifyOtp によって一時的な認証済みセッションが
         // 確立されている前提。セッションが無い状態での呼び出しは拒否する。
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",
@@ -371,9 +368,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) throw new ActionError({ code: "UNAUTHORIZED" });
 
         // ファイル名をサニタイズ（Issue #001 / #008）
@@ -437,7 +432,7 @@ export const server = {
   // ----------------------------------------------------------------
   // member_posts CRUD
   // RLS で保護済みだが、Actions 側でも認証必須 + user_id はサーバー側で導出。
-  // クライアントから user_id を受け取らない（サーバー側の auth.getUser() を信頼）。
+  // クライアントから user_id を受け取らない（サーバー側の getAuthUser() を信頼）。
   // ----------------------------------------------------------------
   posts: {
     create: defineAction({
@@ -450,9 +445,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",
@@ -492,9 +485,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",
@@ -541,9 +532,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",
@@ -588,9 +577,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",

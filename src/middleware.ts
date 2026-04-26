@@ -1,5 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
 
+import { getAuthUser } from "./lib/auth-claims";
 import { checkActionBodySize } from "./lib/request-size-limits";
 import { safeNextPath } from "./lib/safe-redirect";
 import { applySecurityHeaders } from "./lib/security-headers";
@@ -8,7 +9,7 @@ import { createClient } from "./lib/supabase";
 export const onRequest = defineMiddleware(async (context, next) => {
   // Issue #9: Astro Actions（/_actions/*）への入口で Content-Length を検査し、
   // 用途別の上限を超えるリクエストは Supabase クライアント生成より前に弾く。
-  // これにより巨大ボディ攻撃で getUser() / cookie 解析の費用を負担しない。
+  // これにより巨大ボディ攻撃で auth 検証 / cookie 解析の費用を負担しない。
   const sizeCheck = checkActionBodySize(
     context.url.pathname,
     context.request.headers.get("content-length"),
@@ -21,17 +22,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return response;
   }
 
-  // 全ページで Supabase クライアントを生成し getUser() を呼ぶ。
+  // 全ページで Supabase クライアントを生成し getAuthUser (= getClaims) を呼ぶ。
   // これにより期限切れトークンのサイレントリフレッシュが走り、
   // createServerClient 内の setAll 経由で新しい Cookie が
   // context.cookies.set() される（Astro が自動で response に反映）。
+  // 非対称署名鍵設定時は WebCrypto によるローカル検証で Auth サーバ往復が消える。
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
   });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   context.locals.user = user;
   context.locals.profile = null;
