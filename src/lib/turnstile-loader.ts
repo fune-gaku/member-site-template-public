@@ -21,8 +21,11 @@ declare global {
 
 let loaderPromise: Promise<void> | null = null;
 
+// 公式: explicit rendering 用 URL は `?render=explicit&onload=...`、
+// 属性は `defer` のみ推奨 (`async` は付けない)。
+// https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/
 const TURNSTILE_SCRIPT_SRC =
-  "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileReady";
+  "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileReady";
 const LOADER_SCRIPT_MARKER = "data-turnstile-loader";
 
 /**
@@ -66,7 +69,6 @@ export function ensureTurnstileLoaded(): Promise<void> {
 
     const script = document.createElement("script");
     script.src = TURNSTILE_SCRIPT_SRC;
-    script.async = true;
     script.defer = true;
     script.dataset.turnstileLoader = "true";
     document.head.appendChild(script);
