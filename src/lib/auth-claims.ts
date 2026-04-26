@@ -53,17 +53,32 @@ export async function getAuthUser(
 /**
  * 強制的に Auth サーバへ問い合わせて JWT を検証する版。
  *
- * `auth.getUser()` を毎回叩くため、**セッション失効 / アカウント停止 /
- * 強制ログアウトが即時反映** される。代償として 1 リクエスト分の往復が
- * 発生する (asymmetric mode で `getAuthUser` がローカル検証に切り替わっても、
- * こちらは server 検証を維持)。
+ * `auth.getUser()` を毎回叩く。Auth サーバ側で JWT 署名 + `auth.users` レコードの
+ * 状態 (有効 / 削除 / 停止) を検証するため、`getAuthUser` (= `getClaims` の
+ * asymmetric mode ローカル検証) と比べて以下が **即時反映** される:
  *
- * 用途:
- * - admin Action 全般 (盗難 admin JWT による横移動を最小化)
+ * - アカウントの **削除** (`auth.users` の row がなくなる)
+ * - アカウントの **停止 / banned** (Auth サーバがエラーを返す)
+ * - 不正な JWT 署名 (asymmetric mode でも server 検証を再実施)
+ *
+ * **重要 (公式仕様)**: 別端末からの **sign-out (= `auth.sessions` 削除)** や
+ * セッション失効そのものは、`getUser()` でも **JWT 寿命までは検出されない**。
+ * これは Supabase の設計上の挙動 (sign-out は refresh_token を無効化するが
+ * 既発行 JWT の寿命は変わらない)。完全な失効反映が必要なら別途
+ * `auth.sessions` テーブルの `session_id` 存在確認が必要 (= 公式推奨パターン、
+ * Issue #23 で別途追跡)。
+ *
+ * 用途 (本テンプレでの妥協点):
+ * - admin Action 全般 (盗難 admin JWT が account 停止後も使えてしまう状態を防ぐ)
  * - middleware の `/admin/*` 経路ガード
- * - その他「失効を即時反映したい」security-sensitive な操作
  *
- * 一般 member 経路は `getAuthUser()` で十分 (失効ラグは JWT 寿命まで許容)。
+ * 一般 member 経路は `getAuthUser()` で十分 (失効ラグは JWT 寿命まで許容、
+ * 自分のデータ操作のみで横移動なし)。
+ *
+ * 代償: 1 リクエストあたり Auth サーバへの往復が 1 回。admin 操作は頻度が
+ * 低いので許容。
+ *
+ * @see https://supabase.com/docs/guides/auth/sessions
  */
 export async function getAuthUserFresh(
   supabase: SupabaseClient,

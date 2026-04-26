@@ -88,12 +88,19 @@ async function assertTurnstilePassed(
  * 認証済みユーザー + profile.role === "admin" を検証するヘルパー。
  * 成功時は caller の User を返す。失敗時は ActionError を throw。
  *
- * admin Action は **getAuthUserFresh** (= auth.getUser、強制サーバ検証) を
- * 使う。一般経路で使う getAuthUser (= getClaims) は asymmetric signing key 設定時に
- * ローカル JWT 検証になりサーバ側のセッション失効・アカウント停止・強制ログアウトを
- * 即時反映できないため、admin 経路で盗難 admin JWT による横移動を許す退行を避ける。
- * 1 リクエストあたり Auth サーバへの往復が 1 回増えるが、admin 操作は頻度が低く
- * 許容できるコスト。
+ * admin Action は **getAuthUserFresh** (= auth.getUser、強制サーバ検証) を使う。
+ * asymmetric signing key 設定時、getAuthUser (= getClaims) はローカル検証
+ * になり、停止された admin アカウントの JWT も寿命 (≒1h) 切れまで通って
+ * しまうため、admin 経路では Auth サーバへ毎回問い合わせて auth.users の
+ * 状態 (削除 / 停止) を確認する。
+ *
+ * 制約: getUser() でも別端末 sign-out (auth.sessions 削除) は検出できない
+ * (公式仕様)。完全な失効反映には auth.sessions テーブルへの session_id
+ * 存在確認が必要 (Issue #23 で追跡)。本テンプレでは「アカウント削除 / 停止
+ * の即時反映」までを admin 経路の保証範囲とする。
+ *
+ * 1 リクエストあたり Auth サーバへの往復が 1 回増えるが、admin 操作は頻度が
+ * 低く許容できるコスト。
  */
 async function requireAdmin(context: ActionAPIContext) {
   const supabase = createClient({

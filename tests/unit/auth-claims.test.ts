@@ -111,10 +111,12 @@ describe("getAuthUserFresh (= auth.getUser wrapper, 強制サーバ検証)", () 
     expect(user).toEqual({ id: "admin-1", email: "admin@example.com" });
   });
 
-  it("error が返ったら null (失効済みセッション・アカウント停止)", async () => {
+  it("error が返ったら null (アカウント削除・停止・JWT 不正)", async () => {
+    // 注: 別端末 sign-out (auth.sessions 削除) は getUser でも検出できない
+    // (公式仕様、JWT 寿命まで遅延)。Issue #23 で auth.sessions check を追跡。
     const supabase = clientWithGetUser(async () => ({
       data: { user: null },
-      error: { message: "JWT revoked" },
+      error: { message: "User not found" },
     }));
 
     expect(await getAuthUserFresh(supabase)).toBeNull();

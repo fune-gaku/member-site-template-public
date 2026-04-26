@@ -32,11 +32,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // context.cookies.set() される（Astro が自動で response に反映）。
   //
   // /admin/* だけは getAuthUserFresh (= auth.getUser、強制サーバ検証) を使う。
-  // 一般経路で使う getAuthUser (= getClaims) は asymmetric signing key 設定時に
-  // ローカル JWT 検証になりサーバ側のセッション失効・アカウント停止・強制
-  // ログアウトを最大 JWT 寿命 (≒1h) まで反映できないため、admin 経路で盗難
-  // JWT による横移動を許してしまう退行を避ける。一般 member 経路では失効ラグは
-  // 許容して getClaims の高速化メリットを取る。
+  // asymmetric signing key 設定時、getAuthUser (= getClaims) はローカル検証に
+  // なり、Auth サーバ側のアカウント削除 / 停止が反映されるまで JWT 寿命 (≒1h)
+  // 待つことになる。admin 経路だけは getUser() で auth.users の状態を毎回確認
+  // することで、停止された admin アカウントの JWT が active 期間中も admin 操作を
+  // 続けられないようにする。
+  //
+  // 制約: getUser() でも別端末 sign-out (auth.sessions 削除) は検出できない
+  // (公式仕様、JWT 寿命まで遅延)。完全な失効反映には auth.sessions テーブル
+  // 直接 query が必要 (Issue #23 で追跡)。
+  // 一般 member 経路は失効ラグを許容して getClaims の高速化を取る。
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
