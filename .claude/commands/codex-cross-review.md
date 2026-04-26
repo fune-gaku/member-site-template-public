@@ -30,9 +30,10 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
    codex login              # ChatGPT Pro/Plus でサインイン
    ```
 2. **gh CLI**: `command -v gh` ＋ `gh auth status`（このリポは既に gh 利用中なので通常 OK）
-3. **PR が OPEN かつ非 draft**: `gh pr view <N> --json state,isDraft,headRefName,baseRefName,mergeable,statusCheckRollup` で確認
-4. **クリーンな working tree**: `git status --short` が空。コミットされていない変更があれば停止
-5. 反復ごとの新規コメントを時刻でフィルタするため、**ループ開始時刻** を `date -u +%Y-%m-%dT%H:%M:%SZ` で取得して保持
+3. **gh auth token を export（Codex sandbox 用）**: `GH_TOKEN=$(gh auth token)` を取得して保持。Codex CLI の sandbox は macOS Keychain にアクセスできず、sandbox 内から `gh` を叩くと `The token in default is invalid` で失敗する（Issue #28）。`GH_TOKEN` env が設定されていれば gh は keyring を引かずに env を使うため、これで回避する
+4. **PR が OPEN かつ非 draft**: `gh pr view <N> --json state,isDraft,headRefName,baseRefName,mergeable,statusCheckRollup` で確認
+5. **クリーンな working tree**: `git status --short` が空。コミットされていない変更があれば停止
+6. 反復ごとの新規コメントを時刻でフィルタするため、**ループ開始時刻** を `date -u +%Y-%m-%dT%H:%M:%SZ` で取得して保持
 
 ---
 
@@ -55,7 +56,8 @@ LAST_KNOWN_MAIN=$(git rev-parse origin/$BASE_BRANCH)
 ```bash
 ITER_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-codex exec --sandbox workspace-write \
+# GH_TOKEN を明示注入（Codex sandbox は macOS Keychain を引けないため）。Issue #28 参照
+GH_TOKEN=$(gh auth token) codex exec --sandbox workspace-write \
   "あなたは PR #<N> （https://github.com/<owner>/<repo>/pull/<N>）をレビューします。
 
    gh CLI で diff を読み取り、行単位の指摘は
