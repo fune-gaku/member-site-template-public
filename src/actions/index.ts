@@ -3,6 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
 import { env } from "cloudflare:workers";
 
+import { getAuthUser } from "../lib/auth-claims";
 import { performSignIn } from "../lib/auth-signin";
 import {
   ALLOWED_AVATAR_MIME,
@@ -13,6 +14,10 @@ import { passwordSchema } from "../lib/password-schema";
 import { isHibpCheckEnabled, isPasswordPwned } from "../lib/pwned-password";
 import { createClient } from "../lib/supabase";
 import { createAdminClient } from "../lib/supabase-admin";
+import {
+  TURNSTILE_RESPONSE_FIELD,
+  verifyTurnstileToken,
+} from "../lib/turnstile";
 
 /**
  * 環境変数 `ENABLE_HIBP_CHECK=true` のときのみ HIBP 漏洩チェックを実行する。
@@ -44,17 +49,64 @@ async function assertNotPwned(password: string): Promise<void> {
 }
 
 /**
+ * Turnstile (CAPTCHA) 検証。
+ *
+ * `TURNSTILE_SECRET_KEY` (秘密) が設定されているときのみ有効化する opt-in 方式。
+ * 検証失敗は fail-closed で BAD_REQUEST。トークンは Cloudflare Workers の
+ * `CF-Connecting-IP` で縛り、token の使い回しを抑制する。
+ *
+ * site key (`PUBLIC_TURNSTILE_SITE_KEY`) はクライアントが widget 表示用に
+ * `import.meta.env` 経由で読むだけ。サーバが site key を読まないことで
+ * wrangler.jsonc vars への登録が不要になり、site key を入れ忘れても
+ * サーバ検証だけは secret 起点で動き続ける (silent fail を防ぐ)。
+ */
+async function assertTurnstilePassed(
+  token: string | undefined,
+  request: Request,
+): Promise<void> {
+  let secret: string | undefined;
+  try {
+    secret = (env as unknown as Record<string, string | undefined>)
+      .TURNSTILE_SECRET_KEY;
+  } catch {
+    secret = undefined;
+  }
+  if (!secret) return;
+
+  const remoteIp = request.headers.get("CF-Connecting-IP") ?? undefined;
+  const ok = await verifyTurnstileToken(token, secret, remoteIp);
+  if (!ok) {
+    throw new ActionError({
+      code: "BAD_REQUEST",
+      message:
+        "ボット対策の検証に失敗しました。ページを再読み込みしてもう一度お試しください。",
+    });
+  }
+}
+
+/**
  * 認証済みユーザー + profile.role === "admin" を検証するヘルパー。
  * 成功時は caller の User を返す。失敗時は ActionError を throw。
+ *
+ * 認証は `getAuthUser` (= `auth.getClaims`、Supabase 公式の最新推奨) を使う。
+ * asymmetric signing key 設定時はローカル検証になるため、Auth サーバ側の
+ * アカウント停止 / 別端末 sign-out 等の失効は JWT 寿命まで反映されない。
+ * 公式は "Most applications rarely need such strong guarantees. Consider
+ * adjusting the JWT expiry time to an acceptable value." と明記しており、
+ * 本テンプレは JWT 寿命を運用で短く設定することで失効ラグを許容範囲に収める
+ * 方針 (.claude/deployment.md「Supabase Auth: JWT 寿命とセッション設定」)。
+ *
+ * Role 変更は profile.role を毎リクエスト DB から読むため即時反映される
+ * (admin → member 降格は遅延なし)。残るギャップはアカウント停止 / sign-out の
+ * 即時反映で、公式 strong validation pattern (auth.sessions check) は
+ * Issue #23 で別途追跡。
  */
 async function requireAdmin(context: ActionAPIContext) {
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
   });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) {
     throw new ActionError({ code: "UNAUTHORIZED", message: "認証が必要です" });
   }
@@ -87,8 +139,18 @@ export const server = {
       input: z.object({
         email: z.string().email().max(254),
         password: passwordSchema,
+        // Turnstile widget が submit に含める hidden field。
+        // Turnstile が無効化されている環境では未送信なので optional。
+        // 有効化されている場合は assertTurnstilePassed が空文字列を弾く。
+        [TURNSTILE_RESPONSE_FIELD]: z.string().max(2048).optional(),
       }),
       handler: async (input, context) => {
+        // CAPTCHA (Turnstile) — 環境変数で opt-in。無効時は noop。
+        await assertTurnstilePassed(
+          input[TURNSTILE_RESPONSE_FIELD],
+          context.request,
+        );
+
         // 漏洩パスワードチェック（ENABLE_HIBP_CHECK=true の場合のみ）
         await assertNotPwned(input.password);
 
@@ -255,9 +317,7 @@ export const server = {
 
         // recovery / invite フローでは verifyOtp によって一時的な認証済みセッションが
         // 確立されている前提。セッションが無い状態での呼び出しは拒否する。
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",
@@ -320,9 +380,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) throw new ActionError({ code: "UNAUTHORIZED" });
 
         // ファイル名をサニタイズ（Issue #001 / #008）
@@ -386,7 +444,7 @@ export const server = {
   // ----------------------------------------------------------------
   // member_posts CRUD
   // RLS で保護済みだが、Actions 側でも認証必須 + user_id はサーバー側で導出。
-  // クライアントから user_id を受け取らない（サーバー側の auth.getUser() を信頼）。
+  // クライアントから user_id を受け取らない（サーバー側の getAuthUser() を信頼）。
   // ----------------------------------------------------------------
   posts: {
     create: defineAction({
@@ -399,9 +457,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",
@@ -441,9 +497,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",
@@ -490,9 +544,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",
@@ -537,9 +589,7 @@ export const server = {
           request: context.request,
           cookies: context.cookies,
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (!user) {
           throw new ActionError({
             code: "UNAUTHORIZED",

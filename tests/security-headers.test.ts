@@ -12,16 +12,16 @@ describe("SECURITY_HEADERS", () => {
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": expect.stringContaining("strict-origin"),
       "Strict-Transport-Security": expect.stringContaining("max-age"),
-      "Content-Security-Policy": expect.stringContaining(
-        "frame-ancestors 'none'",
-      ),
+      "Permissions-Policy": expect.stringContaining("camera=()"),
+      "Cross-Origin-Opener-Policy": "same-origin",
     });
   });
 
-  it("CSP allows Supabase endpoints", () => {
-    const csp = SECURITY_HEADERS["Content-Security-Policy"]!;
-    expect(csp).toContain("https://*.supabase.co");
-    expect(csp).toContain("wss://*.supabase.co");
+  it("does not emit Content-Security-Policy header (CSP is injected via Astro <meta>)", () => {
+    // CSP を header と <meta> の両方から出すと両者が独立評価され、
+    // ハッシュ無しの header 側で bundle script が拒否される。
+    // CSP は astro.config.mjs の security.csp にのみ集約する。
+    expect(SECURITY_HEADERS["Content-Security-Policy"]).toBeUndefined();
   });
 
   it("HSTS has production-grade max-age", () => {

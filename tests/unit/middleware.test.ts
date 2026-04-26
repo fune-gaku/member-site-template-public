@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../../src/lib/supabase", () => ({
   createClient: vi.fn(() => ({
     auth: {
-      getUser: vi.fn(),
+      getClaims: vi.fn(),
     },
   })),
 }));
@@ -14,7 +14,7 @@ import { onRequest } from "../../src/middleware";
 
 /**
  * createClient のモックを構築するヘルパー。
- * - user: auth.getUser() が返すユーザー（null 可）
+ * - user: getAuthUser (= auth.getClaims) が返すユーザー (null 可)
  * - role: profiles テーブルの role 列の値（指定時のみ from をモック）
  */
 function buildSupabaseMock(options: {
@@ -33,13 +33,19 @@ function buildSupabaseMock(options: {
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
 
+  // getAuthUser は内部で getClaims を呼び claims.sub / claims.email を取り出す。
+  const claims = options.user
+    ? { sub: options.user.id, email: options.user.email }
+    : null;
+  const getClaims = vi.fn().mockResolvedValue({
+    data: claims ? { claims } : null,
+    error: null,
+  });
+
   return {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: options.user } }),
-    },
+    auth: { getClaims },
     from,
-    // 参照しやすいように内部 mock も露出
-    __mocks: { from, select, eq, single },
+    __mocks: { from, select, eq, single, getClaims },
   };
 }
 
@@ -110,8 +116,8 @@ describe("middleware: /member 配下の認可", () => {
     expect(context.locals.profile).toEqual({ role: "member" });
   });
 
-  it("/member 以外のパスでは未認証でもリダイレクトしない（ただし getUser は全ページで呼ばれる）", async () => {
-    // 新しい middleware は全ページで getUser() を呼ぶ
+  it("/member 以外のパスでは未認証でもリダイレクトしない（ただし getClaims は全ページで呼ばれる）", async () => {
+    // 新しい middleware は全ページで getAuthUser (= getClaims) を呼ぶ
     // （トークンの自動リフレッシュのため）
     vi.mocked(createClient).mockReturnValue(
       buildSupabaseMock({ user: null }) as unknown as ReturnType<
@@ -131,7 +137,7 @@ describe("middleware: /member 配下の認可", () => {
 
     await onRequest(context, next);
 
-    // 全ページで getUser（トークンリフレッシュ）が走る
+    // 全ページで getAuthUser (= getClaims によるトークンリフレッシュ) が走る
     expect(createClient).toHaveBeenCalled();
     // しかし /member 以外はリダイレクトされない
     expect(context.redirect).not.toHaveBeenCalled();
@@ -363,6 +369,9 @@ describe("middleware: /_actions/* ボディサイズガード (Issue #9)", () =>
     // 代表的なヘッダをサンプリング検査（applySecurityHeaders の網羅は別テスト）
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(response.headers.get("X-Frame-Options")).toBe("DENY");
-    expect(response.headers.get("Content-Security-Policy")).not.toBeNull();
+    // CSP は middleware ではなく Astro の <meta> 経由で注入されるため
+    // 411/413 のような middleware 直接生成レスポンスでは付与されない。
+    // これらは plain text なので CSP 不要 (HTML レンダリングがない)。
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
   });
 });

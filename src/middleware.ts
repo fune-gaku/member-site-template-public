@@ -1,5 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
 
+import { getAuthUser } from "./lib/auth-claims";
 import { checkActionBodySize } from "./lib/request-size-limits";
 import { safeNextPath } from "./lib/safe-redirect";
 import { applySecurityHeaders } from "./lib/security-headers";
@@ -8,7 +9,7 @@ import { createClient } from "./lib/supabase";
 export const onRequest = defineMiddleware(async (context, next) => {
   // Issue #9: Astro Actions（/_actions/*）への入口で Content-Length を検査し、
   // 用途別の上限を超えるリクエストは Supabase クライアント生成より前に弾く。
-  // これにより巨大ボディ攻撃で getUser() / cookie 解析の費用を負担しない。
+  // これにより巨大ボディ攻撃で auth 検証 / cookie 解析の費用を負担しない。
   const sizeCheck = checkActionBodySize(
     context.url.pathname,
     context.request.headers.get("content-length"),
@@ -21,17 +22,23 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return response;
   }
 
-  // 全ページで Supabase クライアントを生成し getUser() を呼ぶ。
+  // 全ページで Supabase クライアントを生成し JWT を検証する。
   // これにより期限切れトークンのサイレントリフレッシュが走り、
   // createServerClient 内の setAll 経由で新しい Cookie が
   // context.cookies.set() される（Astro が自動で response に反映）。
+  //
+  // 失効反映の挙動: asymmetric signing key 設定時 getAuthUser はローカル検証に
+  // なり、別端末 sign-out / アカウント停止が反映されるまで JWT 寿命まで遅延する。
+  // 公式が "Most applications rarely need such strong guarantees. Consider
+  // adjusting the JWT expiry time to an acceptable value." と明記している通り、
+  // 本テンプレは admin 経路でも特別な強制サーバ検証はせず、JWT 寿命を運用で
+  // 短く設定する方針 (.claude/deployment.md「Supabase Auth: JWT 寿命とセッション
+  // 設定」参照)。完全な strong validation (auth.sessions check) は Issue #23。
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
   });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   context.locals.user = user;
   context.locals.profile = null;

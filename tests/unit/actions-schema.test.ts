@@ -10,6 +10,7 @@ describe("auth.signUp schema", () => {
   const schema = z.object({
     email: z.string().email(),
     password: z.string().min(6),
+    "cf-turnstile-response": z.string().max(2048).optional(),
   });
 
   it("有効な入力を受け入れる", () => {
@@ -32,6 +33,23 @@ describe("auth.signUp schema", () => {
     const result = schema.safeParse({
       email: "redacted@example.com",
       password: "abc",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("Turnstile token は optional (Turnstile 無効環境でも通る)", () => {
+    const result = schema.safeParse({
+      email: "redacted@example.com",
+      password: "securePass123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
+    const result = schema.safeParse({
+      email: "redacted@example.com",
+      password: "securePass123",
+      "cf-turnstile-response": "x".repeat(2049),
     });
     expect(result.success).toBe(false);
   });

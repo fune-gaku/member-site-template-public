@@ -2,19 +2,21 @@
  * 全ページに適用するセキュリティヘッダ。
  *
  * 設計方針:
- * - Astro + Vue のハイドレーション用インラインスクリプト / スタイルが存在するため
- *   CSP は 'unsafe-inline' を許容する（次フェーズで Astro experimental.csp による
- *   ハッシュ化に移行する前提）
- * - Supabase Storage (*.supabase.co) からの署名付き URL 画像を許可
- * - Supabase Auth / DB / Realtime API への接続（https / wss）を許可
+ * - CSP は astro.config.mjs の `security.csp` 経由で <meta> として注入する。
+ *   Astro が bundle した script/style の hash を自動付与してくれるため
+ *   'unsafe-inline' を排除できる。middleware からは CSP を出さない
+ *   （header と meta の重複設定は両方が独立評価され、ハッシュなし側で
+ *    bundle script が拒否される footgun になる）。
+ * - frame-ancestors は CSP 側にあるが、X-Frame-Options も古いブラウザ向けに
+ *   二重で残す（無害な互換ヘッダ）。
  *
  * 参考:
  * - OWASP Secure Headers Project
  * - Mozilla Observatory
- * - Astro Middleware: https://docs.astro.build/en/guides/middleware/
+ * - Astro CSP: https://docs.astro.build/en/reference/configuration-reference/#securitycsp
  */
 export const SECURITY_HEADERS: Record<string, string> = {
-  // クリックジャッキング対策（CSP frame-ancestors と二重化）
+  // クリックジャッキング対策（CSP frame-ancestors の互換層）
   "X-Frame-Options": "DENY",
 
   // MIME sniffing 対策
@@ -33,24 +35,6 @@ export const SECURITY_HEADERS: Record<string, string> = {
 
   // Cross-Origin-Opener-Policy: ポップアップと元窓の分離
   "Cross-Origin-Opener-Policy": "same-origin",
-
-  // CSP 本体
-  "Content-Security-Policy": [
-    "default-src 'self'",
-    "base-uri 'self'",
-    "frame-ancestors 'none'",
-    "object-src 'none'",
-    "form-action 'self'",
-    "img-src 'self' data: blob: https://*.supabase.co",
-    "font-src 'self' data:",
-    // Astro/Vue のハイドレーションがインライン script/style を出力するため暫定 unsafe-inline
-    // TODO: Phase 2 で Astro experimental.csp によるハッシュ化へ移行したら 'unsafe-inline' を削除
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
-    // Supabase Auth / REST / Realtime への接続を許可
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
-    "upgrade-insecure-requests",
-  ].join("; "),
 };
 
 /**

@@ -303,6 +303,109 @@ wrangler secret put ENABLE_HIBP_CHECK
 
 ---
 
+### Supabase Auth: JWT 寿命とセッション設定（必須）
+
+本テンプレートはサーバ側で `auth.getClaims()` (= `getAuthUser()`) を使って JWT を検証する。Supabase が **asymmetric signing keys** モードのとき検証は WebCrypto によるローカル処理になり、Auth サーバとの往復が消える代わりに、別端末からの sign-out / アカウント停止 / 強制ログアウトが **JWT 寿命まで反映されない**。
+
+公式 [Sessions docs](https://supabase.com/docs/guides/auth/sessions) は以下を明記:
+
+> "the validity of the JWT remains until it expires"
+>
+> "Most applications rarely need such strong guarantees. **Consider adjusting the JWT expiry time** to an acceptable value."
+
+本テンプレはこの公式方針に従い、コード側に強制サーバ検証を入れず **JWT 寿命を Dashboard で短く設定** することで失効ラグを許容範囲に収める。完全な strong validation pattern (= `auth.sessions` テーブルへの session_id 直接 query) は Issue #23 で追跡。
+
+#### 推奨設定 (Authentication → Sessions)
+
+| 項目                        | 推奨値 (汎用会員サイト) | 推奨値 (admin 重視・金融系) |
+| --------------------------- | ----------------------- | --------------------------- |
+| **JWT expiry limit**        | 1800 秒 (30 分)         | 300〜900 秒 (5〜15 分)      |
+| **Inactivity timeout**      | 適度な値（例: 7 日）    | 短め（例: 1 日）            |
+| **Time-box user sessions**  | 30 日                   | 24 時間以内                 |
+| **Single session per user** | OFF                     | ON                          |
+
+JWT expiry を短く設定するほど失効ラグが縮まるが、refresh トークンによる再発行頻度が上がりブラウザ側の負荷が増える。**5 分以下は実用上ほぼ意味がなく** (refresh トークンの round-trip コストの方が大きくなる)、**30 分が汎用デフォルト** として落としどころ。
+
+> **トレードオフの指針** (公式 docs より):
+>
+> - 利用シナリオごとに「失効反映の速さ」と「再発行頻度」のバランスを取る
+> - admin role を多数抱える / 金融系 / 規制業界では短めに (5〜15 分)
+> - 一般会員サイトは 30 分〜1 時間で十分
+
+#### 設定変更後の動作確認
+
+```bash
+# 1. Supabase Dashboard で JWT expiry を変更
+# 2. ブラウザでサインイン → DevTools > Application > Cookies で sb-* の Expires を確認
+# 3. 設定値と一致していること
+# 4. 寿命経過後にリクエストを送り、自動で refresh が走ることを確認
+```
+
+---
+
+### Cloudflare Turnstile（任意 / bot 対策）
+
+signup フォームに CAPTCHA を入れる場合のみ実施する opt-in 機能。`TURNSTILE_SECRET_KEY` (秘密) が未設定なら従来挙動（CAPTCHA 検証なし）。実装は [src/lib/turnstile.ts](../src/lib/turnstile.ts) と [src/components/SignupForm.vue](../src/components/SignupForm.vue) を参照。
+
+#### 1. Cloudflare Dashboard で Turnstile サイトを発行
+
+1. **Cloudflare Dashboard > Turnstile > Add Site**
+2. **Site name**: 任意（例: `member-site-template`）
+3. **Domain**: 本番ドメイン（例: `member-site-template.fune-gaku.workers.dev`）。複数登録可
+4. **Widget mode**: **Managed**（推奨。難易度を Cloudflare が自動判定）
+5. 発行された **Site Key**（公開）と **Secret Key**（秘密）を控える
+
+> `.env.example` には Cloudflare 公式の常時 pass テストキーが既定で入っているため、**ローカル開発はこの手順をスキップしても動く**。本番ドメインで実 bot 対策を有効化する時のみ実キーを発行する。
+
+#### 2. ローカル開発環境
+
+既定（`.env.example` のテストキー）で動作する。実キーで挙動確認したい場合は `.env` に site key、`.dev.vars` に secret key を設定:
+
+```bash
+# .env (公開値、Vite が build 時に bundle へ inline)
+PUBLIC_TURNSTILE_SITE_KEY=<step 1 の site key>
+
+# .dev.vars (秘密値、wrangler dev / wrangler deploy が runtime env に注入)
+TURNSTILE_SECRET_KEY=<step 1 の secret key>
+```
+
+#### 3. 本番（Cloudflare Workers）
+
+サーバ側は **secret しか参照しない設計**（site key はクライアント widget 表示専用）。Cloudflare 公式の secret 推奨パターンで 1 コマンドだけ:
+
+```bash
+# 秘密値: per-Worker Secret として登録（Cloudflare 公式推奨）
+npx wrangler secret put TURNSTILE_SECRET_KEY --name member-site-template
+# プロンプトで Step 1 の secret key を貼り付け
+```
+
+site key (公開値) は **build 時にクライアント bundle へ inline** されるため、ビルド環境の `.env` に置くか、CI 上で `PUBLIC_TURNSTILE_SITE_KEY=xxx npm run deploy` の形で渡す。`wrangler.jsonc` の `vars` への追記は **不要**（サーバが読まないため）。
+
+> **公式の根拠** —
+>
+> - [Workers env vars](https://developers.cloudflare.com/workers/configuration/environment-variables/): _"Do not use plaintext environment variables to store sensitive information. Use secrets instead."_ → secret 側
+> - [Turnstile server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/): _"Only call the Siteverify API in your backend environment. If you expose the secret key in the front-end client code, attackers can bypass the security check."_
+
+#### 4. 確認
+
+```bash
+# Secret が per-Worker Secret に登録されていること
+npx wrangler secret list --name member-site-template | grep TURNSTILE_SECRET_KEY
+# → { "name": "TURNSTILE_SECRET_KEY", "type": "secret_text" }
+```
+
+デプロイ後の動作確認:
+
+- [ ] 本番 `/auth/signup` を開いて Turnstile widget が表示される
+- [ ] widget が pass せずに submit → BAD_REQUEST + 「ボット対策の検証に失敗しました」が出る
+- [ ] widget pass 後 → 通常通りサインアップできる
+
+#### Turnstile を後から無効化する
+
+`npx wrangler secret delete TURNSTILE_SECRET_KEY --name member-site-template` で secret を消すだけで自動的に opt-out される（site key が残っていてもサーバは検証しないため害はないが、混乱回避で `.env` 側も消すのが望ましい）。
+
+---
+
 ## ロールバック
 
 Cloudflare Workers は過去のデプロイ履歴をリトルバックエンドとして保持しているため、即時ロールバックが可能。
@@ -355,6 +458,7 @@ npx wrangler rollback --name member-site-template <version-id>
 - [ ] [Email Templates](#supabase-auth-email-templates必須--issue-002--002-b) を `{{ .TokenHash }}` + `/auth/confirm` 方式に切替済
 - [ ] [Custom SMTP（Resend）](#supabase-auth-smtp-resend-設定本番必須) を有効化、Sender ドメインが `verified` で SPF / DKIM / DMARC 通過
 - [ ] [パスワードポリシー](#supabase-auth-パスワードポリシー必須) を Dashboard 側でも 8 文字以上＋複雑性で設定
+- [ ] [JWT 寿命とセッション設定](#supabase-auth-jwt-寿命とセッション設定必須) を確認（汎用 30 分 / admin 重視 5〜15 分）
 - [ ] マイグレーション適用後 **Security Advisor / Performance Advisor を Run** し新規違反なし
 
 ### Cloudflare Workers（Dashboard / CLI）
@@ -363,6 +467,7 @@ npx wrangler rollback --name member-site-template <version-id>
 - [ ] `wrangler.jsonc` の `vars.PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` が本番値
 - [ ] `compatibility_flags` に `nodejs_compat` が含まれている
 - [ ] Custom Domain を使うなら Supabase 側 `Site URL` / `Redirect URLs` を更新済
+- [ ] **Turnstile を有効化する場合のみ**: [Cloudflare Turnstile（任意）](#cloudflare-turnstile任意--bot-対策) の手順で `TURNSTILE_SECRET_KEY` を per-Worker Secret に登録、`PUBLIC_TURNSTILE_SITE_KEY` を build 環境の `.env` に設定
 
 ### デプロイ後の動作確認
 
