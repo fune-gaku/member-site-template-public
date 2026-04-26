@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 
+import { ensureTurnstileLoaded } from "../lib/turnstile-loader";
+
 const props = withDefaults(
   defineProps<{
     siteKey: string;
@@ -32,7 +34,6 @@ declare global {
       remove: (id: string) => void;
       reset: (id?: string) => void;
     };
-    onTurnstileReady?: () => void;
   }
 }
 
@@ -56,26 +57,13 @@ function reset() {
 
 defineExpose({ reset });
 
-onMounted(() => {
-  if (window.turnstile) {
-    render();
-    return;
-  }
-  const existing = document.querySelector<HTMLScriptElement>(
-    'script[data-turnstile-loader="true"]',
-  );
-  if (existing) {
-    window.onTurnstileReady = render;
-    return;
-  }
-  window.onTurnstileReady = render;
-  const s = document.createElement("script");
-  s.src =
-    "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileReady";
-  s.async = true;
-  s.defer = true;
-  s.dataset.turnstileLoader = "true";
-  document.head.appendChild(s);
+onMounted(async () => {
+  // loader は `src/lib/turnstile-loader.ts` で singleton 化されており、
+  // 同一ページに複数 TurnstileWidget が mount されても script は 1 回だけ
+  // 注入され、すべてのインスタンスが安全に render される (PR #29 codex
+  // review で発覚した silent fail の対策)。
+  await ensureTurnstileLoaded();
+  render();
 });
 
 onBeforeUnmount(() => {
