@@ -37,15 +37,15 @@
 
 ### ファイル名
 
-| 種類                       | 命名規則                                         | 例                                       |
-| -------------------------- | ------------------------------------------------ | ---------------------------------------- |
-| Vue コンポーネント         | `PascalCase.vue`                                 | `ProfileForm.vue` / `PostList.vue`       |
-| Astro レイアウト           | `PascalCase.astro`                               | `Member.astro` / `Admin.astro`           |
-| Astro ページ               | `kebab-case.astro`                               | `signin.astro` / `update-password.astro` |
-| TS モジュール（lib・util） | `kebab-case.ts`                                  | `safe-redirect.ts` / `auth-schemas.ts`   |
-| 型定義のみ                 | `*.d.ts`                                         | `env.d.ts`                               |
-| テスト                     | `<topic>.test.ts`                                | `actions-schema.test.ts`                 |
-| マイグレーション           | `NNN_short-topic.sql`（NNN は 3 桁ゼロ詰め連番） | `001_init.sql`                           |
+| 種類                       | 命名規則                                                                                     | 例                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Vue コンポーネント         | `PascalCase.vue`                                                                             | `ProfileForm.vue` / `PostList.vue`       |
+| Astro レイアウト           | `PascalCase.astro`                                                                           | `Member.astro` / `Admin.astro`           |
+| Astro ページ               | `kebab-case.astro`                                                                           | `signin.astro` / `update-password.astro` |
+| TS モジュール（lib・util） | `kebab-case.ts`                                                                              | `safe-redirect.ts` / `auth-schemas.ts`   |
+| 型定義のみ                 | `*.d.ts`                                                                                     | `env.d.ts`                               |
+| テスト                     | `<topic>.test.ts`                                                                            | `actions-schema.test.ts`                 |
+| マイグレーション           | `<14桁タイムスタンプ>_<topic>.sql`（`supabase migration new <topic>` で自動採番、Issue #34） | `20260420205000_init.sql`                |
 
 ### 変数・関数
 

@@ -179,7 +179,7 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-# src/lib/auth-schemas.ts の Zod passwordSchema (8 文字以上) と一致させて多層防御。
+# src/lib/password-schema.ts の Zod passwordSchema (8 文字以上) と一致させて多層防御。
 minimum_password_length = 8
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
