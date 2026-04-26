@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { actions } from "astro:actions";
-import { onMounted, onBeforeUnmount, ref } from "vue";
+import { ref } from "vue";
 
 import {
   PASSWORD_POLICY_HINT,
   validatePasswordStrength,
 } from "../lib/password-schema";
+import { TURNSTILE_RESPONSE_FIELD } from "../lib/turnstile";
 
-const TURNSTILE_RESPONSE_FIELD = "cf-turnstile-response";
+import TurnstileWidget from "./TurnstileWidget.vue";
 
-// 公開 site key。未設定なら Turnstile を表示しない (opt-in)。
 const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
 const email = ref("");
@@ -18,77 +18,9 @@ const confirmPassword = ref("");
 const isLoading = ref(false);
 const error = ref("");
 const success = ref(false);
+const successMessage = ref("");
 const turnstileToken = ref("");
-const turnstileWidgetEl = ref<HTMLDivElement | null>(null);
-let turnstileWidgetId: string | undefined;
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        el: HTMLElement | string,
-        opts: {
-          sitekey: string;
-          callback?: (token: string) => void;
-          "error-callback"?: () => void;
-          "expired-callback"?: () => void;
-        },
-      ) => string;
-      remove: (id: string) => void;
-      reset: (id?: string) => void;
-    };
-    onTurnstileReady?: () => void;
-  }
-}
-
-function renderTurnstile() {
-  if (!turnstileSiteKey || !turnstileWidgetEl.value || !window.turnstile) {
-    return;
-  }
-  turnstileWidgetId = window.turnstile.render(turnstileWidgetEl.value, {
-    sitekey: turnstileSiteKey,
-    callback: (token: string) => {
-      turnstileToken.value = token;
-    },
-    "expired-callback": () => {
-      turnstileToken.value = "";
-    },
-    "error-callback": () => {
-      turnstileToken.value = "";
-    },
-  });
-}
-
-onMounted(() => {
-  if (!turnstileSiteKey) return;
-
-  // すでに script があるなら直接 render、無ければ動的注入。
-  if (window.turnstile) {
-    renderTurnstile();
-    return;
-  }
-  const existing = document.querySelector<HTMLScriptElement>(
-    'script[data-turnstile-loader="true"]',
-  );
-  if (existing) {
-    window.onTurnstileReady = renderTurnstile;
-    return;
-  }
-  window.onTurnstileReady = renderTurnstile;
-  const s = document.createElement("script");
-  s.src =
-    "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileReady";
-  s.async = true;
-  s.defer = true;
-  s.dataset.turnstileLoader = "true";
-  document.head.appendChild(s);
-});
-
-onBeforeUnmount(() => {
-  if (turnstileWidgetId && window.turnstile) {
-    window.turnstile.remove(turnstileWidgetId);
-  }
-});
+const turnstileWidget = ref<InstanceType<typeof TurnstileWidget> | null>(null);
 
 async function handleSubmit() {
   error.value = "";
@@ -113,7 +45,6 @@ async function handleSubmit() {
   isLoading.value = true;
 
   try {
-    // FormDataを作成
     const formData = new FormData();
     formData.append("email", email.value);
     formData.append("password", password.value);
@@ -121,22 +52,21 @@ async function handleSubmit() {
       formData.append(TURNSTILE_RESPONSE_FIELD, turnstileToken.value);
     }
 
-    const { data: _data, error: actionError } =
-      await actions.auth.signUp(formData);
+    const { data, error: actionError } = await actions.auth.signUp(formData);
 
     if (actionError) {
       error.value = actionError.message;
-      // 失敗時は token を捨てて widget を再要求 (token は 1 回限り)
-      if (turnstileWidgetId && window.turnstile) {
-        window.turnstile.reset(turnstileWidgetId);
-        turnstileToken.value = "";
-      }
-    } else {
+      turnstileWidget.value?.reset();
+    } else if (data) {
+      // performSignUp は既登録メールでも success: true + 統一メッセージを返すため、
+      // UI からは登録有無を判別できない (Issue #14)。
       success.value = true;
+      successMessage.value = data.message;
     }
   } catch (e) {
     console.error("Signup error:", e);
     error.value = "予期しないエラーが発生しました";
+    turnstileWidget.value?.reset();
   } finally {
     isLoading.value = false;
   }
@@ -149,9 +79,7 @@ async function handleSubmit() {
       v-if="success"
       class="mb-6 rounded-lg border border-green-200 bg-green-50 p-4"
     >
-      <p class="text-sm text-green-800">
-        確認メールを送信しました。メール内のリンクをクリックして登録を完了してください。
-      </p>
+      <p class="text-sm text-green-800">{{ successMessage }}</p>
     </div>
 
     <form v-else class="space-y-6" @submit.prevent="handleSubmit">
@@ -168,6 +96,7 @@ async function handleSubmit() {
           v-model="email"
           type="email"
           required
+          autocomplete="email"
           class="focus:ring-brand-500 focus:border-brand-500 w-full rounded-lg border border-gray-300 px-4 py-2 transition outline-none focus:ring-2"
           placeholder="you@example.com"
           :disabled="isLoading"
@@ -210,6 +139,7 @@ async function handleSubmit() {
           v-model="confirmPassword"
           type="password"
           required
+          autocomplete="new-password"
           class="focus:ring-brand-500 focus:border-brand-500 w-full rounded-lg border border-gray-300 px-4 py-2 transition outline-none focus:ring-2"
           placeholder="パスワードを再入力"
           :disabled="isLoading"
@@ -217,7 +147,11 @@ async function handleSubmit() {
       </div>
 
       <div v-if="turnstileSiteKey" class="flex justify-center">
-        <div ref="turnstileWidgetEl" />
+        <TurnstileWidget
+          ref="turnstileWidget"
+          :site-key="turnstileSiteKey"
+          @update:token="turnstileToken = $event"
+        />
       </div>
 
       <button
