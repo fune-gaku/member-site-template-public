@@ -303,6 +303,46 @@ wrangler secret put ENABLE_HIBP_CHECK
 
 ---
 
+### Supabase Auth: JWT 寿命とセッション設定（必須）
+
+本テンプレートはサーバ側で `auth.getClaims()` (= `getAuthUser()`) を使って JWT を検証する。Supabase が **asymmetric signing keys** モードのとき検証は WebCrypto によるローカル処理になり、Auth サーバとの往復が消える代わりに、別端末からの sign-out / アカウント停止 / 強制ログアウトが **JWT 寿命まで反映されない**。
+
+公式 [Sessions docs](https://supabase.com/docs/guides/auth/sessions) は以下を明記:
+
+> "the validity of the JWT remains until it expires"
+>
+> "Most applications rarely need such strong guarantees. **Consider adjusting the JWT expiry time** to an acceptable value."
+
+本テンプレはこの公式方針に従い、コード側に強制サーバ検証を入れず **JWT 寿命を Dashboard で短く設定** することで失効ラグを許容範囲に収める。完全な strong validation pattern (= `auth.sessions` テーブルへの session_id 直接 query) は Issue #23 で追跡。
+
+#### 推奨設定 (Authentication → Sessions)
+
+| 項目                        | 推奨値 (汎用会員サイト) | 推奨値 (admin 重視・金融系) |
+| --------------------------- | ----------------------- | --------------------------- |
+| **JWT expiry limit**        | 1800 秒 (30 分)         | 300〜900 秒 (5〜15 分)      |
+| **Inactivity timeout**      | 適度な値（例: 7 日）    | 短め（例: 1 日）            |
+| **Time-box user sessions**  | 30 日                   | 24 時間以内                 |
+| **Single session per user** | OFF                     | ON                          |
+
+JWT expiry を短く設定するほど失効ラグが縮まるが、refresh トークンによる再発行頻度が上がりブラウザ側の負荷が増える。**5 分以下は実用上ほぼ意味がなく** (refresh トークンの round-trip コストの方が大きくなる)、**30 分が汎用デフォルト** として落としどころ。
+
+> **トレードオフの指針** (公式 docs より):
+>
+> - 利用シナリオごとに「失効反映の速さ」と「再発行頻度」のバランスを取る
+> - admin role を多数抱える / 金融系 / 規制業界では短めに (5〜15 分)
+> - 一般会員サイトは 30 分〜1 時間で十分
+
+#### 設定変更後の動作確認
+
+```bash
+# 1. Supabase Dashboard で JWT expiry を変更
+# 2. ブラウザでサインイン → DevTools > Application > Cookies で sb-* の Expires を確認
+# 3. 設定値と一致していること
+# 4. 寿命経過後にリクエストを送り、自動で refresh が走ることを確認
+```
+
+---
+
 ### Cloudflare Turnstile（任意 / bot 対策）
 
 signup フォームに CAPTCHA を入れる場合のみ実施する opt-in 機能。`TURNSTILE_SECRET_KEY` (秘密) が未設定なら従来挙動（CAPTCHA 検証なし）。実装は [src/lib/turnstile.ts](../src/lib/turnstile.ts) と [src/components/SignupForm.vue](../src/components/SignupForm.vue) を参照。
@@ -418,6 +458,7 @@ npx wrangler rollback --name member-site-template <version-id>
 - [ ] [Email Templates](#supabase-auth-email-templates必須--issue-002--002-b) を `{{ .TokenHash }}` + `/auth/confirm` 方式に切替済
 - [ ] [Custom SMTP（Resend）](#supabase-auth-smtp-resend-設定本番必須) を有効化、Sender ドメインが `verified` で SPF / DKIM / DMARC 通過
 - [ ] [パスワードポリシー](#supabase-auth-パスワードポリシー必須) を Dashboard 側でも 8 文字以上＋複雑性で設定
+- [ ] [JWT 寿命とセッション設定](#supabase-auth-jwt-寿命とセッション設定必須) を確認（汎用 30 分 / admin 重視 5〜15 分）
 - [ ] マイグレーション適用後 **Security Advisor / Performance Advisor を Run** し新規違反なし
 
 ### Cloudflare Workers（Dashboard / CLI）

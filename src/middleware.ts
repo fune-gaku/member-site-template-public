@@ -1,6 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
 
-import { getAuthUser, getAuthUserFresh } from "./lib/auth-claims";
+import { getAuthUser } from "./lib/auth-claims";
 import { checkActionBodySize } from "./lib/request-size-limits";
 import { safeNextPath } from "./lib/safe-redirect";
 import { applySecurityHeaders } from "./lib/security-headers";
@@ -22,36 +22,30 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return response;
   }
 
-  const pathname = context.url.pathname;
-  const isMemberArea = pathname.startsWith("/member");
-  const isAdminArea = pathname.startsWith("/admin");
-
   // 全ページで Supabase クライアントを生成し JWT を検証する。
   // これにより期限切れトークンのサイレントリフレッシュが走り、
   // createServerClient 内の setAll 経由で新しい Cookie が
   // context.cookies.set() される（Astro が自動で response に反映）。
   //
-  // /admin/* だけは getAuthUserFresh (= auth.getUser、強制サーバ検証) を使う。
-  // asymmetric signing key 設定時、getAuthUser (= getClaims) はローカル検証に
-  // なり、Auth サーバ側のアカウント削除 / 停止が反映されるまで JWT 寿命 (≒1h)
-  // 待つことになる。admin 経路だけは getUser() で auth.users の状態を毎回確認
-  // することで、停止された admin アカウントの JWT が active 期間中も admin 操作を
-  // 続けられないようにする。
-  //
-  // 制約: getUser() でも別端末 sign-out (auth.sessions 削除) は検出できない
-  // (公式仕様、JWT 寿命まで遅延)。完全な失効反映には auth.sessions テーブル
-  // 直接 query が必要 (Issue #23 で追跡)。
-  // 一般 member 経路は失効ラグを許容して getClaims の高速化を取る。
+  // 失効反映の挙動: asymmetric signing key 設定時 getAuthUser はローカル検証に
+  // なり、別端末 sign-out / アカウント停止が反映されるまで JWT 寿命まで遅延する。
+  // 公式が "Most applications rarely need such strong guarantees. Consider
+  // adjusting the JWT expiry time to an acceptable value." と明記している通り、
+  // 本テンプレは admin 経路でも特別な強制サーバ検証はせず、JWT 寿命を運用で
+  // 短く設定する方針 (.claude/deployment.md「Supabase Auth: JWT 寿命とセッション
+  // 設定」参照)。完全な strong validation (auth.sessions check) は Issue #23。
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
   });
-  const user = isAdminArea
-    ? await getAuthUserFresh(supabase)
-    : await getAuthUser(supabase);
+  const user = await getAuthUser(supabase);
 
   context.locals.user = user;
   context.locals.profile = null;
+
+  const pathname = context.url.pathname;
+  const isMemberArea = pathname.startsWith("/member");
+  const isAdminArea = pathname.startsWith("/admin");
 
   // 認証必須エリア: 未認証なら /auth/signin にリダイレクト
   if ((isMemberArea || isAdminArea) && !user) {

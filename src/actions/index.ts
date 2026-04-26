@@ -3,7 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import type { ActionAPIContext } from "astro:actions";
 import { env } from "cloudflare:workers";
 
-import { getAuthUser, getAuthUserFresh } from "../lib/auth-claims";
+import { getAuthUser } from "../lib/auth-claims";
 import { performSignIn } from "../lib/auth-signin";
 import {
   ALLOWED_AVATAR_MIME,
@@ -88,26 +88,25 @@ async function assertTurnstilePassed(
  * 認証済みユーザー + profile.role === "admin" を検証するヘルパー。
  * 成功時は caller の User を返す。失敗時は ActionError を throw。
  *
- * admin Action は **getAuthUserFresh** (= auth.getUser、強制サーバ検証) を使う。
- * asymmetric signing key 設定時、getAuthUser (= getClaims) はローカル検証
- * になり、停止された admin アカウントの JWT も寿命 (≒1h) 切れまで通って
- * しまうため、admin 経路では Auth サーバへ毎回問い合わせて auth.users の
- * 状態 (削除 / 停止) を確認する。
+ * 認証は `getAuthUser` (= `auth.getClaims`、Supabase 公式の最新推奨) を使う。
+ * asymmetric signing key 設定時はローカル検証になるため、Auth サーバ側の
+ * アカウント停止 / 別端末 sign-out 等の失効は JWT 寿命まで反映されない。
+ * 公式は "Most applications rarely need such strong guarantees. Consider
+ * adjusting the JWT expiry time to an acceptable value." と明記しており、
+ * 本テンプレは JWT 寿命を運用で短く設定することで失効ラグを許容範囲に収める
+ * 方針 (.claude/deployment.md「Supabase Auth: JWT 寿命とセッション設定」)。
  *
- * 制約: getUser() でも別端末 sign-out (auth.sessions 削除) は検出できない
- * (公式仕様)。完全な失効反映には auth.sessions テーブルへの session_id
- * 存在確認が必要 (Issue #23 で追跡)。本テンプレでは「アカウント削除 / 停止
- * の即時反映」までを admin 経路の保証範囲とする。
- *
- * 1 リクエストあたり Auth サーバへの往復が 1 回増えるが、admin 操作は頻度が
- * 低く許容できるコスト。
+ * Role 変更は profile.role を毎リクエスト DB から読むため即時反映される
+ * (admin → member 降格は遅延なし)。残るギャップはアカウント停止 / sign-out の
+ * 即時反映で、公式 strong validation pattern (auth.sessions check) は
+ * Issue #23 で別途追跡。
  */
 async function requireAdmin(context: ActionAPIContext) {
   const supabase = createClient({
     request: context.request,
     cookies: context.cookies,
   });
-  const user = await getAuthUserFresh(supabase);
+  const user = await getAuthUser(supabase);
   if (!user) {
     throw new ActionError({ code: "UNAUTHORIZED", message: "認証が必要です" });
   }

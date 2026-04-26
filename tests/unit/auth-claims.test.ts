@@ -1,19 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { getAuthUser, getAuthUserFresh } from "../../src/lib/auth-claims";
+import { getAuthUser } from "../../src/lib/auth-claims";
 
 // SupabaseClient の auth.getClaims() だけを satisfies する最小モック
 function clientWithClaims(impl: () => Promise<unknown>) {
   return {
     auth: { getClaims: vi.fn(impl) },
-    // biome-ignore lint/suspicious/noExplicitAny: 部分モック
-  } as any;
-}
-
-// SupabaseClient の auth.getUser() だけを satisfies する最小モック
-function clientWithGetUser(impl: () => Promise<unknown>) {
-  return {
-    auth: { getUser: vi.fn(impl) },
     // biome-ignore lint/suspicious/noExplicitAny: 部分モック
   } as any;
 }
@@ -89,68 +81,5 @@ describe("getAuthUser (= auth.getClaims wrapper)", () => {
 
     const user = await getAuthUser(supabase);
     expect(user).toEqual({ id: "user-789", email: undefined });
-  });
-});
-
-describe("getAuthUserFresh (= auth.getUser wrapper, 強制サーバ検証)", () => {
-  it("有効な user を { id, email } に詰めて返す", async () => {
-    const supabase = clientWithGetUser(async () => ({
-      data: {
-        user: {
-          id: "admin-1",
-          email: "admin@example.com",
-          app_metadata: {},
-          user_metadata: {},
-          aud: "authenticated",
-        },
-      },
-      error: null,
-    }));
-
-    const user = await getAuthUserFresh(supabase);
-    expect(user).toEqual({ id: "admin-1", email: "admin@example.com" });
-  });
-
-  it("error が返ったら null (アカウント削除・停止・JWT 不正)", async () => {
-    // 注: 別端末 sign-out (auth.sessions 削除) は getUser でも検出できない
-    // (公式仕様、JWT 寿命まで遅延)。Issue #23 で auth.sessions check を追跡。
-    const supabase = clientWithGetUser(async () => ({
-      data: { user: null },
-      error: { message: "User not found" },
-    }));
-
-    expect(await getAuthUserFresh(supabase)).toBeNull();
-  });
-
-  it("user が無ければ null", async () => {
-    const supabase = clientWithGetUser(async () => ({
-      data: { user: null },
-      error: null,
-    }));
-
-    expect(await getAuthUserFresh(supabase)).toBeNull();
-  });
-
-  it("email が文字列でなければ undefined にフォールバック (壊れた User 防御)", async () => {
-    const supabase = clientWithGetUser(async () => ({
-      data: { user: { id: "u1", email: 12345 } },
-      error: null,
-    }));
-
-    const user = await getAuthUserFresh(supabase);
-    expect(user).toEqual({ id: "u1", email: undefined });
-  });
-
-  it("getAuthUser とは違って auth.getUser を呼ぶ (= サーバ検証経路)", async () => {
-    const getUserSpy = vi.fn(async () => ({
-      data: { user: { id: "u2", email: "u2@example.com" } },
-      error: null,
-    }));
-    const supabase = { auth: { getUser: getUserSpy } } as unknown as Parameters<
-      typeof getAuthUserFresh
-    >[0];
-
-    await getAuthUserFresh(supabase);
-    expect(getUserSpy).toHaveBeenCalledTimes(1);
   });
 });
