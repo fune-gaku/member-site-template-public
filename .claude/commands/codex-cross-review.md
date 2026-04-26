@@ -42,9 +42,11 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
 gh pr checkout <N>
 BASE_BRANCH=$(gh pr view <N> --json baseRefName --jq .baseRefName)   # 通常 main
 LAST_KNOWN_MAIN=$(git rev-parse origin/$BASE_BRANCH)
+mkdir -p /tmp/codex-cross-review-<N>   # log / body の保存先を先に作る (Section A の tee が失敗しないように)
 ```
 
-ループ中の中間 state は `/tmp/codex-cross-review-<N>/iteration-<k>.json` に保存（事後レビュー用）。
+ループ中の中間 state は `/tmp/codex-cross-review-<N>/iter-<k>.log` (codex stdout) と
+`/tmp/codex-cross-review-<N>/iter-<k>-body.md` (PR 投稿用本文) に保存（事後レビュー用）。
 
 ---
 
@@ -53,6 +55,7 @@ LAST_KNOWN_MAIN=$(git rev-parse origin/$BASE_BRANCH)
 ### A. Codex にレビューを依頼（stdout を `tee` で保存）
 
 ```bash
+set -o pipefail   # `codex exec | tee` で codex 失敗が tee の status に隠されないように
 LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
 
 # GH_TOKEN を明示注入（Codex sandbox は macOS Keychain を引けないため）。Issue #28 参照。
@@ -95,17 +98,19 @@ GH_TOKEN=$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token) \
 
 ### B. Codex の stdout から本文と verdict を抽出して PR に代理投稿
 
-`$LOG` から (1) verdict より前のレビュー本文 (2) `CODEX VERDICT:` 行を分離し、
-本文を Claude が PR に 1 件のトップレベルコメントとして代理投稿する:
+`$LOG` を **そのまま** PR に投稿し、verdict 行は別途 grep で停止判定に使う。
+`CODEX VERDICT: CHANGES REQUESTED` の後ろの bullet summary も PR に届かせる
+ため、本文と verdict を分離せずに 1 件のトップレベルコメントとして残す:
 
 ```bash
 LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
 BODY=/tmp/codex-cross-review-<N>/iter-<k>-body.md
 
-# CODEX VERDICT 行より前を本文として抽出
-sed '/^CODEX VERDICT:/,$d' "$LOG" > "$BODY"
+# 本文 = $LOG 全体 (verdict と bullet summary もそのまま含む)。
+# codex CLI 末尾の noise (tokens used 等) も含まれるが audit trail 上は問題なし。
+cp "$LOG" "$BODY"
 
-# verdict 行を抽出 (停止判定に使う)
+# verdict 行を抽出 (機械可読な停止条件)
 VERDICT=$(grep -m1 -E '^CODEX VERDICT:' "$LOG")
 
 gh pr comment <N> --body-file "$BODY"
