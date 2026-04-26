@@ -8,6 +8,10 @@ import { safeNextPath } from "../../lib/safe-redirect";
 const nextPath = safeNextPath(Astro.url.searchParams.get("next"));
 ---
 
-<Auth title="サインイン" description="アカウントにログインしてください">
+<Auth
+  title="サインイン"
+  description="アカウントにログインしてください"
+  enableTurnstile
+>
   <LoginForm client:load next={nextPath} />
 </Auth>

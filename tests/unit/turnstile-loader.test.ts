@@ -51,6 +51,22 @@ describe("ensureTurnstileLoaded (PR #29 multi-widget safety)", () => {
     );
   });
 
+  it("注入される script は Turnstile 公式の explicit rendering URL と defer-only 属性を持つ (regression: render=explicit / onload= / async 非付与)", async () => {
+    // Cloudflare 公式 (https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/) は
+    // explicit rendering で `?render=explicit&onload=...` URL と `defer` のみを推奨する。
+    // 旧 URL (`?onload=...` 単独) や `async` 再混入を回帰検出する。
+    void ensureTurnstileLoaded();
+    const script = document.head.querySelector<HTMLScriptElement>(
+      'script[data-turnstile-loader="true"]',
+    );
+    expect(script).not.toBeNull();
+    const src = script!.getAttribute("src") ?? "";
+    expect(src).toContain("render=explicit");
+    expect(src).toContain("onload=onTurnstileReady");
+    expect(script!.hasAttribute("async")).toBe(false);
+    expect(script!.hasAttribute("defer")).toBe(true);
+  });
+
   it("複数 call しても script tag は 1 件しか注入されない (singleton)", async () => {
     const p1 = ensureTurnstileLoaded();
     const p2 = ensureTurnstileLoaded();

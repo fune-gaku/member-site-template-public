@@ -4,12 +4,29 @@ import Base from "./Base.astro";
 interface Props {
   title: string;
   description?: string;
+  enableTurnstile?: boolean;
 }
 
-const { title, description } = Astro.props;
+const { title, description, enableTurnstile = false } = Astro.props;
+
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
+const injectTurnstileLoader = enableTurnstile && Boolean(turnstileSiteKey);
 ---
 
 <Base title={title} description={description}>
+  {
+    injectTurnstileLoader && (
+      <Fragment slot="head">
+        <link rel="preconnect" href="https://challenges.cloudflare.com" />
+        <script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileReady"
+          defer
+          data-turnstile-loader="true"
+          is:inline
+        />
+      </Fragment>
+    )
+  }
   <div
     class="from-brand-50 to-brand-100 flex min-h-screen items-center justify-center bg-gradient-to-br px-4 py-12"
   >
