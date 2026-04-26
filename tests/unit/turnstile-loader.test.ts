@@ -203,6 +203,38 @@ describe("ensureTurnstileLoaded loader-error handling (Issue #30)", () => {
     ).toBe(0);
   });
 
+  it("Auth.astro pre-injected script の onerror 発火でも reject + DOM 除去 + retry できる (実運用主経路)", async () => {
+    // Auth.astro が <head> に出した preload script を simulate
+    // (実運用ではこちらの経路が常に取られる: PR #38 codex iter 1 で発覚)
+    const preInjected = document.createElement("script");
+    preInjected.dataset.turnstileLoader = "true";
+    document.head.appendChild(preInjected);
+
+    const p1 = ensureTurnstileLoaded();
+    // existing 分岐で onerror が hook されたはず
+    preInjected.onerror?.(new Event("error"));
+    await expect(p1).rejects.toThrow(/failed to load/i);
+
+    // 失敗 script が DOM から除去されること (次回 retry の前提)
+    expect(
+      document.head.querySelectorAll('script[data-turnstile-loader="true"]')
+        .length,
+    ).toBe(0);
+
+    // 次回 call は singleton リセットにより新規 script を注入する
+    const p2 = ensureTurnstileLoaded();
+    expect(p2).not.toBe(p1);
+    const script2 = document.head.querySelector<HTMLScriptElement>(
+      'script[data-turnstile-loader="true"]',
+    );
+    expect(script2).not.toBeNull();
+    expect(script2).not.toBe(preInjected);
+
+    // クリーンアップ
+    script2!.onerror?.(new Event("error"));
+    await expect(p2).rejects.toThrow();
+  });
+
   it("reject 後の再 call は singleton リセットにより新しい注入を試みる", async () => {
     const p1 = ensureTurnstileLoaded();
     const script1 = document.head.querySelector<HTMLScriptElement>(
