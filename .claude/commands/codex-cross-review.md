@@ -110,10 +110,38 @@ gh api "repos/<owner>/<repo>/issues/<N>/comments" --paginate \
 2. **影響範囲** — 1 箇所の指摘でも、`grep` で同パターンが他に何箇所あるか調べる。1 箇所修正で他 3 箇所が壊れたまま、は最悪
 3. **副作用** — 提案修正がコール元 / 既存テスト / 規約を壊さないか
 4. **Codex が見落とした点** — diff を新鮮な目で読み直し、**Codex の指摘は出発点であって天井ではない**
+5. **公式 docs 照合 (フレームワーク / ライブラリ挙動主張があるとき必須)** — 後述の C-2 を参照
 
 カテゴリ分け: `MUST-FIX` / `VALID-NIT` / `FALSE-POSITIVE` / `DEFER-TO-FOLLOWUP`
 
 `MUST-FIX` と `VALID-NIT` は**このイテレーションで適用**。`FALSE-POSITIVE` と `DEFER` は **PR にトップレベル返信** で「適用しない理由」を投稿（次の Codex 評価が考慮できるように）。
+
+### C-2. 公式 docs 照合（library / framework 挙動が前提の指摘では必須）
+
+Codex の指摘が **「ライブラリ X の挙動 Y」「フレームワーク F の API Z」を前提にした recommendation** を含む場合、accept する前に **必ず公式 docs を一次情報として読んで突き合わせる**。Codex も Claude も学習時点の知識でしかないため、以下のような誤りが混入しうる:
+
+- ライブラリの挙動を勘違いしている (例: `getUser()` で session 失効が即時反映される、と暗に仮定)
+- 公式が逆の guidance を出している (例: 公式は "Most apps don't need such strong guarantees" と言っているのに、Codex は強い保証を要求)
+- 公式推奨パターンと違う方法を提案している (例: 公式は X.sessions テーブル直接 query を推奨だが Codex は別 API 提案)
+
+**手順** (CLAUDE.md「最新情報・不明な情報の確認ルール」の優先順位に従う):
+
+1. 指摘の中で **挙動主張の核**を抽出 (例: 「getUser() を使えば session 失効が即時反映される」)
+2. 一次情報を取得:
+   - Astro: `mcp__astro-docs__search_astro_docs` skill (環境にあれば最優先)
+   - Supabase / Cloudflare Workers / Tailwind / Vue 等: `WebFetch` で公式 docs URL を直接取得
+   - 一般ベストプラクティス: `WebSearch` (公式 issue / RFC を含めて検索)
+3. **公式の文言を verbatim で引用してメモ**。コミットメッセージや PR コメントに残せる形に
+4. 公式と Codex 主張を突き合わせ:
+   - 完全一致 → MUST-FIX として受け入れ可
+   - 部分一致 (改善はあるが完全ではない) → MUST-FIX で受け入れつつ、docstring / コメントで **保証の限界を正確に明記**。受け入れ範囲を超えた完全パターンは別 Issue で追跡
+   - 不一致 (Codex が誤り) → FALSE-POSITIVE として PR コメントで論拠 (公式引用) と共に拒否
+   - 公式は別の推奨パターン → 公式パターンを優先採用 (Codex 提案ではなく)。複雑度トレードオフが大きいなら Issue 化して defer
+5. 受け入れる場合、コミットメッセージに **公式 docs URL と引用** を含める。後続 reviewer が同じ照合をやり直さなくて済むように
+
+**公式が「ほとんどのアプリには不要」「ベストエフォート」「許容できるトレードオフ」と書いている領域には、code 複雑性を入れない**。テンプレートでは特に、defaults を simple に保ち、必要な人は opt-in or 別 Issue で対応の方針を取る。
+
+**この照合を skip した過去事例** (反面教師): PR #22 iteration 2 で Codex が「admin 経路で `getClaims()` だと session 失効が遅れるので `getUser()` を使え」と指摘 → 公式照合せず accept → 後で公式は "Most applications rarely need such strong guarantees. Consider adjusting the JWT expiry time" と書いていることが判明し、commit を revert する手戻りが発生 (commit 4f5e9ea)。**最初に C-2 を回していれば防げた**。
 
 ### D. ローカルチェック（コード変更後）
 
@@ -200,7 +228,9 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 
 - **ローカルチェックを skip しない。** `--no-verify` / `--no-gpg-sign` / `--force` は禁止
 - **Codex の提案を盲信しない。** すべての修正はあなた自身のレビューを通す
+- **library / framework 挙動主張を含む Codex 指摘は accept 前に必ず公式 docs を一次情報で照合** (C-2 参照)。これを skip すると後で revert する手戻りが発生する
 - **Codex に異議があれば、返信コメントで論拠を示す**（沈黙の disagreement は収束 protocol を壊す）
+- **公式が「ほとんどのアプリには不要」と書く領域に code 複雑性を追加しない**。defaults は simple に、強化は opt-in or 別 Issue
 - **push 前に必ず main 同期。** stale ブランチは人工的なコンフリクトを生み両 reviewer を混乱させる
 - **secret は絶対にコミットしない。** `.env` / `.dev.vars` / credential ファイルを diff に入れない（gitleaks pre-commit で検出されるが事前確認）
 - **Codex が見落とした指摘は honestly 帰属表示**。「Codex が指摘した」ように装わない。コミット本文で「observed during Claude review, not flagged by Codex」と明示
@@ -213,6 +243,7 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 「Codex が黙った」だけでは不十分。あなた自身の OK には以下が必要:
 
 - `MUST-FIX` 残ゼロ（Codex 指摘 / あなた自身の発見の両方）
+- **library / framework 挙動主張を含む受け入れ済 MUST-FIX について、公式 docs で照合し引用をコミット本文に残してある** (C-2)
 - 隣接コードに **「diff が誘発するが直してない明らかな関連 issue」が残っていない**（意図的に defer したものは PR コメントで理由付きで明示済）
 - ローカルチェック全 green
 - 変更形状に **テスト追加が伴っている**（新規ロジックには最低 1 つ振る舞いを assert するテスト）
