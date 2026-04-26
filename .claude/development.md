@@ -245,6 +245,16 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 - 新規 Action / コンポーネント / 関数を追加するときは、対応する `tests/unit/<topic>.test.ts` を最低 1 ファイル以上同時に追加する
 - `npm run test` で両系統が一括実行される
 
+### 影響確認（マージ後・依存更新後）の進め方
+
+依存更新（Dependabot 等）や大きな変更のマージ後に「動作確認プラン」を立てるときは、**手順に curl や手動操作を書く前に必ず `tests/` を grep** して既存カバレッジを確認する。
+
+- 既存テストが網羅していれば `npm test` の green = その観点は維持されている、と判断して**手動検証は省略**
+- カバーされていない観点だけを手動検証プランに残す
+- ギャップが見つかったら、手動検証で済ませず **テスト追加 Issue を切る**（手動検証は再発防止にならない）
+
+例: security headers は [tests/security-headers.test.ts](../tests/security-headers.test.ts)、`/member` `/admin` 配下の認可は [tests/unit/middleware.test.ts](../tests/unit/middleware.test.ts) でカバー済みなので、curl での再確認は冗長。一方 `/auth/signout` GET 405 / CSRF cross-origin POST 403 は未カバー（Issue #16）。
+
 ---
 
 ## パフォーマンス
