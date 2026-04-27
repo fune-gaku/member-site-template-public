@@ -210,10 +210,15 @@ token_verifications = 30
 web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
-# [auth.captcha]
-# enabled = true
-# provider = "hcaptcha"
-# secret = ""
+# Issue #52: Cloudflare Turnstile を Supabase Auth (GoTrue) で公式検証する。
+# secret = "env(...)" でプロジェクトルート `.env` から解決される（Supabase CLI が
+# `supabase/` から repo root まで walk するため）。`.env` は repo root の .gitignore で
+# ignore 済 + `supabase/.env` への defensive ignore も `supabase/.gitignore` に追加済。
+# 公式: https://supabase.com/docs/guides/auth/auth-captcha
+[auth.captcha]
+enabled = true
+provider = "turnstile"
+secret = "env(TURNSTILE_SECRET_KEY)"
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.

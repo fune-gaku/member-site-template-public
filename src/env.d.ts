@@ -7,8 +7,11 @@ declare global {
     readonly PUBLIC_SUPABASE_URL: string;
     readonly PUBLIC_SUPABASE_PUBLISHABLE_KEY: string;
     /**
-     * Cloudflare Turnstile site key (公開可、なければ Turnstile 無効)。
-     * 対の secret は Cloudflare Workers の環境変数 TURNSTILE_SECRET_KEY。
+     * Cloudflare Turnstile site key (公開可、なければクライアント widget を表示しない)。
+     * Issue #52 以降、対の secret は **Supabase Auth (Bot and Abuse Protection)** が
+     * 直接持つ。本テンプレ Workers では検証しないため、Workers env の secret は不要。
+     * ローカル開発では `supabase/config.toml` の `[auth.captcha]` が
+     * `env(TURNSTILE_SECRET_KEY)` でプロジェクトルート `.env` から secret を解決する。
      */
     readonly PUBLIC_TURNSTILE_SITE_KEY?: string;
   }

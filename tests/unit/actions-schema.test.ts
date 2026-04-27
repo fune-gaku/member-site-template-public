@@ -14,7 +14,7 @@ describe("auth.signUp schema", () => {
   const schema = z.object({
     email: z.string().email(),
     password: z.string().min(6),
-    "cf-turnstile-response": z.string().max(2048).optional(),
+    captchaToken: z.string().max(2048).optional(),
   });
 
   it("有効な入力を受け入れる", () => {
@@ -53,7 +53,7 @@ describe("auth.signUp schema", () => {
     const result = schema.safeParse({
       email: "redacted@example.com",
       password: "securePass123",
-      "cf-turnstile-response": "x".repeat(2049),
+      captchaToken: "x".repeat(2049),
     });
     expect(result.success).toBe(false);
   });
@@ -64,7 +64,7 @@ describe("auth.signIn schema (Issue #8 / A3, Issue #21 Turnstile follow-up)", ()
   const schema = z.object({
     email: z.string().email(),
     password: z.string(),
-    "cf-turnstile-response": z.string().max(2048).optional(),
+    captchaToken: z.string().max(2048).optional(),
   });
 
   it("有効なメール + パスワードを受け入れる", () => {
@@ -95,7 +95,7 @@ describe("auth.signIn schema (Issue #8 / A3, Issue #21 Turnstile follow-up)", ()
     const result = schema.safeParse({
       email: "user@example.com",
       password: "anything",
-      "cf-turnstile-response": "valid-token",
+      captchaToken: "valid-token",
     });
     expect(result.success).toBe(true);
   });
@@ -104,7 +104,7 @@ describe("auth.signIn schema (Issue #8 / A3, Issue #21 Turnstile follow-up)", ()
     const result = schema.safeParse({
       email: "user@example.com",
       password: "anything",
-      "cf-turnstile-response": "x".repeat(2049),
+      captchaToken: "x".repeat(2049),
     });
     expect(result.success).toBe(false);
   });
@@ -136,7 +136,7 @@ describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
   // actions/index.ts の resetPassword input と同じ形
   const schema = z.object({
     email: z.string().email(),
-    "cf-turnstile-response": z.string().max(2048).optional(),
+    captchaToken: z.string().max(2048).optional(),
   });
 
   it("有効なメールアドレスを受け入れる", () => {
@@ -157,7 +157,7 @@ describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
   it("Turnstile token 付きでも通る", () => {
     const result = schema.safeParse({
       email: "redacted@example.com",
-      "cf-turnstile-response": "valid-token",
+      captchaToken: "valid-token",
     });
     expect(result.success).toBe(true);
   });
@@ -165,7 +165,7 @@ describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
   it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
     const result = schema.safeParse({
       email: "redacted@example.com",
-      "cf-turnstile-response": "x".repeat(2049),
+      captchaToken: "x".repeat(2049),
     });
     expect(result.success).toBe(false);
   });
@@ -354,16 +354,16 @@ describe("Issue #9: 文字列フィールドの .max() 多層防御", () => {
   const signInSchema = z.object({
     email: z.string().email().max(254),
     password: z.string().max(200),
-    "cf-turnstile-response": z.string().max(2048).optional(),
+    captchaToken: z.string().max(2048).optional(),
   });
   const signUpSchema = z.object({
     email: z.string().email().max(254),
     password: z.string().min(8),
-    "cf-turnstile-response": z.string().max(2048).optional(),
+    captchaToken: z.string().max(2048).optional(),
   });
   const resetPasswordSchema = z.object({
     email: z.string().email().max(254),
-    "cf-turnstile-response": z.string().max(2048).optional(),
+    captchaToken: z.string().max(2048).optional(),
   });
   const confirmOtpSchema = z.object({
     token_hash: z.string().min(1).max(512),

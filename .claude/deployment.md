@@ -345,13 +345,9 @@ JWT expiry を短く設定するほど失効ラグが縮まるが、refresh ト�
 
 ### Cloudflare Turnstile（任意 / bot 対策）
 
-> 🔄 **移行進行中（Issue #52）**: 現在は **Astro Action 側で自前 siteverify** している実装だが、Supabase Auth (GoTrue) は Turnstile を **公式サポート** しており、Auth サーバーへの委譲に切り替える。
->
-> - 移行の全体像と最終形のセットアップ手順 → 直下の [Cloudflare Turnstile（Supabase 公式統合・移行先）](#cloudflare-turnstilesupabase-公式統合移行先) を参照
-> - Issue #52 の **PR 2** マージで Action 側 siteverify が削除され、`supabase/config.toml` の `[auth.captcha]` で配線が切り替わる。**新規プロジェクトはそちらを採用**してこのセクションは無視してよい
-> - 既存プロジェクトは PR 2 マージまでは引き続きこのセクションの設定で動作する。**PR 2 マージ後にこのセクションごと削除予定**
+`auth.signUp` / `auth.signIn` / `auth.resetPassword` の 3 経路に CAPTCHA を入れる opt-in 機能。**検証は Supabase Auth (GoTrue) の公式機能** が直接行う設計（Issue #52 で `src/lib/turnstile.ts` の自前 siteverify を廃止し、`captchaToken` を `supabase-js` の `options.captchaToken` に流すだけの薄い経路に統一した）。
 
-signup フォームに CAPTCHA を入れる場合のみ実施する opt-in 機能。`TURNSTILE_SECRET_KEY` (秘密) が未設定なら従来挙動（CAPTCHA 検証なし）。実装は [src/lib/turnstile.ts](../src/lib/turnstile.ts) と [src/components/SignupForm.vue](../src/components/SignupForm.vue) を参照。
+クライアント widget は引き続き [src/components/TurnstileWidget.vue](../src/components/TurnstileWidget.vue) が Cloudflare CDN script で描画し、token を 3 フォーム共通で Action に submit する。
 
 #### 1. Cloudflare Dashboard で Turnstile サイトを発行
 
@@ -363,113 +359,58 @@ signup フォームに CAPTCHA を入れる場合のみ実施する opt-in 機�
 
 > `.env.example` には Cloudflare 公式の常時 pass テストキーが既定で入っているため、**ローカル開発はこの手順をスキップしても動く**。本番ドメインで実 bot 対策を有効化する時のみ実キーを発行する。
 
-#### 2. ローカル開発環境
-
-既定（`.env.example` のテストキー）で動作する。実キーで挙動確認したい場合は `.env` に site key、`.dev.vars` に secret key を設定:
-
-```bash
-# .env (公開値、Vite が build 時に bundle へ inline)
-PUBLIC_TURNSTILE_SITE_KEY=<step 1 の site key>
-
-# .dev.vars (秘密値、wrangler dev / wrangler deploy が runtime env に注入)
-TURNSTILE_SECRET_KEY=<step 1 の secret key>
-```
-
-#### 3. 本番（Cloudflare Workers）
-
-サーバ側は **secret しか参照しない設計**（site key はクライアント widget 表示専用）。Cloudflare 公式の secret 推奨パターンで 1 コマンドだけ:
-
-```bash
-# 秘密値: per-Worker Secret として登録（Cloudflare 公式推奨）
-npx wrangler secret put TURNSTILE_SECRET_KEY --name member-site-template
-# プロンプトで Step 1 の secret key を貼り付け
-```
-
-site key (公開値) は **build 時にクライアント bundle へ inline** されるため、ビルド環境の `.env` に置くか、CI 上で `PUBLIC_TURNSTILE_SITE_KEY=xxx npm run deploy` の形で渡す。`wrangler.jsonc` の `vars` への追記は **不要**（サーバが読まないため）。
-
-> **公式の根拠** —
->
-> - [Workers env vars](https://developers.cloudflare.com/workers/configuration/environment-variables/): _"Do not use plaintext environment variables to store sensitive information. Use secrets instead."_ → secret 側
-> - [Turnstile server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/): _"Only call the Siteverify API in your backend environment. If you expose the secret key in the front-end client code, attackers can bypass the security check."_
-
-#### 4. 確認
-
-```bash
-# Secret が per-Worker Secret に登録されていること
-npx wrangler secret list --name member-site-template | grep TURNSTILE_SECRET_KEY
-# → { "name": "TURNSTILE_SECRET_KEY", "type": "secret_text" }
-```
-
-デプロイ後の動作確認:
-
-- [ ] 本番 `/auth/signup` を開いて Turnstile widget が表示される
-- [ ] widget が pass せずに submit → BAD_REQUEST + 「ボット対策の検証に失敗しました」が出る
-- [ ] widget pass 後 → 通常通りサインアップできる
-
-#### Turnstile を後から無効化する
-
-`npx wrangler secret delete TURNSTILE_SECRET_KEY --name member-site-template` で secret を消すだけで自動的に opt-out される（site key が残っていてもサーバは検証しないため害はないが、混乱回避で `.env` 側も消すのが望ましい）。
-
----
-
-### Cloudflare Turnstile（Supabase 公式統合・移行先）
-
-Issue #52 の PR 2 で **コードと `supabase/config.toml` を atomic に切り替える** ことで、Action 側自前 siteverify を完全廃止し、**Supabase Auth (GoTrue) が `captchaToken` を受け取り Cloudflare Turnstile を直接検証する** 構成に移る。CLAUDE.md の「公式推奨の実装パターンを厳守」「最新情報は一次情報で検証」方針に沿った正攻法。
-
-**前提**:
-
-- このセクションの **Dashboard 設定 / Cloudflare Site 発行は PR 2 マージ前から実施可** （runtime には影響しないため）
-- ただし **`supabase/config.toml` の `[auth.captcha]` を有効化するのは PR 2 のコード変更とセット**（先に `[auth.captcha]` だけ ON にすると、Supabase Auth が `captchaToken` を要求し始めるが、PR 1 までのコードは Action 側で先に siteverify する作りなので、ローカルの sign-in / sign-up / reset-password が `captcha_failed` で全滅する）
-
-#### 1. Cloudflare Dashboard で Turnstile サイトを発行
-
-[Cloudflare Turnstile（任意 / bot 対策）](#cloudflare-turnstile任意--bot-対策) の手順 1 と同一（同じ Site Key / Secret Key を流用してよい）。
-
 #### 2. Supabase Dashboard で Turnstile を有効化（本番）
+
+Supabase Auth が secret を直接持つため、本番では **Cloudflare Workers の secret 登録は不要**。Supabase Dashboard 側で 1 回設定すれば済む。
 
 1. **Supabase Dashboard > Authentication > Settings > Bot and Abuse Protection**
 2. **Enable CAPTCHA protection** を ON
 3. **Choose CAPTCHA provider** で **Cloudflare Turnstile** を選択
-4. **CAPTCHA secret** に Cloudflare で発行した **Secret Key** を貼り付け
+4. **CAPTCHA secret** に Step 1 で発行した **Secret Key** を貼り付け
 5. **Save** で確定
 
 > 公式: [Enable CAPTCHA Protection (Supabase Docs)](https://supabase.com/docs/guides/auth/auth-captcha)
 
-#### 3. ローカル開発（PR 2 で適用される設定 — 参考）
+#### 3. ローカル開発
 
-PR 2 で `supabase/config.toml` に以下のセクションが追加され、`supabase start` が読み取って Auth コンテナに環境変数を注入する。`secret = "env(...)"` 構文は Supabase CLI が **プロジェクトルートの `.env`** から値を解決する仕様（[公式: Managing Config](https://supabase.com/docs/guides/local-development/managing-config)：_"This will detect any values stored in an `.env` file at the root of your project directory."_）。
+`supabase/config.toml` の `[auth.captcha]` セクションが既に有効化されており、`supabase start` 起動時に Auth コンテナへ secret を注入する。`secret = "env(TURNSTILE_SECRET_KEY)"` 構文は Supabase CLI が **プロジェクトルートの `.env`** から値を解決する仕様（[公式: Managing Config](https://supabase.com/docs/guides/local-development/managing-config)：_"This will detect any values stored in an `.env` file at the root of your project directory."_）。
 
 ```toml
+# supabase/config.toml (既に投入済)
 [auth.captcha]
 enabled = true
 provider = "turnstile"
 secret = "env(TURNSTILE_SECRET_KEY)"
 ```
 
-ローカル開発で Turnstile 検証を効かせたい場合は **プロジェクトルートの `.env`**（`PUBLIC_TURNSTILE_SITE_KEY` 等と同じファイル）に Cloudflare のテストキー（[公式テスト用キー一覧](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）または実 secret を置く。`.env` は既に `.gitignore` 対象なので誤コミットの心配はない。
+ローカル開発で Turnstile 検証を効かせる場合は **プロジェクトルートの `.env`**（`PUBLIC_TURNSTILE_SITE_KEY` 等と同じファイル）に Cloudflare のテストキー（[公式テスト用キー一覧](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）または実 secret を置く。`.env` は repo root の `.gitignore` で ignore 対象。
 
 ```bash
 # .env (プロジェクトルート、Vite と Supabase CLI 双方が読み取る)
+PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA  # 常時 pass のテスト site key
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA  # 常時 pass のテスト secret
 ```
 
-> 📝 **補足**: Supabase CLI v2 系は `supabase/` から repo root まで `.env` を walk して読むため `supabase/.env` 等にも置けるが、**公式 docs の表記とリポジトリの `.gitignore` 設定（ルート `.env` のみ ignore 対象）に揃えるためプロジェクトルートを推奨する**。`supabase/.env` を使う場合は `supabase/.gitignore` に `.env` を追加して誤コミットを防ぐこと（PR 2 のスコープで defensive に追加予定）。
+> 📝 **補足**: Supabase CLI v2 の `loadNestedEnv` は `supabase/` から repo root まで walk するため `supabase/.env` も解決される。本テンプレでは secret は **プロジェクトルート `.env`** に置く方針（公式 docs 表記 + 既存 `.gitignore` 設定との整合）だが、開発者が誤って `supabase/.env` に置いた場合の事故防止に `supabase/.gitignore` で `.env` も defensive に ignore してある。
 
-> ⚠️ **本番では Cloudflare Workers の Secret は不要になる**：移行後は Supabase Auth が Turnstile を検証するため、`wrangler secret put TURNSTILE_SECRET_KEY` で登録した Workers secret は無用になる。Issue #52 PR 3 で `wrangler secret delete TURNSTILE_SECRET_KEY` を実行して掃除する（本番で不要な機密情報を残さない原則）。
+#### 4. 動作確認
 
-#### 4. 検証 (PR 2 マージ後に実施)
+ローカル:
 
-- [ ] 本番 `/auth/signup` を開いて Turnstile widget が表示される（クライアントは引き続き Cloudflare CDN script + site key で widget を描画する）
-- [ ] DevTools で `captchaToken` を空にして送信 → サーバ側で 400 系 + 「ボット対策の検証に失敗しました」相当の応答（Supabase Auth が `captcha_failed` を返す）
-- [ ] widget pass 後 → 通常通りサインアップできる
-- [ ] アカウント列挙対策（Issue #8 / #14）の bytewise 同一応答が **Turnstile 失敗を除いて** 維持されている（既存ユニットテストが green）
+```bash
+npm run dev   # PUBLIC_TURNSTILE_SITE_KEY 未設定なら widget 非表示で従来通り動く
+```
 
-#### 5. 廃止対象（PR 3 で実施）
+本番デプロイ後:
 
-- 本番 Workers secret: `npx wrangler secret delete TURNSTILE_SECRET_KEY --name member-site-template`
-- ローカル `.dev.vars` から `TURNSTILE_SECRET_KEY` を削除（プロジェクトルート `.env` に移管されるため）
-- `.dev.vars.example` から同 entry を削除
-- CI / GitHub Actions secret に同名のものがあれば削除
+- [ ] `/auth/signup` を開いて Turnstile widget が表示される（site key を build 時に inline）
+- [ ] DevTools で `captchaToken` を空にして submit → 400 系 + 「ボット対策の検証に失敗しました」相当の応答（Supabase Auth が `error.code === "captcha_failed"` を返す）
+- [ ] widget pass 後 → 通常通りサインアップ・サインイン・パスワードリセットができる
+- [ ] アカウント列挙対策（Issue #8 / #14）の bytewise 同一応答が **Turnstile 失敗ケースを除いて** 維持されている（`tests/unit/auth-{signin,signup,reset-password}.test.ts` で自動検証）
+
+#### Turnstile を後から無効化する
+
+Supabase Dashboard > Authentication > Settings > Bot and Abuse Protection で **Enable CAPTCHA protection** を OFF にする。クライアント側は `PUBLIC_TURNSTILE_SITE_KEY` を削除すれば widget も消える（site key が残っていても Auth が検証しないため害は無いが、混乱回避で消すのが望ましい）。
 
 ---
 
@@ -610,7 +551,7 @@ npx wrangler rollback --name member-site-template <version-id>
 - [ ] 公開値 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` が **ビルド時の `.env`（または `.env.production`）** に本番値で入っている。`wrangler.jsonc` の `vars` に書いても効かないので注意（[README「8. 本番公開値の供給」](../README.md#8-本番公開値の供給ビルド時-inline) 参照）
 - [ ] `compatibility_flags` に `nodejs_compat` が含まれている
 - [ ] Custom Domain を使うなら Supabase 側 `Site URL` / `Redirect URLs` を更新済
-- [ ] **Turnstile を有効化する場合のみ**: [Cloudflare Turnstile（任意）](#cloudflare-turnstile任意--bot-対策) の手順で `TURNSTILE_SECRET_KEY` を per-Worker Secret に登録、`PUBLIC_TURNSTILE_SITE_KEY` を build 環境の `.env` に設定。Issue #52 PR 2 マージ後は **代わりに** [Cloudflare Turnstile（Supabase 公式統合・移行先）](#cloudflare-turnstilesupabase-公式統合移行先) の手順（Supabase Dashboard 側 secret 登録）を実施
+- [ ] **Turnstile を有効化する場合のみ**: [Cloudflare Turnstile（任意 / bot 対策）](#cloudflare-turnstile任意--bot-対策) の手順で **Supabase Dashboard > Auth > Bot and Abuse Protection** に Secret Key を登録、`PUBLIC_TURNSTILE_SITE_KEY` を build 環境の `.env` に設定。本番 Workers の secret は不要（Supabase Auth が直接検証する）
 
 ### デプロイ後の動作確認
 

@@ -1,7 +1,1 @@
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-for-local-dev
-
-# Cloudflare Turnstile secret key (任意・opt-in、設定時のみ signup で CAPTCHA 検証)
-# 下記は Cloudflare 公式の localhost / CI 用テストキー (常時 pass、任意ドメイン可)。
-# https://developers.cloudflare.com/turnstile/troubleshooting/testing/
-# 本番では Cloudflare Dashboard で発行した実 secret key を `wrangler secret put` で登録する。
-TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA

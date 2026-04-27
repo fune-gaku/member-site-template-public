@@ -6,3 +6,12 @@
 .env.keys
 .env.local
 .env.*.local
+
+# Issue #52: Supabase CLI v2 の `loadNestedEnv` (pkg/config/config.go) は
+# `supabase/` から repo root まで walk して .env を読み込むため、`supabase/.env`
+# も解決されてしまう。本テンプレでは secret はプロジェクトルート `.env` に置く
+# 方針 (公式 docs と root .gitignore に揃える) だが、開発者が誤って
+# `supabase/.env` に置いた場合の事故防止に defensive で ignore に入れる。
+.env
+.env.production
+.env.*
