@@ -347,7 +347,9 @@ JWT expiry を短く設定するほど失効ラグが縮まるが、refresh ト�
 
 `auth.signUp` / `auth.signIn` / `auth.resetPassword` の 3 経路に CAPTCHA を入れる opt-in 機能。**検証は Supabase Auth (GoTrue) の公式機能** が直接行う設計（Issue #52 で `src/lib/turnstile.ts` の自前 siteverify を廃止し、`captchaToken` を `supabase-js` の `options.captchaToken` に流すだけの薄い経路に統一した）。
 
-クライアント widget は引き続き [src/components/TurnstileWidget.vue](../src/components/TurnstileWidget.vue) が Cloudflare CDN script で描画し、token を 3 フォーム共通で Action に submit する。
+> **本テンプレートのデフォルトは OFF**（[supabase/config.toml](../supabase/config.toml) の `[auth.captcha].enabled = false`、本番 Supabase Dashboard も OFF 想定）。bot 対策が必要なプロジェクトで以下の 3 層をすべて ON に揃えて opt-in する。
+
+クライアント widget は [src/components/TurnstileWidget.vue](../src/components/TurnstileWidget.vue) が Cloudflare CDN script で描画し、token を 3 フォーム共通で Action に submit する仕組みは残置されているため、**3 層を ON にするだけで再有効化できる**。
 
 #### 1. Cloudflare Dashboard で Turnstile サイトを発行
 
@@ -373,10 +375,10 @@ Supabase Auth が secret を直接持つため、本番では **Cloudflare Worke
 
 #### 3. ローカル開発
 
-`supabase/config.toml` の `[auth.captcha]` セクションが既に有効化されており、`supabase start` 起動時に Auth コンテナへ secret を注入する。`secret = "env(TURNSTILE_SECRET_KEY)"` 構文は Supabase CLI が **プロジェクトルートの `.env`** から値を解決する仕様（[公式: Managing Config](https://supabase.com/docs/guides/local-development/managing-config)：_"This will detect any values stored in an `.env` file at the root of your project directory."_）。
+`supabase/config.toml` の `[auth.captcha]` を `enabled = true` に切り替えると、`supabase start` 起動時に Auth コンテナへ secret を注入する。`secret = "env(TURNSTILE_SECRET_KEY)"` 構文は Supabase CLI が **プロジェクトルートの `.env`** から値を解決する仕様（[公式: Managing Config](https://supabase.com/docs/guides/local-development/managing-config)：_"This will detect any values stored in an `.env` file at the root of your project directory."_）。
 
 ```toml
-# supabase/config.toml (既に投入済)
+# supabase/config.toml (デフォルト OFF。enabled を true にして使う)
 [auth.captcha]
 enabled = true
 provider = "turnstile"
@@ -391,6 +393,8 @@ PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA  # 常時 pass のテスト s
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA  # 常時 pass のテスト secret
 ```
 
+`supabase/config.toml` を変更したら `supabase stop && supabase start` で再起動して Auth コンテナに反映する。
+
 > 📝 **補足**: Supabase CLI v2 の `loadNestedEnv` は `supabase/` から repo root まで walk するため `supabase/.env` も解決される。本テンプレでは secret は **プロジェクトルート `.env`** に置く方針（公式 docs 表記 + 既存 `.gitignore` 設定との整合）だが、開発者が誤って `supabase/.env` に置いた場合の事故防止に `supabase/.gitignore` で `.env` も defensive に ignore してある。
 
 #### 4. 動作確認
@@ -398,19 +402,25 @@ TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA  # 常時 pass のテ�
 ローカル:
 
 ```bash
-npm run dev   # PUBLIC_TURNSTILE_SITE_KEY 未設定なら widget 非表示で従来通り動く
+npm run dev   # 3 層が揃っていれば widget が描画され、Auth が captchaToken を verify する
 ```
 
 本番デプロイ後:
 
 - [ ] `/auth/signup` を開いて Turnstile widget が表示される（site key を build 時に inline）
-- [ ] DevTools で `captchaToken` を空にして submit → 400 系 + 「ボット対策の検証に失敗しました」相当の応答（Supabase Auth が `error.code === "captcha_failed"` を返す）
+- [ ] widget を pass せず submit → 400 系で UI 上「メールアドレスまたはパスワードが正しくありません」相当（実際の Auth 応答は `unexpected_failure` 500 だが [auth-signin.ts](../src/lib/auth-signin.ts) で UNAUTHORIZED に正規化、enumeration 防御として正しい挙動）
 - [ ] widget pass 後 → 通常通りサインアップ・サインイン・パスワードリセットができる
 - [ ] アカウント列挙対策（Issue #8 / #14）の bytewise 同一応答が **Turnstile 失敗ケースを除いて** 維持されている（`tests/unit/auth-{signin,signup,reset-password}.test.ts` で自動検証）
 
 #### Turnstile を後から無効化する
 
-Supabase Dashboard > Authentication > Settings > Bot and Abuse Protection で **Enable CAPTCHA protection** を OFF にする。クライアント側は `PUBLIC_TURNSTILE_SITE_KEY` を削除すれば widget も消える（site key が残っていても Auth が検証しないため害は無いが、混乱回避で消すのが望ましい）。
+3 層を **同期して** OFF にする（順序：サーバ → クライアントの順で切るとログイン破壊事故が無い）:
+
+1. **本番**: Supabase Dashboard > Authentication > Settings > Bot and Abuse Protection で **Enable CAPTCHA protection** を OFF + Save
+2. **ローカル**: `supabase/config.toml` で `[auth.captcha].enabled = false` + `supabase stop && supabase start`
+3. **クライアント (任意)**: `PUBLIC_TURNSTILE_SITE_KEY` を `.env` / build 環境から削除すると widget も消える（残しても無害だが UI ノイズ回避で削除推奨）
+
+> ⚠️ **やってはいけない順序**: クライアント (層 3) を先に消してサーバ (層 1) が ON のままにすると、widget が出ないため誰も `captchaToken` を取得できず、**全 sign-in / sign-up / reset-password が UNAUTHORIZED で失敗** する。必ずサーバ側から先に切ること。
 
 ---
 
