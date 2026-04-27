@@ -437,7 +437,7 @@ Issue #52 の PR 2 で **コードと `supabase/config.toml` を atomic に切�
 
 #### 3. ローカル開発（PR 2 で適用される設定 — 参考）
 
-PR 2 で `supabase/config.toml` に以下のセクションが追加され、`supabase start` が読み取って Auth コンテナに環境変数を注入する。`secret = "env(...)"` 構文は Supabase CLI が `supabase/.env` から値を解決する仕様（[公式: Managing Config](https://supabase.com/docs/guides/local-development/managing-config)）。
+PR 2 で `supabase/config.toml` に以下のセクションが追加され、`supabase start` が読み取って Auth コンテナに環境変数を注入する。`secret = "env(...)"` 構文は Supabase CLI が **プロジェクトルートの `.env`** から値を解決する仕様（[公式: Managing Config](https://supabase.com/docs/guides/local-development/managing-config)：_"This will detect any values stored in an `.env` file at the root of your project directory."_）。
 
 ```toml
 [auth.captcha]
@@ -446,12 +446,14 @@ provider = "turnstile"
 secret = "env(TURNSTILE_SECRET_KEY)"
 ```
 
-ローカル開発で Turnstile 検証を効かせたい場合は `supabase/.env` に Cloudflare のテストキー（[公式テスト用キー一覧](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）または実 secret を置く。
+ローカル開発で Turnstile 検証を効かせたい場合は **プロジェクトルートの `.env`**（`PUBLIC_TURNSTILE_SITE_KEY` 等と同じファイル）に Cloudflare のテストキー（[公式テスト用キー一覧](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）または実 secret を置く。`.env` は既に `.gitignore` 対象なので誤コミットの心配はない。
 
 ```bash
-# supabase/.env (Supabase CLI 専用 env、`supabase start` で読まれる)
+# .env (プロジェクトルート、Vite と Supabase CLI 双方が読み取る)
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA  # 常時 pass のテスト secret
 ```
+
+> 📝 **補足**: Supabase CLI v2 系は `supabase/` から repo root まで `.env` を walk して読むため `supabase/.env` 等にも置けるが、**公式 docs の表記とリポジトリの `.gitignore` 設定（ルート `.env` のみ ignore 対象）に揃えるためプロジェクトルートを推奨する**。`supabase/.env` を使う場合は `supabase/.gitignore` に `.env` を追加して誤コミットを防ぐこと（PR 2 のスコープで defensive に追加予定）。
 
 > ⚠️ **本番では Cloudflare Workers の Secret は不要になる**：移行後は Supabase Auth が Turnstile を検証するため、`wrangler secret put TURNSTILE_SECRET_KEY` で登録した Workers secret は無用になる。Issue #52 PR 3 で `wrangler secret delete TURNSTILE_SECRET_KEY` を実行して掃除する（本番で不要な機密情報を残さない原則）。
 
@@ -465,7 +467,8 @@ TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA  # 常時 pass のテ�
 #### 5. 廃止対象（PR 3 で実施）
 
 - 本番 Workers secret: `npx wrangler secret delete TURNSTILE_SECRET_KEY --name member-site-template`
-- ローカル `.dev.vars` から `TURNSTILE_SECRET_KEY` を削除（`supabase/.env` に移管されるため）
+- ローカル `.dev.vars` から `TURNSTILE_SECRET_KEY` を削除（プロジェクトルート `.env` に移管されるため）
+- `.dev.vars.example` から同 entry を削除
 - CI / GitHub Actions secret に同名のものがあれば削除
 
 ---
