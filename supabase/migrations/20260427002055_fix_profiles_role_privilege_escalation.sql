@@ -17,6 +17,16 @@
 -- を成功させられる (RLS は own row への UPDATE を許可しているため、
 -- 残る防壁は column-level revoke だけだったが効いていない)。
 --
+-- PostgreSQL 公式が同じ罠を明示的に警告:
+--   https://www.postgresql.org/docs/current/sql-grant.html (Notes section)
+--   > "A user may perform SELECT, INSERT, etc. on a column if they hold
+--   >  that privilege for either the specific column or its whole table.
+--   >  Granting the privilege at the table level and then revoking it for
+--   >  one column will not do what one might wish: the table-level grant
+--   >  is unaffected by a column-level operation."
+-- table-level UPDATE を保ったまま column-level UPDATE を revoke しても、
+-- effective privilege は OR 結合で table-level が勝つ。
+--
 -- 修正:
 --   1. table-level UPDATE を authenticated から剥奪する
 --   2. 安全なカラム (display_name / avatar_url / updated_at) のみ

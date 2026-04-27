@@ -58,7 +58,7 @@ grant update (display_name, avatar_url, updated_at)
 
 正しいパターンは **table-level revoke + 安全カラムのみ column-level grant** の組み合わせ。これにより `update profiles set role = ...` は 42501（permission denied）となり、`update profiles set display_name = ...` は通常通り動作する。`role` の変更は `service_role` の table-level grant 経由で `admin.updateUserRole` Action から行う。
 
-履歴: 初版 (`20260420205000_init.sql`) は column-level revoke 単独で no-op となっており、`20260427002055_fix_profiles_role_privilege_escalation.sql` で修正済み（pgTAP 010 テストで回帰検出）。
+履歴: 初版 (`20260420205000_init.sql`) は column-level revoke 単独で no-op となっており、`20260427002055_fix_profiles_role_privilege_escalation.sql` で修正済み。回帰検出用の pgTAP 010 テストは [Issue #35](https://github.com/fune-gaku/member-site-template/issues/35) で別 PR として整備中（`supabase/tests/database/010-profiles-role-revoke.test.sql`）。
 
 **トリガー**:
 
