@@ -448,7 +448,7 @@ npx wrangler rollback --name member-site-template <version-id>
 
 - スキーマ変更を含むデプロイで問題が出た場合は、まずアプリを Workers でロールバックしつつ、Supabase 側は **Pro プラン以上のみ Point in Time Recovery (PITR)** が利用可能
 - 無料プランの場合は手動の `pg_dump` バックアップに依存する（→ [バックアップ](#バックアップ) 参照）
-- マイグレーションは [security.md「マイグレーション運用ルール」](./security.md#マイグレーション運用ルール) に従って **本番適用前にローカル再現確認** を必ず行うこと
+- マイグレーションは [database.md「マイグレーション運用」](./database.md#マイグレーション運用) に従って **本番適用前にローカル再現確認** を必ず行うこと
 
 ---
 
@@ -460,7 +460,7 @@ npx wrangler rollback --name member-site-template <version-id>
 | Worker メトリクス              | 同 Worker > **Metrics**                                                                                       | リクエスト数 / CPU 時間 / エラーレート / サブリクエスト数                                                                                                                                         |
 | Supabase Auth ログ             | Supabase Dashboard > **Logs → Auth Logs**                                                                     | サインアップ／サインインの失敗、SMTP 4xx/5xx、OTP 失効                                                                                                                                            |
 | Supabase DB ログ               | Supabase Dashboard > **Logs → Postgres Logs**                                                                 | クエリエラー、RLS 違反                                                                                                                                                                            |
-| Security / Performance Advisor | Supabase Dashboard > **Database → Advisors**                                                                  | RLS 未有効テーブル / インデックス不足等。マイグレーション適用直後に必ず実行（[security.md「マイグレーション適用直後に必ずやること」](./security.md#マイグレーション適用直後に必ずやること) 参照） |
+| Security / Performance Advisor | Supabase Dashboard > **Database → Advisors**                                                                  | RLS 未有効テーブル / インデックス不足等。マイグレーション適用直後に必ず実行（[security.md「手動で定期実施する項目」](./security.md#手動で定期実施する項目) 参照） |
 | 依存パッケージ脆弱性           | GitHub > Security > Dependabot                                                                                | `npm audit --audit-level=high` の CI と Dependabot が週次で監視                                                                                                                                   |
 | セキュリティヘッダ             | [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) | 四半期に 1 回 A 以上を維持                                                                                                                                                                        |
 

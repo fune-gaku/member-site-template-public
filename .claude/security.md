@@ -39,7 +39,7 @@
 - [x] `SUPABASE_SERVICE_ROLE_KEY` はサーバーのみで使用
 - [x] Admin クライアントは毎リクエスト生成（セッション漏洩防止）
 - [x] CSRF 対策：状態変更操作は POST のみ、`security.checkOrigin` 有効、`/auth/signout` GET 405 ガード + クロスオリジン POST 403 を自動テストでカバー（`tests/integration/signout-csrf.test.ts` / `tests/workers/csrf.test.ts`、→ [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)）
-- [x] OTP / PKCE の適切な分離：メールリンクは `/auth/confirm` のランディング経由でスキャナ GET 耐性を確保（→ [メール経由の認証フロー](./architecture.md#メール経由の認証フロー-issue-002--002-b)）
+- [x] OTP / PKCE の適切な分離：メールリンクは `/auth/confirm` のランディング経由でスキャナ GET 耐性を確保（→ [メール経由の認証フロー](./architecture.md#メール経由の認証フローissue-002--002-b)）
 - [x] Open Redirect 対策：`next` クエリは `safeNextPath` でサニタイズ（`src/lib/safe-redirect.ts`）
 - [x] Supabase メールテンプレートで `{{ .ConfirmationURL }}` は禁止、`{{ .TokenHash }}` + `/auth/confirm` 経由に統一
 - [x] Supabase Dashboard のセキュリティ設定を完了（→ [Supabase Dashboard セキュリティ設定チェックリスト](#supabase-dashboard-セキュリティ設定チェックリスト)）
