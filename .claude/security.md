@@ -354,7 +354,7 @@ main マージの前提として、PR description（または PR 不経由のと
 | ----------------------- | -------------------------- | ----------------------------------------------------------------- |
 | Email confirmation      | **ON**                     | メール到達性を保証、なりすまし登録防止                            |
 | OTP 有効期限            | **≤ 3600 秒（1 時間）**    | Supabase 公式推奨上限。超えると Security Advisor が警告           |
-| Minimum password length | **8 文字**                 | `src/lib/auth-schemas.ts` の Zod `passwordSchema` と一致させる    |
+| Minimum password length | **8 文字**                 | `src/lib/password-schema.ts` の Zod `passwordSchema` と一致させる |
 | Password requirements   | **数字 + 小文字 + 大文字** | アプリ側 Zod と一致させる（Zod で先に弾き、Dashboard で二重防御） |
 | Confirm email change    | **ON**                     | メール変更時の乗っ取り防止                                        |
 | Secure email change     | **ON**                     | 旧メール側での承認を要求                                          |
