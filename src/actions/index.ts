@@ -17,10 +17,6 @@ import { passwordSchema } from "../lib/password-schema";
 import { isHibpCheckEnabled, isPasswordPwned } from "../lib/pwned-password";
 import { createClient } from "../lib/supabase";
 import { createAdminClient } from "../lib/supabase-admin";
-import {
-  TURNSTILE_RESPONSE_FIELD,
-  verifyTurnstileToken,
-} from "../lib/turnstile";
 
 /**
  * 環境変数 `ENABLE_HIBP_CHECK=true` のときのみ HIBP 漏洩チェックを実行する。
@@ -47,42 +43,6 @@ async function assertNotPwned(password: string): Promise<void> {
       code: "BAD_REQUEST",
       message:
         "このパスワードは過去の漏洩データに含まれています。別のパスワードを使用してください。",
-    });
-  }
-}
-
-/**
- * Turnstile (CAPTCHA) 検証。
- *
- * `TURNSTILE_SECRET_KEY` (秘密) が設定されているときのみ有効化する opt-in 方式。
- * 検証失敗は fail-closed で BAD_REQUEST。トークンは Cloudflare Workers の
- * `CF-Connecting-IP` で縛り、token の使い回しを抑制する。
- *
- * site key (`PUBLIC_TURNSTILE_SITE_KEY`) はクライアントが widget 表示用に
- * `import.meta.env` 経由で読むだけ。サーバが site key を読まないことで
- * wrangler.jsonc vars への登録が不要になり、site key を入れ忘れても
- * サーバ検証だけは secret 起点で動き続ける (silent fail を防ぐ)。
- */
-async function assertTurnstilePassed(
-  token: string | undefined,
-  request: Request,
-): Promise<void> {
-  let secret: string | undefined;
-  try {
-    secret = (env as unknown as Record<string, string | undefined>)
-      .TURNSTILE_SECRET_KEY;
-  } catch {
-    secret = undefined;
-  }
-  if (!secret) return;
-
-  const remoteIp = request.headers.get("CF-Connecting-IP") ?? undefined;
-  const ok = await verifyTurnstileToken(token, secret, remoteIp);
-  if (!ok) {
-    throw new ActionError({
-      code: "BAD_REQUEST",
-      message:
-        "ボット対策の検証に失敗しました。ページを再読み込みしてもう一度お試しください。",
     });
   }
 }
@@ -142,23 +102,21 @@ export const server = {
       input: z.object({
         email: z.string().email().max(254),
         password: passwordSchema,
-        // Turnstile widget が submit に含める hidden field。
-        // Turnstile が無効化されている環境では未送信なので optional。
-        // 有効化されている場合は assertTurnstilePassed が空文字列を弾く。
-        [TURNSTILE_RESPONSE_FIELD]: z.string().max(2048).optional(),
+        // Issue #52: Cloudflare Turnstile の検証は Supabase Auth (GoTrue) に
+        // 委譲する。Action は token をそのまま `options.captchaToken` に流すだけ。
+        // Turnstile が Supabase Dashboard で無効化されている環境では未送信なので optional。
+        // 公式 type: `@supabase/auth-js` SignUpWithPasswordCredentials.options.captchaToken
+        captchaToken: z.string().max(2048).optional(),
       }),
       // 本体は `src/lib/auth-signup.ts` の `performSignUp` に分離してある。
       // Issue #14 (A3 follow-up): Supabase が返す `User already registered`
       // を含む全失敗ケースを統一成功メッセージに正規化し、メール存在判定を
-      // 防ぐ。Turnstile / HIBP の事前検証 BAD_REQUEST はバリデーション失敗
-      // (enumeration vector ではない) なので通常通りユーザに返す。
+      // 防ぐ。HIBP の事前検証 BAD_REQUEST はバリデーション失敗 (enumeration
+      // vector ではない) なので通常通りユーザに返す。
+      // Issue #52: Turnstile 失敗 (`error.code === "captcha_failed"`) は
+      // performSignUp 側で BAD_REQUEST に再分類して個別エラーで返す
+      // (bot 検知失敗は enumeration vector ではないため)。
       handler: async (input, context) => {
-        // CAPTCHA (Turnstile) — 環境変数で opt-in。無効時は noop。
-        await assertTurnstilePassed(
-          input[TURNSTILE_RESPONSE_FIELD],
-          context.request,
-        );
-
         // 漏洩パスワードチェック（ENABLE_HIBP_CHECK=true の場合のみ）
         await assertNotPwned(input.password);
 
@@ -169,6 +127,7 @@ export const server = {
         return performSignUp(supabase, {
           email: input.email,
           password: input.password,
+          captchaToken: input.captchaToken,
           options: {
             emailRedirectTo: `${context.url.origin}/auth/callback`,
           },
@@ -181,21 +140,16 @@ export const server = {
       input: z.object({
         email: z.string().email().max(254),
         password: z.string().max(200),
-        // Issue #21: signin にも Turnstile を適用（credential stuffing 抑止）。
-        // Turnstile が無効化されている環境では未送信なので optional。
-        [TURNSTILE_RESPONSE_FIELD]: z.string().max(2048).optional(),
+        // Issue #21 / #52: signin の CAPTCHA (Turnstile) は Supabase Auth が検証する。
+        // Turnstile が Dashboard で無効化されている環境では未送信なので optional。
+        captchaToken: z.string().max(2048).optional(),
       }),
       // 本体は `src/lib/auth-signin.ts` の `performSignIn` に分離してある。
       // Issue #8 (A3): すべての失敗ケースを統一メッセージに正規化することで
       // アカウント列挙を防ぐ。Timing は Supabase 側の bcrypt 検証が
       // 概ね吸収する想定。
+      // Issue #52: Turnstile 失敗は performSignIn 側で BAD_REQUEST に再分類。
       handler: async (input, context) => {
-        // Issue #21: CAPTCHA (Turnstile) を signin にも適用（credential stuffing 抑止）。
-        await assertTurnstilePassed(
-          input[TURNSTILE_RESPONSE_FIELD],
-          context.request,
-        );
-
         const supabase = createClient({
           request: context.request,
           cookies: context.cookies,
@@ -203,6 +157,7 @@ export const server = {
         return performSignIn(supabase, {
           email: input.email,
           password: input.password,
+          captchaToken: input.captchaToken,
         });
       },
     }),
@@ -229,20 +184,14 @@ export const server = {
       accept: "form",
       input: z.object({
         email: z.string().email().max(254),
-        // Issue #21: reset-password にも Turnstile を適用（spam reset 抑止）。
-        [TURNSTILE_RESPONSE_FIELD]: z.string().max(2048).optional(),
+        // Issue #21 / #52: reset-password の CAPTCHA も Supabase Auth が検証する（spam reset 抑止）。
+        captchaToken: z.string().max(2048).optional(),
       }),
       // 本体は `src/lib/auth-reset-password.ts` の `performResetPassword` に分離してある。
       // Issue #14 (A3 follow-up): 未登録メール / SMTP 失敗 / レート超過の各失敗ケースを
       // 統一成功メッセージに正規化し、登録有無を判定不能にする。
-      // Turnstile 事前検証の BAD_REQUEST はバリデーション失敗のため通常通り返す。
+      // Issue #52: Turnstile 失敗は performResetPassword 側で BAD_REQUEST に再分類。
       handler: async (input, context) => {
-        // Issue #21: CAPTCHA (Turnstile) を reset-password にも適用（spam reset 抑止）。
-        await assertTurnstilePassed(
-          input[TURNSTILE_RESPONSE_FIELD],
-          context.request,
-        );
-
         const supabase = createClient({
           request: context.request,
           cookies: context.cookies,
@@ -253,6 +202,7 @@ export const server = {
         // フォールバックとしてのみ機能する。詳細は .claude/deployment.md 参照（Issue #002 / #002-B）。
         return performResetPassword(supabase, {
           email: input.email,
+          captchaToken: input.captchaToken,
           options: {
             redirectTo: `${context.url.origin}/auth/confirm?next=/auth/update-password`,
           },

@@ -2,8 +2,6 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
-import { TURNSTILE_RESPONSE_FIELD } from "../lib/turnstile";
-
 import TurnstileWidget from "./TurnstileWidget.vue";
 
 // `next` は signin.astro 側で safeNextPath() による検証済みの値を受け取る。
@@ -40,7 +38,7 @@ async function handleSubmit() {
     formData.append("email", email.value);
     formData.append("password", password.value);
     if (turnstileToken.value) {
-      formData.append(TURNSTILE_RESPONSE_FIELD, turnstileToken.value);
+      formData.append("captchaToken", turnstileToken.value);
     }
 
     const { data: _data, error: actionError } =

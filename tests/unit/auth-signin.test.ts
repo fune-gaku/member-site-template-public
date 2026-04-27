@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { SIGNIN_GENERIC_ERROR_MESSAGE } from "../../src/lib/auth-errors";
+import {
+  CAPTCHA_FAILED_MESSAGE,
+  SIGNIN_GENERIC_ERROR_MESSAGE,
+} from "../../src/lib/auth-errors";
 import {
   performSignIn,
   type SignInCapableClient,
@@ -13,11 +16,18 @@ import {
  * `Email not confirmed` 等）が **すべて同一の `UNAUTHORIZED` + 統一メッセージ**
  * に正規化されることを Action ロジック本体 (`performSignIn`) で検証する。
  *
+ * Issue #52: Cloudflare Turnstile 検証を Supabase Auth に委譲したため、CAPTCHA
+ * 失敗 (`error.code === "captcha_failed"`) は **統一応答に巻き込まずに**
+ * `BAD_REQUEST` で個別エラーとして返すこと（bot 検知失敗は enumeration vector
+ * ではないため）も assert する。
+ *
  * 真の防衛線はこの正規化。エラーメッセージ定数を変えただけで handler が
  * 旧経路に戻ってしまわないよう、振る舞いを直接 assert する。
  */
 
-function makeClient(error: { message: string } | null): SignInCapableClient & {
+function makeClient(
+  error: { message: string; code?: string } | null,
+): SignInCapableClient & {
   auth: { signInWithPassword: ReturnType<typeof vi.fn> };
 } {
   return {
@@ -34,7 +44,22 @@ describe("performSignIn (Issue #8 / A3)", () => {
     const client = makeClient(null);
     const result = await performSignIn(client, VALID_INPUT);
     expect(result).toEqual({ success: true });
-    expect(client.auth.signInWithPassword).toHaveBeenCalledWith(VALID_INPUT);
+    // captchaToken 無しのときは options 無しで呼ぶ (Turnstile 無効環境)
+    expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: VALID_INPUT.email,
+      password: VALID_INPUT.password,
+      options: undefined,
+    });
+  });
+
+  it("captchaToken を渡すと options.captchaToken に流す (Issue #52)", async () => {
+    const client = makeClient(null);
+    await performSignIn(client, { ...VALID_INPUT, captchaToken: "tk-123" });
+    expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: VALID_INPUT.email,
+      password: VALID_INPUT.password,
+      options: { captchaToken: "tk-123" },
+    });
   });
 
   it.each([
@@ -77,9 +102,33 @@ describe("performSignIn (Issue #8 / A3)", () => {
     },
   );
 
+  it("captcha_failed は BAD_REQUEST + 個別メッセージに分離される (Issue #52)", async () => {
+    // bot 検知失敗は enumeration vector ではないので統一応答に巻き込まない。
+    const supabaseError = {
+      message: "captcha protection: request disallowed (...)",
+      code: "captcha_failed",
+    };
+    const client = makeClient(supabaseError);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {
+      // suppress
+    });
+
+    await expect(performSignIn(client, VALID_INPUT)).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: CAPTCHA_FAILED_MESSAGE,
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "auth.signIn captcha_failed:",
+      supabaseError,
+    );
+    errorSpy.mockRestore();
+  });
+
   it("複数の異なる Supabase エラーを順に渡しても応答は同一 (区別不能)", async () => {
     // enumeration 観点では、攻撃者が応答を比較しても情報が抽出できないことが
     // 重要。message と code が **bytewise に同一** であることを assert する。
+    // (captcha_failed は別経路に分離されているのでここでは含めない)
     const errors = [
       { message: "Invalid login credentials" },
       { message: "Email not confirmed" },

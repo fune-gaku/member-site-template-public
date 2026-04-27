@@ -41,3 +41,14 @@ export const SIGNUP_GENERIC_SUCCESS_MESSAGE =
  */
 export const RESET_PASSWORD_GENERIC_SUCCESS_MESSAGE =
   "ご登録のメールアドレス宛にパスワード再設定用のリンクを送信しました。届いていない場合はアカウントが未登録の可能性があります。";
+
+/**
+ * Issue #52: Cloudflare Turnstile 検証が Supabase Auth (GoTrue) で失敗したとき
+ * (`error.code === "captcha_failed"`) のユーザー向けメッセージ。
+ *
+ * これは enumeration vector ではない（bot 検知失敗であってアカウント存在判定
+ * ではない）ため、`signIn` / `signUp` / `resetPassword` の統一応答とは分離して
+ * 個別の `BAD_REQUEST` で返し、ユーザーに actionable な instruction を出す。
+ */
+export const CAPTCHA_FAILED_MESSAGE =
+  "ボット対策の検証に失敗しました。ページを再読み込みしてもう一度お試しください。";

@@ -2,8 +2,6 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
-import { TURNSTILE_RESPONSE_FIELD } from "../lib/turnstile";
-
 import TurnstileWidget from "./TurnstileWidget.vue";
 
 const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
@@ -32,7 +30,7 @@ async function handleSubmit() {
     const formData = new FormData();
     formData.append("email", email.value);
     if (turnstileToken.value) {
-      formData.append(TURNSTILE_RESPONSE_FIELD, turnstileToken.value);
+      formData.append("captchaToken", turnstileToken.value);
     }
 
     const { data, error: actionError } =

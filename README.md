@@ -184,7 +184,7 @@ npx wrangler secret list --name member-site-template
 # → [{ "name": "SUPABASE_SERVICE_ROLE_KEY", "type": "secret_text" }] が出れば OK
 ```
 
-Turnstile (CAPTCHA) を有効化する場合は同様に `TURNSTILE_SECRET_KEY` を登録します。詳細手順は [.claude/deployment.md「Cloudflare Turnstile（任意 / bot 対策）」](.claude/deployment.md#cloudflare-turnstile任意--bot-対策) を参照。
+Turnstile (CAPTCHA) を有効化する場合は **Supabase Dashboard > Authentication > Settings > Bot and Abuse Protection** で Cloudflare Turnstile を有効化し Secret Key を登録します（Workers の secret 登録は不要）。詳細手順は [.claude/deployment.md「Cloudflare Turnstile（任意 / bot 対策）」](.claude/deployment.md#cloudflare-turnstile任意--bot-対策) を参照。
 
 > **⚠️ Cloudflare の Secret には 2 系統あります**
 >

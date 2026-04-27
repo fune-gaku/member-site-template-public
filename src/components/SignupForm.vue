@@ -6,7 +6,6 @@ import {
   PASSWORD_POLICY_HINT,
   validatePasswordStrength,
 } from "../lib/password-schema";
-import { TURNSTILE_RESPONSE_FIELD } from "../lib/turnstile";
 
 import TurnstileWidget from "./TurnstileWidget.vue";
 
@@ -50,7 +49,7 @@ async function handleSubmit() {
     formData.append("email", email.value);
     formData.append("password", password.value);
     if (turnstileToken.value) {
-      formData.append(TURNSTILE_RESPONSE_FIELD, turnstileToken.value);
+      formData.append("captchaToken", turnstileToken.value);
     }
 
     const { data, error: actionError } = await actions.auth.signUp(formData);
