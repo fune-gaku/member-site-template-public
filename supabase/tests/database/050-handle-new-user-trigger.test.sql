@@ -15,7 +15,7 @@
 -- INSERT してから平の select is(...) で検証する。
 
 begin;
-select plan(4);
+select plan(7);
 
 -- ----------------------------------------
 -- Test 1+2: raw_user_meta_data に display_name 有り
@@ -77,6 +77,54 @@ select is(
     where user_id = '22222222-2222-2222-2222-222222222222'),
   ''::text,
   'meta data に display_name 無しの場合は空文字にフォールバック'
+);
+
+-- ----------------------------------------
+-- Test 5+6+7: Google OAuth 経由の signup を模した meta_data (Issue #49)
+--   raw_user_meta_data には Google OIDC userinfo が並ぶ:
+--     - name / full_name / iss / sub 等
+--   ただし `display_name` キーは含まれない。
+--   raw_app_meta_data には provider="google" と providers=["google"] が入る。
+-- 本テンプレートの handle_new_user は `display_name` キーのみ参照するため、
+-- Google OAuth 経由のユーザは display_name が空文字になる仕様（後追いで
+-- ユーザが /member/profile から編集する想定）。トリガが落ちないこと + role が
+-- default の 'member' になることを保証する。
+-- ----------------------------------------
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at, confirmation_token, email_change,
+  email_change_token_new, recovery_token
+) values (
+  '00000000-0000-0000-0000-000000000000',
+  '33333333-3333-3333-3333-333333333333',
+  'authenticated', 'authenticated', 'oauth-google@example.com',
+  '',  -- OAuth ユーザは encrypted_password を持たない
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"iss":"https://accounts.google.com","name":"Bob Smith","full_name":"Bob Smith","email":"oauth-google@example.com","email_verified":true,"avatar_url":"https://lh3.googleusercontent.com/test","provider_id":"108888888888888888888","sub":"108888888888888888888"}'::jsonb,
+  now(), now(), '', '', '', ''
+);
+
+select is(
+  (select count(*)::int from public.profiles
+    where user_id = '33333333-3333-3333-3333-333333333333'),
+  1,
+  'OAuth-shaped raw_user_meta_data でも profiles 行が作られる (Issue #49)'
+);
+
+select is(
+  (select display_name from public.profiles
+    where user_id = '33333333-3333-3333-3333-333333333333'),
+  ''::text,
+  'OAuth: display_name キー無しは空文字フォールバック (name/full_name は転記しない仕様)'
+);
+
+select is(
+  (select role from public.profiles
+    where user_id = '33333333-3333-3333-3333-333333333333'),
+  'member'::text,
+  'OAuth signup でも role は default の member（昇格は service_role 経由のみ）'
 );
 
 select * from finish();

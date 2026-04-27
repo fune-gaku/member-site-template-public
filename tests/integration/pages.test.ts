@@ -99,6 +99,118 @@ describe("Auth layout — Turnstile loader opt-in (PR #32 / Issue #31)", () => {
   });
 });
 
+describe("signin / signup pages — Google OAuth opt-in (Issue #49 / PR 3)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  // Astro Actions の `actions.auth.signInWithGoogle` は form の action prop に
+  // 渡されると `?_action=auth.signInWithGoogle` (current URL + query) に展開される
+  // (Astro の自然な書き分け: 同一 URL POST + query で action 識別)。
+  // 別途 worker test (`tests/workers/csrf.test.ts`) では `/_actions/...` の
+  // 直接 POST も同等にハンドルされ CSRF guard が効くことを検証している。
+  const GOOGLE_BUTTON_FORM_RE =
+    /<form[^>]+action="\?_action=auth\.signInWithGoogle"/;
+
+  it("signin.astro: PUBLIC_GOOGLE_AUTH_ENABLED 未設定では Google ボタンが描画されない (デフォルト OFF)", async () => {
+    // 明示的に false を入れて build inline 値を上書き。
+    vi.stubEnv("PUBLIC_GOOGLE_AUTH_ENABLED", "false");
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+
+    const { default: SigninPage } =
+      await import("../../src/pages/auth/signin.astro");
+    const result = await container.renderToString(SigninPage);
+
+    expect(result).not.toMatch(GOOGLE_BUTTON_FORM_RE);
+    expect(result).not.toContain("Google でサインイン");
+  });
+
+  it("signin.astro: PUBLIC_GOOGLE_AUTH_ENABLED=true で Google ボタン form が描画される (action + next hidden field 含む)", async () => {
+    vi.stubEnv("PUBLIC_GOOGLE_AUTH_ENABLED", "true");
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+
+    const { default: SigninPage } =
+      await import("../../src/pages/auth/signin.astro");
+    const result = await container.renderToString(SigninPage);
+
+    expect(result).toMatch(GOOGLE_BUTTON_FORM_RE);
+    expect(result).toContain("Google でサインイン");
+    // next hidden field がデフォルト fallback (/member/dashboard) で埋まる
+    expect(result).toMatch(
+      /<input[^>]+type="hidden"[^>]+name="next"[^>]+value="\/member\/dashboard"/,
+    );
+    // POST メソッド指定であること（GET だと CSRF / プリフェッチで意図せず Action が起動する）
+    expect(result).toMatch(
+      /<form[^>]+method="POST"[^>]+action="\?_action=auth\.signInWithGoogle"|<form[^>]+action="\?_action=auth\.signInWithGoogle"[^>]+method="POST"/,
+    );
+  });
+
+  it("signin.astro: ?next=/member/profile を渡すと hidden field に safeNextPath 適用後の値が載る", async () => {
+    vi.stubEnv("PUBLIC_GOOGLE_AUTH_ENABLED", "true");
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+
+    const { default: SigninPage } =
+      await import("../../src/pages/auth/signin.astro");
+    const result = await container.renderToString(SigninPage, {
+      request: new Request(
+        "https://example.com/auth/signin?next=/member/profile",
+      ),
+    });
+
+    expect(result).toMatch(
+      /<input[^>]+type="hidden"[^>]+name="next"[^>]+value="\/member\/profile"/,
+    );
+  });
+
+  it("signin.astro: ?next=//evil.com を渡しても safeNextPath で fallback (/member/dashboard) に正規化される (Open Redirect 防御)", async () => {
+    vi.stubEnv("PUBLIC_GOOGLE_AUTH_ENABLED", "true");
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+
+    const { default: SigninPage } =
+      await import("../../src/pages/auth/signin.astro");
+    const result = await container.renderToString(SigninPage, {
+      request: new Request(
+        "https://example.com/auth/signin?next=//evil.example.com/x",
+      ),
+    });
+
+    expect(result).toMatch(
+      /<input[^>]+type="hidden"[^>]+name="next"[^>]+value="\/member\/dashboard"/,
+    );
+    expect(result).not.toContain("evil.example.com");
+  });
+
+  it("signup.astro: PUBLIC_GOOGLE_AUTH_ENABLED 未設定では Google ボタンが描画されない", async () => {
+    vi.stubEnv("PUBLIC_GOOGLE_AUTH_ENABLED", "false");
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+
+    const { default: SignupPage } =
+      await import("../../src/pages/auth/signup.astro");
+    const result = await container.renderToString(SignupPage);
+
+    expect(result).not.toMatch(GOOGLE_BUTTON_FORM_RE);
+    expect(result).not.toContain("Google で新規登録");
+  });
+
+  it("signup.astro: PUBLIC_GOOGLE_AUTH_ENABLED=true で Google ボタン form が描画される", async () => {
+    vi.stubEnv("PUBLIC_GOOGLE_AUTH_ENABLED", "true");
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+
+    const { default: SignupPage } =
+      await import("../../src/pages/auth/signup.astro");
+    const result = await container.renderToString(SignupPage);
+
+    expect(result).toMatch(GOOGLE_BUTTON_FORM_RE);
+    expect(result).toContain("Google で新規登録");
+  });
+});
+
 describe("Index page with Vue component", () => {
   it("Vue renderer を含むコンテナで top page が描画される", async () => {
     const renderers = await loadRenderers([vueContainerRenderer()]);
