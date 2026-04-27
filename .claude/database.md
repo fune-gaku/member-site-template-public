@@ -332,7 +332,7 @@ npm run db:push:dry-run   # → 「Local migrations are up to date」を確認
 - 既存マイグレーションファイル (`20260420205000_init.sql`) は本番に適用済みなので **直接編集禁止**。スキーマ変更は新しいタイムスタンプのファイルで追加 / 変更する
 - 本番適用前に必ず `/db-check`（ローカル reset + lint + test）を通す
 - 破壊的変更（`drop table` 等）は `supabase db push --dry-run` で diff を二重確認してから実行
-- 運用フロー・Advisor 実行タイミングは [.claude/security.md](./security.md#マイグレーション運用ルール) を参照
+- 運用フロー・Advisor 実行タイミングは [.claude/security.md「手動で定期実施する項目」](./security.md#手動で定期実施する項目) を参照
 
 ---
 
