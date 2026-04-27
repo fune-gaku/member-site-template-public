@@ -46,10 +46,19 @@
 **権限昇格攻撃（Privilege Escalation）防止**:
 
 ```sql
-revoke update (role) on public.profiles from authenticated;
+-- 1. table-level UPDATE を剥奪 (Supabase default privileges で grant されている)
+revoke update on public.profiles from authenticated;
+
+-- 2. 安全なカラムのみ column-level UPDATE を再付与
+grant update (display_name, avatar_url, updated_at)
+  on public.profiles to authenticated;
 ```
 
-一般ユーザーからは `role` 列の UPDATE 権限を剥奪。カラムレベル権限は RLS より先に評価されるため、シンプルで堅牢な防御策。
+⚠️ **重要な落とし穴**: `revoke update (role) on public.profiles from authenticated;` のように **column-level revoke 単独では権限を剥奪できない**。Supabase の default privileges (`alter default privileges in schema public grant all on tables to authenticated, anon, service_role`) で table-level UPDATE が grant されており、PostgreSQL の挙動上、table-level UPDATE は全カラムに継承されるため column-level revoke が無効化される。
+
+正しいパターンは **table-level revoke + 安全カラムのみ column-level grant** の組み合わせ。これにより `update profiles set role = ...` は 42501（permission denied）となり、`update profiles set display_name = ...` は通常通り動作する。`role` の変更は `service_role` の table-level grant 経由で `admin.updateUserRole` Action から行う。
+
+履歴: 初版 (`20260420205000_init.sql`) は column-level revoke 単独で no-op となっており、`20260427002055_fix_profiles_role_privilege_escalation.sql` で修正済み（pgTAP 010 テストで回帰検出）。
 
 **トリガー**:
 
@@ -295,9 +304,10 @@ npm run db:push:dry-run   # → 「Local migrations are up to date」を確認
 
 ### 権限昇格攻撃の防止
 
-- `role` 列は一般ユーザーから更新不可（`revoke update (role)`）
-- カラムレベル権限は RLS より先に評価されるため、確実に防御できる
-- `role` の変更は管理者が `createAdminClient()` 経由で行う
+- `role` 列は一般ユーザーから更新不可（**table-level revoke + 安全カラムのみ column-level grant** の組み合わせで実現）
+- ⚠️ column-level revoke 単独は Supabase default privileges 下で no-op になる（[profiles テーブル](#profiles)節の警告枠を参照）
+- カラム権限チェックは RLS より先に評価されるため、自分の行であっても `role` への UPDATE は 42501 で拒否される
+- `role` の変更は管理者が `createAdminClient()`（`service_role`）経由で行う。`service_role` は `init.sql` で明示的に table-level grant されている
 
 ### トリガーのセキュリティ
 
@@ -338,7 +348,7 @@ npm run db:push:dry-run   # → 「Local migrations are up to date」を確認
 - [ ] ポリシー内で **`(select auth.uid())`** を使った（裸の `auth.uid()` は行ごとに再評価されて遅い）
 - [ ] FK カラム（`user_id` 等）および **ポリシーで参照するカラムに index** を貼った
 - [ ] ユーザー入力系の text カラムには **CHECK 制約** で長さ上限を設定（多層防御、例: `profiles.display_name` は 100 文字）
-- [ ] `role` のような**権限に直結するカラム**は、一般ユーザーから `revoke update (col)` して column-level privilege で保護した
+- [ ] `role` のような**権限に直結するカラム**は、`revoke update on <table> from authenticated;` で **table-level UPDATE を剥奪** したうえで、`grant update (<safe cols>) on <table> to authenticated;` で安全カラムのみ再付与した（**column-level `revoke update (col)` 単独は Supabase default privileges 下で no-op なので NG** — 上記 [profiles テーブル](#profiles)節の警告枠参照）
 
 ### 新規ポリシー（既存テーブルへの追加）
 
