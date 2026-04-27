@@ -11,7 +11,16 @@
 -- 退行検出: いずれかのポリシーをコメントアウトすると該当テストが fail。
 
 begin;
-select plan(5);
+select plan(8);
+
+-- ----------------------------------------
+-- 設計ノート (Codex iteration 1 P1 finding 1):
+--   negative-only な assertion (例: bob は alice の post を見れない = 0 行)
+--   は、対応 policy 自体を **消した** 場合でも default-deny + 0 rows で
+--   green のままになり、own-row の正常系を壊す regression を見逃す。
+--   Test 6/7/8 で alice 自身の SELECT/UPDATE/DELETE 正常動作を positive
+--   assertion として固定する。
+-- ----------------------------------------
 
 -- セットアップ: alice, bob 作成。alice の post を 1 件 (postgres 権限で直接 insert)
 select tests.create_supabase_user('alice@example.com');
@@ -80,6 +89,54 @@ select is(
   (select count(*)::int from del),
   0,
   '他ユーザーの post への DELETE は 0 rows'
+);
+
+-- ----------------------------------------
+-- Test 6 (positive): alice は自分の post を SELECT できる
+-- ----------------------------------------
+-- SELECT ポリシー自体が消されると 0 rows になり、Test 3 の negative
+-- assertion はそれでも green のまま通ってしまう。alice 視点で 2 件以上
+-- (setup での 1 件 + Test 1 の 1 件) 見えることを固定する。
+select tests.authenticate_as('alice@example.com');
+
+select is(
+  (select count(*)::int from public.member_posts),
+  2,
+  'alice は自分の post を SELECT できる (Test 1 で insert した 1 件 + setup の 1 件)'
+);
+
+-- ----------------------------------------
+-- Test 7 (positive): alice は自分の post を UPDATE できる
+-- ----------------------------------------
+-- UPDATE ポリシーが消されると alice の自己更新も 0 rows になる
+-- → このテストが fail する。
+with upd as (
+  update public.member_posts set title = 'edited'
+   where user_id = (select auth.uid())
+  returning 1
+)
+select cmp_ok(
+  (select count(*)::int from upd),
+  '>=',
+  1,
+  'alice は自分の post を UPDATE できる (>=1 row affected)'
+);
+
+-- ----------------------------------------
+-- Test 8 (positive): alice は自分の post を DELETE できる
+-- ----------------------------------------
+-- DELETE ポリシーが消されると alice の自己削除も 0 rows になる
+-- → このテストが fail する。
+with del as (
+  delete from public.member_posts
+   where user_id = (select auth.uid())
+  returning 1
+)
+select cmp_ok(
+  (select count(*)::int from del),
+  '>=',
+  1,
+  'alice は自分の post を DELETE できる (>=1 row deleted)'
 );
 
 select * from finish();
