@@ -406,6 +406,82 @@ npx wrangler secret list --name member-site-template | grep TURNSTILE_SECRET_KEY
 
 ---
 
+## 初期 admin の bootstrap（必須・1 回限り）
+
+新規 Supabase プロジェクトを作って `supabase db push` でマイグレーション適用直後は、`auth.users` も `profiles` も空の状態で **admin ユーザーが 1 人もいない**。`/admin/users` の招待機能 (`admin.inviteUser` Action) は admin としてサインインしている前提なので、最初の 1 人だけは別経路で作る必要がある（chicken-and-egg）。
+
+PR #48 で `profiles.role` への column-level UPDATE 権限を `authenticated` から剥奪したため、**通常のサインアップ経路では決して admin になれない**設計。promotion は **`service_role` 権限を持つ Supabase Dashboard SQL Editor から実行**する。
+
+### 推奨経路
+
+#### Option A: 通常サインアップ → SQL Editor で promotion（**推奨**）
+
+エンドユーザーと同じフローを通るので、Email Templates / Custom SMTP / `/auth/confirm` ランディング等の **deployment 全体の動作も同時に validate** できる。
+
+```
+1. 本番 URL の /auth/signup にアクセス
+   例: https://member-site-template.fune-gaku.workers.dev/auth/signup
+2. admin 用のメールアドレスでサインアップ
+3. 確認メールが届く（Resend 経由）→ メール内のリンクをクリック
+   → /auth/confirm 経由で session 確立 → /member/dashboard にリダイレクト
+4. Supabase Dashboard > SQL Editor で以下を実行:
+
+   update public.profiles
+      set role = 'admin'
+    where user_id = (
+      select id from auth.users
+       where email = 'YOUR_ADMIN_EMAIL@example.com'
+    );
+
+5. ブラウザで /admin/users にアクセスして表示されれば成功
+   （middleware が profiles.role を毎リクエスト fetch するため、
+    JWT を refresh せず即時反映される。サインアウト/再ログイン不要）
+```
+
+#### Option B: Dashboard から直接ユーザー作成 → promotion
+
+Resend / SMTP / Email Templates の設定が **未完了** でも進められる。Email 経路の動作確認はスキップされる。
+
+```
+1. Supabase Dashboard > Authentication > Users > "Add user" > "Create new user"
+   - Email: admin@your-domain.com
+   - Password: 強力なパスワード（8 文字以上 + 数字 + 大文字 + 小文字）
+   - Auto Confirm User: ON  ← 重要、メール確認をスキップ
+2. handle_new_user トリガーが発火し、profiles 行が自動生成される（role='member'）
+3. SQL Editor で Option A の step 4 と同じ promotion クエリを実行
+4. 本番 URL の /auth/signin で作成したメアド + パスワードでログイン
+5. /admin/users にアクセスできれば成功
+```
+
+### Option A vs B の選択
+
+| 観点                                                 | Option A                | Option B                               |
+| ---------------------------------------------------- | ----------------------- | -------------------------------------- |
+| Resend / SMTP の動作確認も兼ねる                     | ✅                      | ❌                                     |
+| Email Templates（`{{ .TokenHash }}` 経路）の動作確認 | ✅                      | ❌                                     |
+| `/auth/confirm` ランディングの動作確認               | ✅                      | ❌                                     |
+| 失敗時の切り分けやすさ                               | △（失敗ポイントが多い） | ✅（DB レイヤー直 + ログイン経路だけ） |
+| 速さ                                                 | △（メール往復が必要）   | ✅                                     |
+
+**推奨**: 最初は **Option A** で full path を検証 → 失敗するレイヤーがあれば該当節（[Email Templates](#supabase-auth-email-templates必須--issue-002--002-b) / [SMTP (Resend)](#supabase-auth-smtp-resend-設定本番必須) / [URL Configuration](#supabase-auth-jwt-寿命とセッション設定必須)）を確認。Option A が成功したら、以降の追加 admin / 通常メンバーは `/admin/users` 画面の招待機能（`admin.inviteUser` Action）から運用できる。
+
+### 設計根拠
+
+- **なぜ migration / seed.sql で admin を pre-seed しないか**: メールアドレスやパスワードハッシュを repo に含めることになり、（a）秘密情報が git 履歴に残る、（b）admin 変更時にマイグレーションを再発行する必要がある、（c）downstream fork が template の admin 認証情報をそのまま流用するリスクがある。1 回限りの bootstrap は手動の方が安全。
+- **なぜ `service_role` 経由でしか admin promotion できない設計か**: `authenticated` ロールから `profiles.role` の column-level UPDATE 権限を剥奪する設計が PR #48 で確定（[security.md「想定する脅威」](./security.md#想定する脅威) の権限昇格行 / [database.md「権限昇格攻撃の防止」](./database.md#権限昇格攻撃の防止)）。これにより、自分で自分を admin に promote するクライアント経路が存在しないため、最初の 1 人は別 channel が必須。Dashboard SQL Editor は `service_role` 権限で動作するためこの制約を正規にバイパスできる。
+- **promotion 後にセッション再確立は不要**: middleware ([src/middleware.ts:60-76](../src/middleware.ts#L60-L76)) は `/member/*` `/admin/*` への各リクエストで `profiles.role` を fetch する設計。JWT に role を埋め込んでいないため、UPDATE 直後の次のページ遷移で `/admin/*` 配下が解放される。
+
+### チェックリスト
+
+- [ ] 新規 Supabase プロジェクトに `supabase db push` で migration 適用済み
+- [ ] `/admin/users` にアクセスすると `/member/dashboard` にリダイレクトされることを事前確認（= まだ admin 不在）
+- [ ] Option A または B で 1 人目の admin を作成
+- [ ] SQL Editor で promotion 実行
+- [ ] `/admin/users` にアクセスして表示されることを確認
+- [ ] 念のため `select role from public.profiles where user_id = ...` で `'admin'` が入っていることを SQL で再確認
+
+---
+
 ## ロールバック
 
 Cloudflare Workers は過去のデプロイ履歴をリトルバックエンドとして保持しているため、即時ロールバックが可能。
@@ -474,6 +550,7 @@ npx wrangler rollback --name member-site-template <version-id>
 - [ ] [security.md「セキュリティヘッダの動作確認」](./security.md#セキュリティヘッダの動作確認) の `curl -sI` を流して全ヘッダ付与を確認
 - [ ] [security.md「CSRF 対策（サインアウト経路）」](./security.md#csrf-対策サインアウト経路) の 3 コマンドが期待通り（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）
 - [ ] サインアップ → 確認メール到達 → 「続行」クリック → `/auth/update-password` 遷移 → サインインの一連が成功
+- [ ] [初期 admin の bootstrap](#初期-admin-の-bootstrap必須1-回限り) を完了（新規 Supabase プロジェクトの場合 1 回限り、SQL Editor で promotion）
 - [ ] `/admin/users` に admin ロールでアクセス可、member ロールでアクセス不可
 
 ---
