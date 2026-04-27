@@ -132,6 +132,35 @@ describe("auth.signIn account enumeration defense (Issue #8 / A3)", () => {
   });
 });
 
+describe("auth.signInWithGoogle schema (Issue #49)", () => {
+  // actions/index.ts の signInWithGoogle input と同じ形
+  const schema = z.object({
+    next: z.string().max(1024).optional(),
+  });
+
+  it("next が無くても受け入れる（フォールバックは Action 側で /member/dashboard）", () => {
+    const result = schema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("有効な next パスを受け入れる", () => {
+    const result = schema.safeParse({ next: "/member/dashboard" });
+    expect(result.success).toBe(true);
+  });
+
+  it("次パスが文字列なら受け入れる（実際のサニタイズは Action 内の safeNextPath が担う）", () => {
+    // `next` のサニタイズは `src/lib/safe-redirect.ts` の `safeNextPath` の責務。
+    // schema 層では「文字列であること + 上限以下であること」のみ検証する。
+    const result = schema.safeParse({ next: "//evil.example.com/x" });
+    expect(result.success).toBe(true);
+  });
+
+  it("next が長すぎる場合は拒否 (DoS 対策)", () => {
+    const result = schema.safeParse({ next: "/" + "a".repeat(1024) });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
   // actions/index.ts の resetPassword input と同じ形
   const schema = z.object({

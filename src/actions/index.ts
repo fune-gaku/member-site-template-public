@@ -7,6 +7,10 @@ import { performChangePassword } from "../lib/auth-change-password";
 import { getAuthUser } from "../lib/auth-claims";
 import { performResetPassword } from "../lib/auth-reset-password";
 import { performSignIn } from "../lib/auth-signin";
+import {
+  isGoogleAuthEnabled,
+  performSignInWithGoogle,
+} from "../lib/auth-signin-google";
 import { performSignUp } from "../lib/auth-signup";
 import {
   ALLOWED_AVATAR_MIME,
@@ -15,6 +19,7 @@ import {
 } from "../lib/avatar-upload";
 import { passwordSchema } from "../lib/password-schema";
 import { isHibpCheckEnabled, isPasswordPwned } from "../lib/pwned-password";
+import { safeNextPath } from "../lib/safe-redirect";
 import { createClient } from "../lib/supabase";
 import { createAdminClient } from "../lib/supabase-admin";
 
@@ -158,6 +163,56 @@ export const server = {
           email: input.email,
           password: input.password,
           captchaToken: input.captchaToken,
+        });
+      },
+    }),
+
+    /**
+     * Issue #49: Google OAuth ログイン (PKCE フロー) を開始する Action。
+     *
+     * `PUBLIC_GOOGLE_AUTH_ENABLED=true` のときのみ受け付け、未設定 / `false` では
+     * 多層防御として `NOT_FOUND` を投げる。**真の防衛線は Supabase Dashboard 側で
+     * Google provider が有効化されていること**で、Action の env チェックは UI が
+     * 隠れていてもブラウザから直接叩かれた場合の追加防御層。
+     *
+     * 振る舞い:
+     *   1. `next` を `safeNextPath` でサニタイズ（Open Redirect / CWE-601 対策）
+     *   2. `${origin}/auth/callback?next=<sanitized>` を `redirectTo` に指定して
+     *      `signInWithOAuth({ provider: 'google' })` を呼ぶ
+     *   3. 返ってきた authorization URL を `{ url }` として返す
+     *
+     * caller (signin.astro / signup.astro / PR 3 で実装) は `Astro.getActionResult`
+     * で `{ url }` を受け取り、`Astro.redirect(url)` で Google にリダイレクトする。
+     * Google → Supabase Auth (`<project-ref>.supabase.co/auth/v1/callback`) →
+     * アプリ `/auth/callback?code=...&next=...` の順にリダイレクトされ、
+     * 既存 callback.astro の `exchangeCodeForSession` で session 確立 → next へ遷移。
+     *
+     * Turnstile は OAuth ボタンには付けない（Google 自身が認証する前提、Issue #49 合意）。
+     *
+     * @see https://supabase.com/docs/guides/auth/social-login/auth-google?framework=astro
+     * @see .claude/deployment.md「Google OAuth セットアップ（任意）」
+     */
+    signInWithGoogle: defineAction({
+      accept: "form",
+      input: z.object({
+        next: z.string().max(1024).optional(),
+      }),
+      handler: async (input, context) => {
+        if (!isGoogleAuthEnabled(import.meta.env.PUBLIC_GOOGLE_AUTH_ENABLED)) {
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "ページが見つかりません",
+          });
+        }
+
+        const sanitizedNext = safeNextPath(input.next);
+        const callbackUrl = `${context.url.origin}/auth/callback?next=${encodeURIComponent(sanitizedNext)}`;
+        const supabase = createClient({
+          request: context.request,
+          cookies: context.cookies,
+        });
+        return performSignInWithGoogle(supabase, {
+          redirectTo: callbackUrl,
         });
       },
     }),
