@@ -28,6 +28,26 @@ describe("CSRF: cross-origin POST guard via Astro security.checkOrigin", () => {
     expect(response.status).toBe(403);
   });
 
+  it("クロスオリジン POST /_actions/auth.signInWithGoogle は 403 を返す (Issue #49)", async () => {
+    // Google OAuth トリガ Action もすべての state-changing Action と同様に
+    // cross-origin POST から保護されている（Astro security.checkOrigin 経由）。
+    // 攻撃者がリンク踏ませで強制 OAuth リダイレクトを起こせないことの回帰テスト。
+    const body = new URLSearchParams();
+    const response = await SELF.fetch(
+      "https://member-site-template.fune-gaku.workers.dev/_actions/auth.signInWithGoogle",
+      {
+        method: "POST",
+        headers: {
+          Origin: "https://evil.example.com",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+      },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
   it("同一オリジン POST /_actions/auth.signOut は 403 を返さない（CSRF を通過する）", async () => {
     const body = new URLSearchParams();
     const url =
