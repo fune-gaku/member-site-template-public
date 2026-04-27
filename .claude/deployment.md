@@ -351,6 +351,8 @@ JWT expiry を短く設定するほど失効ラグが縮まるが、refresh ト�
 
 クライアント widget は [src/components/TurnstileWidget.vue](../src/components/TurnstileWidget.vue) が Cloudflare CDN script で描画し、token を 3 フォーム共通で Action に submit する仕組みは残置されているため、**3 層を ON にするだけで再有効化できる**。
 
+> ⚠️ **既存プロジェクトを default OFF へ移行するときの注意**: 本番 (Supabase hosted Auth) の runtime 設定は **Dashboard が真実の source of truth** であり、`supabase/config.toml` は **ローカル CLI 開発専用**。すでに本番で Dashboard の Bot and Abuse Protection を ON にしている場合、本テンプレートを default OFF に切り替えても、**マージ単体では本番 Auth の captcha enforcement は OFF にならない**。本番でも OFF にしたい場合は下記 [Turnstile を後から無効化する](#turnstile-を後から無効化する) の順序で Dashboard を OFF にする操作を別途実施すること（クライアント側の `PUBLIC_TURNSTILE_SITE_KEY` を先に消すと本番ログインが全滅するので順序厳守）。
+
 #### 1. Cloudflare Dashboard で Turnstile サイトを発行
 
 1. **Cloudflare Dashboard > Turnstile > Add Site**
