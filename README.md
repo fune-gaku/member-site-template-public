@@ -303,3 +303,9 @@ npx wrangler secrets-store secret list <STORE-ID>
 4. ブラウザで管理者画面をリロード（再デプロイ不要）
 
 Dashboard UI は見た目が紛らわしいため、**Secret は CLI で登録・管理するのが確実**です。
+
+---
+
+## License
+
+[MIT](LICENSE) © Michio Fujii
