@@ -44,7 +44,7 @@
 - [x] Supabase メールテンプレートで `{{ .ConfirmationURL }}` は禁止、`{{ .TokenHash }}` + `/auth/confirm` 経由に統一
 - [x] Supabase Dashboard のセキュリティ設定を完了（→ [Supabase Dashboard セキュリティ設定チェックリスト](#supabase-dashboard-セキュリティ設定チェックリスト)）
 - [x] アカウント列挙対策：`auth.signIn` / `auth.signUp` / `auth.resetPassword` の全失敗ケースを統一応答（成功扱い or `UNAUTHORIZED` + 同一文言）に正規化し、メールアドレスの登録有無を判別不能にする（実装は `src/lib/auth-signin.ts` / `auth-signup.ts` / `auth-reset-password.ts`、テストで bytewise 同一を検証 — Issue #8 / #14）
-- [x] CAPTCHA (Cloudflare Turnstile) ：`auth.signUp` / `auth.signIn` / `auth.resetPassword` の 3 経路すべてで `TURNSTILE_SECRET_KEY` 設定時に opt-in で有効化。bot による credential stuffing / 自動アカウント作成 / spam reset を抑止（`src/components/TurnstileWidget.vue` を 3 フォーム共通で使用 — Issue #21）。loader script 取得失敗 (ad blocker / CSP / network) は `script.onerror` + 10s timeout で graceful 化し、`@loader-error` emit を通じて各フォームでユーザ向け instruction を表示（Issue #30）
+- [x] CAPTCHA (Cloudflare Turnstile) ：`auth.signUp` / `auth.signIn` / `auth.resetPassword` の 3 経路すべてで `TURNSTILE_SECRET_KEY` 設定時に opt-in で有効化。bot による credential stuffing / 自動アカウント作成 / spam reset を抑止（`src/components/TurnstileWidget.vue` を 3 フォーム共通で使用 — Issue #21）。loader script 取得失敗 (ad blocker / CSP / network) は `script.onerror` + 10s timeout で graceful 化し、`@loader-error` emit を通じて各フォームでユーザ向け instruction を表示（Issue #30）。**🔄 Issue #52 進行中**: 現在は Astro Action 側で自前 siteverify する実装。Supabase Auth の公式 Turnstile サポートに委譲する移行を進行中（PR 1 = docs / PR 2 = code + `supabase/config.toml` atomic / PR 3 = secret cleanup）。移行手順は [.claude/deployment.md「Cloudflare Turnstile（Supabase 公式統合・移行先）」](./deployment.md#cloudflare-turnstilesupabase-公式統合移行先) 参照
 - [x] ログイン中のパスワード変更時に現在のパスワード再認証を要求：`auth.changePassword` Action は `signInWithPassword` で現パスワードを検証してから `updateUser` を呼ぶ。recovery 用 `auth.updatePassword` とは分離。盗難セッション Cookie 単独 / 共有 PC 攻撃での account takeover を抑止（OWASP Authentication Cheat Sheet / NIST SP 800-63B §5.2.10、実装は `src/lib/auth-change-password.ts` — Issue #19）
 - [ ] **未実装（将来課題）**: admin role への MFA / TOTP 必須化。Supabase Auth は MFA factor をサポートしているため、admin が増えるタイミングで導入を検討する
 
@@ -149,8 +149,8 @@
 | CSRF攻撃                        | 低           | SameSite Cookie（`@supabase/ssr`）+ Astro Actions POST 限定 + `security.checkOrigin`（Origin/Referer 照合）。[CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)参照                                                           |
 | RLS バイパス                    | 高           | RLS を全テーブルで有効化、service_role キーはサーバーのみ                                                                                                                                                                              |
 | アカウント列挙                  | 中           | `auth.signIn` / `signUp` / `resetPassword` の全失敗ケースを統一応答に正規化（`auth-signin.ts` / `auth-signup.ts` / `auth-reset-password.ts`）— Issue #8 / #14                                                                          |
-| Credential stuffing             | 中           | `auth.signIn` に Cloudflare Turnstile を opt-in 適用（`TURNSTILE_SECRET_KEY` 設定時のみ有効化）— Issue #21                                                                                                                             |
-| 自動アカウント作成 / Spam reset | 中           | `auth.signUp` / `auth.resetPassword` にも Turnstile を opt-in 適用 — Issue #21                                                                                                                                                         |
+| Credential stuffing             | 中           | `auth.signIn` に Cloudflare Turnstile を opt-in 適用（`TURNSTILE_SECRET_KEY` 設定時のみ有効化）— Issue #21（🔄 Issue #52 で Supabase 公式統合へ移行中）                                                                                |
+| 自動アカウント作成 / Spam reset | 中           | `auth.signUp` / `auth.resetPassword` にも Turnstile を opt-in 適用 — Issue #21（🔄 Issue #52 で Supabase 公式統合へ移行中）                                                                                                            |
 
 ---
 
@@ -172,13 +172,13 @@
 
 ### 自動化されているチェック
 
-| 層                      | 仕組み                                                                  | タイミング                        | 対象                                                                   |
-| ----------------------- | ----------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------- |
-| ローカル                | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks              | コミット時                        | staged ファイルの秘密情報                                              |
-| CI（GitHub Actions）    | [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml)   | PR（package.json 変更）+ 週次月曜 | 依存パッケージの脆弱性（high 以上で fail）                             |
-| CI（GitHub Actions）    | [.github/workflows/test.yml](../.github/workflows/test.yml)             | 全 PR + main への push            | unit / integration / workers テスト全件（CSRF 405 / 403 ガードを含む） |
+| 層                      | 仕組み                                                                  | タイミング                         | 対象                                                                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ローカル                | [.githooks/pre-commit](../.githooks/pre-commit) + gitleaks              | コミット時                         | staged ファイルの秘密情報                                                                                                                                                                   |
+| CI（GitHub Actions）    | [.github/workflows/npm-audit.yml](../.github/workflows/npm-audit.yml)   | PR（package.json 変更）+ 週次月曜  | 依存パッケージの脆弱性（high 以上で fail）                                                                                                                                                  |
+| CI（GitHub Actions）    | [.github/workflows/test.yml](../.github/workflows/test.yml)             | 全 PR + main への push             | unit / integration / workers テスト全件（CSRF 405 / 403 ガードを含む）                                                                                                                      |
 | CI（GitHub Actions）    | [.github/workflows/db-test.yml](../.github/workflows/db-test.yml)       | `supabase/**` を変更した PR + push | `supabase db lint --fail-on warning`（plpgsql_check：関数の型エラー・dead code 等の構文系を warning 以上で検出）+ `supabase test db`（pgTAP：RLS / トリガー / 列レベル grant の退行を検出） |
-| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST                | npm / GitHub Actions の更新 PR 自動生成                                |
+| GitHub プラットフォーム | [.github/dependabot.yml](../.github/dependabot.yml) + Dependabot alerts | 週次月曜 09:00 JST                 | npm / GitHub Actions の更新 PR 自動生成                                                                                                                                                     |
 
 **初回セットアップ**:
 
