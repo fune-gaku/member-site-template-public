@@ -75,7 +75,7 @@
 - [x] 管理者のみアクセス可能な機能が保護されている（role チェック）
 - [x] ファイルストレージのアクセス制御が適切（Storage RLS）
 - [x] APIエンドポイント（Astro Actions）が認証を要求している
-- [x] 権限昇格攻撃を防止（`revoke update (role)` でカラムレベル権限制御）
+- [x] 権限昇格攻撃を防止（`revoke update on profiles from authenticated` で table-level UPDATE を剥奪し、`grant update (display_name, avatar_url, updated_at)` で安全カラムのみ再付与。Supabase の default privileges が table-level UPDATE を grant してくる挙動上、column-level revoke 単独は no-op になる — `20260427002055_fix_profiles_role_privilege_escalation.sql` で修正）
 - [x] Mass Assignment 対策：Zod input スキーマで受け付けるフィールドを必要最小限に絞り、`user_id` などサーバー側で確定すべき値はクライアント入力を信頼せず `auth.getUser()` から導出（`posts.create` / `posts.update` / `admin.updateUserRole`）
 - [x] IDOR（Insecure Direct Object Reference）対策：ID 参照型の更新／削除 Action（`posts.update` / `posts.delete` 等）は RLS に加え、サーバ側で `.eq("user_id", user.id)` を明示して **多層防御**（[src/actions/index.ts](../src/actions/index.ts) 参照）
 
@@ -138,19 +138,19 @@
 
 ### 想定する脅威
 
-| 脅威                            | リスクレベル | 対策                                                                                                                                                                         |
-| ------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 環境変数の漏洩                  | 高           | `.gitignore`、コードレビュー                                                                                                                                                 |
-| 権限昇格攻撃                    | 高           | `revoke update (role)` でカラムレベル権限制御                                                                                                                                |
-| XSS攻撃                         | 中           | Vue自動エスケープ、`v-html`禁止                                                                                                                                              |
-| SQLインジェクション             | 中           | Supabaseクライアント使用（パラメータ化クエリ）                                                                                                                               |
-| 不正ファイルアップロード        | 中           | 拡張子・MIME・サイズ制限（5MB）                                                                                                                                              |
-| セッションハイジャック          | 中           | Secure Cookie、HTTPS、トークン自動リフレッシュ                                                                                                                               |
-| CSRF攻撃                        | 低           | SameSite Cookie（`@supabase/ssr`）+ Astro Actions POST 限定 + `security.checkOrigin`（Origin/Referer 照合）。[CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)参照 |
-| RLS バイパス                    | 高           | RLS を全テーブルで有効化、service_role キーはサーバーのみ                                                                                                                    |
-| アカウント列挙                  | 中           | `auth.signIn` / `signUp` / `resetPassword` の全失敗ケースを統一応答に正規化（`auth-signin.ts` / `auth-signup.ts` / `auth-reset-password.ts`）— Issue #8 / #14                |
-| Credential stuffing             | 中           | `auth.signIn` に Cloudflare Turnstile を opt-in 適用（`TURNSTILE_SECRET_KEY` 設定時のみ有効化）— Issue #21                                                                   |
-| 自動アカウント作成 / Spam reset | 中           | `auth.signUp` / `auth.resetPassword` にも Turnstile を opt-in 適用 — Issue #21                                                                                               |
+| 脅威                            | リスクレベル | 対策                                                                                                                                                                                                                                   |
+| ------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 環境変数の漏洩                  | 高           | `.gitignore`、コードレビュー                                                                                                                                                                                                           |
+| 権限昇格攻撃                    | 高           | `profiles` の table-level UPDATE を authenticated から剥奪 + 安全カラムのみ column-level UPDATE を再付与（`20260427002055_*.sql`）。column-level revoke 単独は Supabase default privileges 下で no-op なので table-level revoke が必須 |
+| XSS攻撃                         | 中           | Vue自動エスケープ、`v-html`禁止                                                                                                                                                                                                        |
+| SQLインジェクション             | 中           | Supabaseクライアント使用（パラメータ化クエリ）                                                                                                                                                                                         |
+| 不正ファイルアップロード        | 中           | 拡張子・MIME・サイズ制限（5MB）                                                                                                                                                                                                        |
+| セッションハイジャック          | 中           | Secure Cookie、HTTPS、トークン自動リフレッシュ                                                                                                                                                                                         |
+| CSRF攻撃                        | 低           | SameSite Cookie（`@supabase/ssr`）+ Astro Actions POST 限定 + `security.checkOrigin`（Origin/Referer 照合）。[CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)参照                                                           |
+| RLS バイパス                    | 高           | RLS を全テーブルで有効化、service_role キーはサーバーのみ                                                                                                                                                                              |
+| アカウント列挙                  | 中           | `auth.signIn` / `signUp` / `resetPassword` の全失敗ケースを統一応答に正規化（`auth-signin.ts` / `auth-signup.ts` / `auth-reset-password.ts`）— Issue #8 / #14                                                                          |
+| Credential stuffing             | 中           | `auth.signIn` に Cloudflare Turnstile を opt-in 適用（`TURNSTILE_SECRET_KEY` 設定時のみ有効化）— Issue #21                                                                                                                             |
+| 自動アカウント作成 / Spam reset | 中           | `auth.signUp` / `auth.resetPassword` にも Turnstile を opt-in 適用 — Issue #21                                                                                                                                                         |
 
 ---
 
