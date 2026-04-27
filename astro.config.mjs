@@ -44,7 +44,11 @@ export default defineConfig({
         "base-uri 'self'",
         "frame-ancestors 'none'",
         "object-src 'none'",
-        "form-action 'self'",
+        // form-action は CSP3 仕様上 **送信中の全リダイレクトターゲット** に適用
+        // されるため、Google OAuth (Issue #49) のフローで通過する Supabase Auth と
+        // Google accounts ホストを明示的に許可する。OAuth 無効環境では `*.supabase.co`
+        // 経路のフォーム送信は発生しないので permission を持っていても実害なし。
+        "form-action 'self' https://*.supabase.co https://accounts.google.com",
         // Supabase Storage 署名付き URL (avatar 表示) を許可
         "img-src 'self' data: blob: https://*.supabase.co",
         "font-src 'self' data:",
