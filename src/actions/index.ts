@@ -190,7 +190,7 @@ export const server = {
      * Turnstile は OAuth ボタンには付けない（Google 自身が認証する前提、Issue #49 合意）。
      *
      * @see https://supabase.com/docs/guides/auth/social-login/auth-google?framework=astro
-     * @see .claude/deployment.md「Google OAuth セットアップ（任意）」
+     * @see .claude/deployment-optional.md「Google OAuth セットアップ（任意）」
      */
     signInWithGoogle: defineAction({
       accept: "form",

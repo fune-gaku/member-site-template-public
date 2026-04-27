@@ -214,7 +214,7 @@ web3 = 30
 # 本テンプレートではデフォルト OFF。bot 対策が必要なプロジェクトで `enabled = true` に
 # 切り替えて使う opt-in 方式（本番側は Supabase Dashboard > Auth > Bot and Abuse
 # Protection で Turnstile を有効化 + Secret Key を登録する別系統。詳細は
-# .claude/deployment.md「Cloudflare Turnstile（任意 / bot 対策）」参照）。
+# .claude/deployment-optional.md「Cloudflare Turnstile（任意 / bot 対策）」参照）。
 #
 # secret = "env(...)" は Supabase CLI が プロジェクトルート `.env` から解決する仕様
 # （CLI が `supabase/` から repo root まで walk）。enabled = true にする時は
