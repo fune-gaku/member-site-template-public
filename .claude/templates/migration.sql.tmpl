@@ -1,0 +1,52 @@
+-- ========================================
+-- {{ topic }}: {{ short summary in Japanese }}
+-- ========================================
+--
+-- 背景 / なぜこのマイグレーションが必要か:
+--   <ここに動機を書く。バグ修正なら何が誤動作していたか、新機能なら
+--    何を実装するか。code を読めば分かる "what" ではなく "why" を残す。>
+--
+-- 影響範囲:
+--   - 触るオブジェクト: <table / function / policy / index 等を列挙>
+--   - 破壊的変更の有無: <yes/no と理由>
+--   - 既存データへの影響: <yes/no と理由>
+--
+-- 関連:
+--   - Issue / PR: #<N>
+--   - 公式 docs (挙動を引いた場合): <URL + verbatim 引用>
+--
+-- 適用方法:
+--   - ローカル: `npm run db:reset` で全マイグレーション再適用
+--   - 本番: `supabase db push` (新規 fork) または
+--          `supabase migration repair --status applied <version>` (既存 fork)
+--
+-- セルフチェック (.claude/database.md「新規マイグレーション時のセルフチェック
+-- リスト」を満たしているか):
+--   - [ ] 新規テーブルなら enable row level security + RLS policy 全種類
+--   - [ ] ポリシーは `to authenticated` 明示 + `(select auth.uid())` で評価コスト最小化
+--   - [ ] FK + ポリシー参照カラムに index
+--   - [ ] 権限カラム (role 等) は **table-level revoke + 安全カラムのみ
+--         column-level grant** (column-level revoke 単独は no-op)
+--   - [ ] security definer 関数は `set search_path = pg_catalog, public[, extensions]`
+--   - [ ] Storage バケットなら `allowed_mime_types` + `file_size_limit` 明示
+--   - [ ] 対応する pgTAP テストを supabase/tests/database/ に同 PR で追加
+--
+-- ========================================
+
+-- ここから SQL を書く。1 マイグレーション = 1 関心事。
+
+-- 例: 新規テーブル
+-- create table public.<table> (
+--   id uuid primary key default gen_random_uuid(),
+--   user_id uuid not null references auth.users(id) on delete cascade,
+--   ...
+--   created_at timestamptz not null default now()
+-- );
+--
+-- alter table public.<table> enable row level security;
+--
+-- create policy "Users can view own <noun>"
+--   on public.<table> for select to authenticated
+--   using ((select auth.uid()) = user_id);
+--
+-- create index <table>_user_id_idx on public.<table>(user_id);

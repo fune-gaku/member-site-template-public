@@ -1,0 +1,88 @@
+-- ========================================
+-- {{ topic }} のテスト
+-- ========================================
+-- 検証対象 (<migration ファイル名>):
+--   <検証する不変条件を箇条書きで明記。policy 名 / constraint 名 / 関数名等>
+--
+-- 退行検出: <この不変条件をどう壊すと検出されるかを 1 行で>
+--
+-- 命名規則:
+--   ファイル名: NNN-<topic>.test.sql (NNN は 010 / 020 / ... の三桁、
+--   既存最大値 + 10 を採番。supabase/tests/database/ 内で alphabetical に
+--   実行されるため、依存関係が無くても順序は決定的)
+--
+-- ========================================
+
+begin;
+
+-- 何個アサーションを書くか宣言。最後の finish() で実行数と一致するか
+-- pg_prove が検証する。
+select plan({{ test count int }});
+
+-- ----------------------------------------
+-- セットアップ (postgres 権限で実行される)
+-- ----------------------------------------
+-- ヘルパー (000-setup-tests-hooks.sql 提供):
+--   tests.create_supabase_user(email)        - auth.users + profiles 自動作成
+--   tests.get_supabase_uid(email)            - 既存ユーザの uuid
+--   tests.authenticate_as(email)             - 以後の SQL を authenticated として実行
+--   tests.clear_authentication()             - postgres 権限に戻す
+--
+select tests.create_supabase_user('alice@example.com');
+-- select tests.create_supabase_user('bob@example.com');
+
+-- ----------------------------------------
+-- Test 1: <短い説明>
+-- ----------------------------------------
+-- 例) authenticated として self-update を試す
+select tests.authenticate_as('alice@example.com');
+
+-- 例) 失敗を期待: throws_ok(query, sqlstate, errmsg, description)
+-- select throws_ok(
+--   $$ <SQL> $$,
+--   '42501',  -- permission denied
+--   null,
+--   'メッセージ'
+-- );
+
+-- 例) 成功を期待: lives_ok(query, description)
+-- select lives_ok(
+--   $$ <SQL> $$,
+--   'メッセージ'
+-- );
+
+-- 例) クエリ結果の比較: results_eq(actual_query, expected_query, description)
+-- select results_eq(
+--   $$ select count(*)::int from public.<table> $$,
+--   $$ values (1) $$,
+--   'メッセージ'
+-- );
+
+-- 例) スカラの比較: is(actual, expected, description)
+-- select is(
+--   (select display_name from public.profiles where user_id = (select auth.uid())),
+--   'expected'::text,
+--   'メッセージ'
+-- );
+
+-- 例) data-modifying CTE で affected row 数を assert する場合は
+-- WITH 句を **top-level** に置く必要がある (subquery 内に置くと
+-- "WITH clause containing a data-modifying statement must be at the top level"
+-- で fail する):
+-- with upd as (
+--   update public.<table> set ... where ...
+--   returning 1
+-- )
+-- select is(
+--   (select count(*)::int from upd),
+--   0,
+--   'メッセージ'
+-- );
+
+-- ----------------------------------------
+-- Test 2: ...
+-- ----------------------------------------
+
+-- 終端: plan(N) と実行数が一致しないと pg_prove が fail を出す
+select * from finish();
+rollback;

@@ -58,7 +58,7 @@ grant update (display_name, avatar_url, updated_at)
 
 正しいパターンは **table-level revoke + 安全カラムのみ column-level grant** の組み合わせ。これにより `update profiles set role = ...` は 42501（permission denied）となり、`update profiles set display_name = ...` は通常通り動作する。`role` の変更は `service_role` の table-level grant 経由で `admin.updateUserRole` Action から行う。
 
-履歴: 初版 (`20260420205000_init.sql`) は column-level revoke 単独で no-op となっており、`20260427002055_fix_profiles_role_privilege_escalation.sql` で修正済み。回帰検出用の pgTAP 010 テストは [Issue #35](https://github.com/fune-gaku/member-site-template/issues/35) で別 PR として整備中（`supabase/tests/database/010-profiles-role-revoke.test.sql`）。
+履歴: 初版 (`20260420205000_init.sql`) は column-level revoke 単独で no-op となっており、`20260427002055_fix_profiles_role_privilege_escalation.sql` で修正済み。回帰検出は pgTAP 010 テスト (`supabase/tests/database/010-profiles-role-revoke.test.sql`) で行う。`update profiles set role = ...` が 42501 で阻止されること、`display_name` 等の通常 UPDATE は通ること、`service_role` 経路は維持されることを 3 アサーションで固定する (Issue #35)。
 
 **トリガー**:
 
@@ -253,7 +253,7 @@ npm run db:reset
 /db-check                 # Claude Code slash command
 # または個別に:
 npm run db:lint           # plpgsql_check で SQL 静的解析
-npm run db:test           # pgTAP テスト (Issue #35 で整備予定)
+npm run db:test           # pgTAP テスト (supabase/tests/database/*.sql)
 ```
 
 ### 本番適用
@@ -371,7 +371,100 @@ npm run db:push:dry-run   # → 「Local migrations are up to date」を確認
 
 ### 適用前・適用後の検証
 
+- [ ] **対応する pgTAP テスト**を `supabase/tests/database/<NNN>-<topic>.test.sql` に同 PR で追加した（雛形は [.claude/templates/pgtap.test.sql.tmpl](./templates/pgtap.test.sql.tmpl)、書き方は [pgTAP テスト Author ガイド](#pgtap-テスト-author-ガイド)）
+- [ ] **退行検証**: 追加した不変条件 (RLS / revoke / CHECK 等) を一時的に弱めると、対応する pgTAP テストが fail することを手元で確認した（PR description に記録）
 - [ ] `/db-check` (= `npm run db:reset` → `db:lint` → `db:test`) がローカルで全 green / skip
 - [ ] `npm run db:push:dry-run` で適用予定の差分を目視確認（破壊的変更が混じっていないか）
 - [ ] 本番適用直後に **Supabase Dashboard > Database > Advisors** を Run し、新規違反が出ていないことを確認
 - [ ] アプリをデプロイし、該当テーブル/ポリシーが期待通り動作することを確認（サインアップ、自分のデータ参照、他ユーザーのデータ参照不可、等）
+
+---
+
+## pgTAP テスト Author ガイド
+
+`supabase/tests/database/*.sql` に置く pgTAP テストの書き方。`supabase test db` (= `npm run db:test`) は内部で pg_prove を呼び、ファイル名アルファベット順に各 `.sql` を独立 transaction で実行する。
+
+### ファイル命名
+
+`NNN-<topic>.test.sql`。`NNN` は 3 桁 (000 / 010 / 020 / ...)。既存最大値 + 10 を採番する。
+
+- `000-setup-tests-hooks.sql` — pgTAP install + ヘルパー関数定義（先頭固定）
+- `010-` 以降 — 個別の不変条件を 1 ファイル = 1 関心事で
+
+依存関係が無くても順序を決定的にしておくと、テスト出力の順番が安定して読みやすい。
+
+### テストの基本骨格
+
+雛形は [.claude/templates/pgtap.test.sql.tmpl](./templates/pgtap.test.sql.tmpl) からコピーして書き始める。
+
+```sql
+begin;
+select plan(N);          -- 何個アサーションを書くか宣言
+
+-- ... pg_prove が plan(N) と実際の実行数を照合する
+
+select * from finish();
+rollback;                -- DB 状態を巻き戻し、ファイル間の独立性を保つ
+```
+
+`plan(N)` と実行数が合わないと pg_prove は `Bad plan. You planned X tests but ran Y.` で fail する。
+
+### 提供ヘルパー (000-setup-tests-hooks.sql)
+
+| ヘルパー                            | 用途                                                     | SECURITY DEFINER                          |
+| ----------------------------------- | -------------------------------------------------------- | ----------------------------------------- |
+| `tests.create_supabase_user(email)` | `auth.users` + `profiles` 自動生成。返り値は uuid        | yes                                       |
+| `tests.get_supabase_uid(email)`     | 既存ユーザの uuid 解決                                   | yes                                       |
+| `tests.authenticate_as(email)`      | 以降の SQL を `authenticated` ロール + JWT claims で実行 | no（`set_config('role',...)` を呼ぶため） |
+| `tests.clear_authentication()`      | postgres ロールに戻す                                    | no                                        |
+
+basejump-supabase_test_helpers (dbdev) と互換シグネチャを意図的に踏襲しているため、将来 dbdev へ移行してもテスト本体を書き換えずに済む。dbdev 依存を避けた理由は 000 ファイル冒頭のコメント参照。
+
+### よく使う pgTAP アサーション
+
+| 関数                                             | 用途                           |
+| ------------------------------------------------ | ------------------------------ |
+| `is(actual, expected, desc)`                     | スカラ比較                     |
+| `results_eq(query, expected, desc)`              | クエリ結果セット比較           |
+| `lives_ok($$ <SQL> $$, desc)`                    | SQL が例外を投げないこと       |
+| `throws_ok($$ <SQL> $$, sqlstate, errmsg, desc)` | 特定 SQLSTATE で fail すること |
+| `is_empty($$ <SQL> $$, desc)`                    | クエリ結果が 0 行              |
+
+### 落とし穴 (Issue #35 で踏んだもの)
+
+1. **do-block 内の `perform is(...)` は TAP 出力しない**
+   `select is(...)` が文単位で TAP 行を emit する仕組みのため、`perform` で包むと plan(N) にカウントされない。`do $$ ... perform is(...) ... $$;` の代わりに、平の `select is(...)` を書くか、CTE で値を取り出してから `select is(...)` する。
+
+2. **data-modifying CTE は top-level 必須**
+   PostgreSQL は `select is((with upd as (UPDATE ...) ...), ...)` のように subquery にネストすると "WITH clause containing a data-modifying statement must be at the top level" で拒否する。次のように書く:
+
+   ```sql
+   with upd as (
+     update public.<table> set ... where ...
+     returning 1
+   )
+   select is(
+     (select count(*)::int from upd),
+     0,
+     'メッセージ'
+   );
+   ```
+
+3. **`tests.authenticate_as` を SECURITY DEFINER にできない**
+   関数内で `set_config('role', 'authenticated', true)` を呼ぶ必要があり、PG が "cannot set parameter "role" within security-definer function" で拒否する。代わりに `auth.users` 読み取りだけを別の SECURITY DEFINER ヘルパー (`tests._build_jwt_claims`) に切り出している。
+
+4. **`storage.objects` への直接 DELETE は protect_delete トリガーで全拒否**
+   ロールに関わらず `storage.protect_delete()` トリガーが "Direct deletion from storage tables is not allowed. Use the Storage API instead." で raise する。RLS DELETE ポリシー (`Users can delete own avatars`) は init.sql に書かれているが pg レベルで単独検証は不可能。実際の防衛線は protect_delete + Storage API のサーバ側認可。
+
+5. **`tests.get_supabase_uid` は SECURITY DEFINER 必須**
+   `auth.users` の SELECT 権限は `service_role` でも持っていない。test caller のロールに関わらず uid 解決できるよう、関数所有者 (postgres) 権限で実行させる。
+
+### pgTAP テストを追加する際のチェック
+
+- [ ] [.claude/templates/pgtap.test.sql.tmpl](./templates/pgtap.test.sql.tmpl) からコピーして書き始めた
+- [ ] `begin; ... rollback;` で完全に巻き戻す (CREATE TABLE 等を除き) — 他テストへの副作用を防ぐ
+- [ ] `plan(N)` と実行アサーション数が一致する
+- [ ] data-modifying CTE は top-level に置いた (subquery 禁止)
+- [ ] do-block 内の `perform is(...)` を使っていない
+- [ ] `npm run db:test` で全件 green
+- [ ] **退行検証**: テスト対象の不変条件 (RLS / revoke / CHECK 等) を一時的に弱めると、対応するテストが fail することを手元で確認 (PR description に記録)
