@@ -8,6 +8,17 @@ const user = Astro.locals.user;
 let initialDisplayName = "";
 let initialAvatarUrl = "";
 
+// Issue #49: ChangePasswordForm は email/password identity を持つユーザーのみに表示する。
+// Google OAuth のみで signup したユーザーには変更すべきパスワードが存在しないため、
+// UI を出さない方が誠実（出してもサーバ側 `auth.changePassword` が現パスワード検証で
+// 必ず失敗するが、UX として無意味なフォームを見せない）。
+//
+// 判定は `auth.getUser()` の identities 配列を見る。middleware は `getClaims()` で
+// 軽量検証する設計のため、identities が必要な箇所だけ明示的に full user を取得する。
+// fail-open: identities が未取得 / undefined のときはフォーム表示（既存 email/password
+// 利用者を transient API 障害で締め出さない）。
+let hasEmailIdentity = true;
+
 if (user) {
   const supabase = createClient({
     request: Astro.request,
@@ -35,6 +46,16 @@ if (user) {
       }
     }
   }
+
+  // identities を取得して email provider の有無を判定。
+  const { data: fullUser, error: userError } = await supabase.auth.getUser();
+  if (userError) {
+    console.error("Profile SSR getUser error:", userError);
+  } else if (Array.isArray(fullUser.user?.identities)) {
+    hasEmailIdentity = fullUser.user.identities.some(
+      (i) => i.provider === "email",
+    );
+  }
 }
 ---
 
@@ -53,6 +74,6 @@ if (user) {
       initialAvatarUrl={initialAvatarUrl}
     />
 
-    <ChangePasswordForm client:load />
+    {hasEmailIdentity && <ChangePasswordForm client:load />}
   </div>
 </Member>

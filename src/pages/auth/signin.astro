@@ -1,4 +1,6 @@
 ---
+import { actions } from "astro:actions";
+
 import LoginForm from "../../components/LoginForm.vue";
 import Auth from "../../layouts/Auth.astro";
 import { safeNextPath } from "../../lib/safe-redirect";
@@ -6,6 +8,23 @@ import { safeNextPath } from "../../lib/safe-redirect";
 // Open Redirect 対策: `next` はサーバ側で検証してから
 // クライアントコンポーネントに props として渡す（CWE-601）。
 const nextPath = safeNextPath(Astro.url.searchParams.get("next"));
+
+// Google OAuth 有効化フラグ（Issue #49）。
+// `PUBLIC_GOOGLE_AUTH_ENABLED=true` のときだけボタンを SSR レンダリングする。
+// 未設定 / `false` ではボタンが描画されず、`auth.signInWithGoogle` Action 自体も
+// 同じ env で守られているため多層防御。
+const googleAuthEnabled = import.meta.env.PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+
+// Google OAuth Action が POST 経由で叩かれた直後の結果を読む。
+// 成功時は data.url（Google の authorization URL）が返るので即時リダイレクト。
+// 失敗時はページ内エラー表示用に message を保持。
+const googleResult = googleAuthEnabled
+  ? Astro.getActionResult(actions.auth.signInWithGoogle)
+  : undefined;
+if (googleResult?.data?.url) {
+  return Astro.redirect(googleResult.data.url);
+}
+const googleErrorMessage = googleResult?.error?.message;
 ---
 
 <Auth
@@ -14,4 +33,37 @@ const nextPath = safeNextPath(Astro.url.searchParams.get("next"));
   enableTurnstile
 >
   <LoginForm client:load next={nextPath} />
+
+  {
+    googleAuthEnabled && (
+      <>
+        <div
+          class="my-6 flex items-center gap-3 text-xs text-gray-500"
+          aria-hidden="true"
+        >
+          <span class="h-px flex-1 bg-gray-200" />
+          <span>または</span>
+          <span class="h-px flex-1 bg-gray-200" />
+        </div>
+
+        {googleErrorMessage && (
+          <div class="mb-3 rounded-lg border border-red-200 bg-red-50 p-3">
+            <p class="text-sm text-red-800" role="alert">
+              {googleErrorMessage}
+            </p>
+          </div>
+        )}
+
+        <form method="POST" action={actions.auth.signInWithGoogle}>
+          <input type="hidden" name="next" value={nextPath} />
+          <button
+            type="submit"
+            class="focus-visible:ring-brand-200 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:ring-4 focus-visible:outline-none"
+          >
+            Google でサインイン
+          </button>
+        </form>
+      </>
+    )
+  }
 </Auth>
