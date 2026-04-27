@@ -21,13 +21,13 @@ jobs:
 
       - uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: 2.90.0
 
       - name: Start local Postgres
         run: supabase db start
 
       - name: Lint database (plpgsql_check)
-        run: supabase db lint
+        run: supabase db lint --fail-on warning
 
       - name: Run pgTAP tests
         run: supabase test db
