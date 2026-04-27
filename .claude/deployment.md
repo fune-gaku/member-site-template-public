@@ -426,6 +426,98 @@ npm run dev   # 3 層が揃っていれば widget が描画され、Auth が cap
 
 ---
 
+### Google OAuth セットアップ（任意）
+
+email + password に加えて Google OAuth ログインを追加する opt-in 機能（Issue #49）。会員サイトとしての登録摩擦低減と、パスワード起因リスク（credential stuffing / 弱パス / HIBP）の軽減が目的。
+
+> ⚠️ **本節の有効化は PR 2 / PR 3 マージ後**。Issue #49 は 3 PR 分割で進行中で、PR 1（本節を導入した PR）は **基盤・ドキュメント先行** のみ。`auth.signInWithGoogle` Action / signin / signup ボタン / `auth.changePassword` UI の provider 分岐などのコードは **PR 2（Action + callback）/ PR 3（UI + 既存フロー調整）** で追加される。本節は将来運用のための参照手順として先行整備したもので、PR 1 だけが入った状態で `PUBLIC_GOOGLE_AUTH_ENABLED=true` にしても下記の挙動は再現しない。3 PR 全マージ後に本節を頭から実施してください。
+
+> **本テンプレートのデフォルトは OFF**（`PUBLIC_GOOGLE_AUTH_ENABLED` 未設定 / `false` で UI 非表示 + Action は `NOT_FOUND` 相当）。利用企業ごとに以下の 3 層を揃えて opt-in する。
+
+> **identity linking モード**: Supabase デフォルトの **automatic linking** のまま（[公式 Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking)）。Supabase Auth は同じ email を持つ identity を automatic に link するが、リンクのタイミングで **未確認 identity（既存の email/password signup で email confirmation 未完了のもの等）を削除** する仕様（公式 docs 引用: _"when a new identity can be linked to an existing user, Supabase Auth will remove any other unconfirmed identities linked to an existing user"_）。本テンプレは **Email confirmation = ON** が前提のため、攻撃者が被害者の email で先回り signup しても "unconfirmed" 状態で留まり、被害者が後から Google OAuth で確認済 identity としてログインした時点で攻撃者の identity は purge される。`linkIdentity()` を使った「ログイン中ユーザーの後付け連携 UI」は本テンプレのスコープ外。
+>
+> **要求スコープ**: Supabase デフォルト（`openid email profile`）のみ。Drive / Calendar 等の追加スコープは要求しない（最小権限）。
+
+#### 1. Google Cloud Console で OAuth client を作成
+
+1. [Google Cloud Console](https://console.cloud.google.com/) > **APIs & Services > Credentials**
+2. **+ Create Credentials > OAuth client ID** を選択。Application type は **Web application**
+3. **Name**: 任意（例: `member-site-template`）
+4. **Authorized JavaScript origins** を追加:
+   - 本番: `https://<your-domain>`（例: `https://member-site-template.fune-gaku.workers.dev` または Custom Domain）
+   - ローカル: `http://localhost:4321`（Astro dev サーバー）
+5. **Authorized redirect URIs** を追加（**Supabase Auth の callback URL であり、アプリの `/auth/callback` ではない**点に注意）:
+   - 本番: `https://<project-ref>.supabase.co/auth/v1/callback`（`<project-ref>` は Supabase Dashboard > Settings > General > Reference ID）
+   - ローカル: `http://127.0.0.1:54321/auth/v1/callback`（Supabase CLI 起動時の Auth コンテナ）
+   - Custom Domain で Supabase の Auth Hostname を変えている場合は該当ホスト名を使用
+6. **Create** で発行された **Client ID** と **Client Secret** を控える
+
+> **Authorized redirect URIs の意図**: Google → Supabase Auth → 自アプリ `/auth/callback` の二段リダイレクトのうち、Google が信頼するのは Supabase Auth の URL。自アプリの `/auth/callback` は Supabase の `redirectTo` で別途指定する（次項の `signInWithOAuth({ options: { redirectTo } })`）ので Google 側に登録不要。
+
+#### 2. Supabase Dashboard で Google プロバイダを有効化
+
+1. **Supabase Dashboard > Authentication > Providers > Google**
+2. **Enable Sign in with Google** を ON
+3. **Client ID (for OAuth)**: Step 1 で発行した Client ID
+4. **Client Secret (for OAuth)**: Step 1 で発行した Client Secret
+5. **Skip nonce checks**: OFF（Web アプリでは default のまま。iOS native 等で `id_token` 直接受け取りをする場合のみ ON 検討）
+6. **Save** で確定
+
+> 公式: [Login with Google (Astro / SSR)](https://supabase.com/docs/guides/auth/social-login/auth-google?framework=astro)
+
+#### 3. ローカル開発（任意 / 動作確認をしたい場合）
+
+ローカル Supabase でも Google OAuth を試したい場合は `supabase/config.toml` の `[auth.external.google]` セクションを有効化する（Supabase CLI が Auth コンテナへ Client ID/Secret を注入する）。プロジェクトルート `.env` に:
+
+```bash
+# .env (プロジェクトルート、Vite と Supabase CLI 双方が読み取る)
+PUBLIC_GOOGLE_AUTH_ENABLED=true
+SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=<client-id>
+SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=<client-secret>
+```
+
+`supabase/config.toml` を編集して `enabled = true` + `client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"` 構文で値を引き、`supabase stop && supabase start` で再起動。**ローカル動作確認が不要なら Step 1〜2（本番 Supabase Dashboard 側のみ）+ `PUBLIC_GOOGLE_AUTH_ENABLED=true` でビルドすれば足りる**。
+
+> ⚠️ **ローカルで Identity Linking の pre-account takeover 防御を再現したい場合**: 本テンプレのローカル `supabase/config.toml` は `[auth.email] enable_confirmations = false`（開発時の摩擦を減らすデフォルト）。これだと email/password signup が即時 confirmed になり、攻撃者の先回り signup が "unconfirmed" 状態で留まる前提（→ Google 初回ログイン時に purge される）が成立せず、上記「automatic linking + unconfirmed 削除」の保護機構をローカル検証できない。検証したい場合は config.toml の同フラグを一時的に `true` にして `supabase stop && supabase start` で再起動する（本番 Supabase Dashboard は Email confirmation = ON 前提なので production 側はこの問題なし）。
+
+#### 4. アプリ側の有効化
+
+ビルド時の `.env`（公開値、build に inline される）に以下を追加:
+
+```bash
+# 本番ビルド（.env または .env.production）
+PUBLIC_GOOGLE_AUTH_ENABLED=true
+```
+
+これで:
+
+- `signin.astro` / `signup.astro` に「Google でサインイン」ボタンが SSR レンダリングされる
+- `auth.signInWithGoogle` Action が `signInWithOAuth({ provider: 'google', options: { redirectTo: '<site-url>/auth/callback?next=...' } })` を呼ぶ
+- Google → Supabase Auth (`<project-ref>.supabase.co/auth/v1/callback`) → アプリ `/auth/callback?code=...` の順にリダイレクトされ、既存 [callback.astro](../src/pages/auth/callback.astro) の PKCE コード交換で session 確立 → `next` へ遷移
+
+未設定 / `false` のときはボタンが描画されず、Action 側でも `NOT_FOUND` を返す（多層防御）。
+
+#### 5. 動作確認
+
+- [ ] `/auth/signin` を開いて「Google でサインイン」ボタンが表示される
+- [ ] ボタンをクリックして Google アカウント選択 → 同意 → `/member/dashboard` に到達する
+- [ ] 同じ email アドレスで既に email/password アカウントがある場合、Email confirmation 済みであれば自動で identity がリンクされる（[Identity Linking docs](https://supabase.com/docs/guides/auth/auth-identity-linking)）
+- [ ] `PUBLIC_GOOGLE_AUTH_ENABLED=false` または未設定でビルドすると、ボタンが非表示で `auth.signInWithGoogle` Action が `NOT_FOUND` を返す
+- [ ] 既存の email/password サインイン・サインアップ・パスワードリセットが回帰なく動作する（CSRF / Turnstile / アカウント列挙対策の自動テストすべて green）
+- [ ] Mozilla Observatory / securityheaders.com で **A 以上維持**（CSP に Google ロゴ画像等を追加した場合は再評価）
+
+#### Google OAuth を後から無効化する
+
+3 層を **同期して** OFF にする（順序：**アプリ → サーバ** の順で切るとログイン破壊事故が無い。Turnstile とは順序が逆。Turnstile はサーバ ON / クライアント OFF だと「token 取れず全 fail」、Google OAuth はサーバ OFF / アプリ ON だと「ボタン押下で `provider is not enabled` 即時失敗」と失敗モードが反対方向のため）:
+
+1. **アプリ**: `PUBLIC_GOOGLE_AUTH_ENABLED=false` または env から削除して再ビルド・再デプロイ → ボタン非表示 + Action `NOT_FOUND`
+2. **本番**: Supabase Dashboard > Authentication > Providers > Google で **Enable Sign in with Google** を OFF + Save
+3. **Google Cloud Console（任意）**: 不要になった OAuth client を削除、または「Disabled」に変更
+
+> ⚠️ **やってはいけない順序**: Supabase Dashboard を先に OFF にしてアプリ側 `PUBLIC_GOOGLE_AUTH_ENABLED=true` のままにすると、ボタンは表示されるが押下時に `provider is not enabled` エラーで失敗する。必ずアプリ側を先に切ること。
+
+---
+
 ## 初期 admin の bootstrap（必須・1 回限り）
 
 新規 Supabase プロジェクトを作って `supabase db push` でマイグレーション適用直後は、`auth.users` も `profiles` も空の状態で **admin ユーザーが 1 人もいない**。`/admin/users` の招待機能 (`admin.inviteUser` Action) は admin としてサインインしている前提なので、最初の 1 人だけは別経路で作る必要がある（chicken-and-egg）。
@@ -564,6 +656,7 @@ npx wrangler rollback --name member-site-template <version-id>
 - [ ] `compatibility_flags` に `nodejs_compat` が含まれている
 - [ ] Custom Domain を使うなら Supabase 側 `Site URL` / `Redirect URLs` を更新済
 - [ ] **Turnstile を有効化する場合のみ**: [Cloudflare Turnstile（任意 / bot 対策）](#cloudflare-turnstile任意--bot-対策) の手順で **Supabase Dashboard > Auth > Bot and Abuse Protection** に Secret Key を登録、`PUBLIC_TURNSTILE_SITE_KEY` を build 環境の `.env` に設定。本番 Workers の secret は不要（Supabase Auth が直接検証する）
+- [ ] **Google OAuth を有効化する場合のみ**: [Google OAuth セットアップ（任意）](#google-oauth-セットアップ任意) の手順で Google Cloud Console に OAuth client を作成、**Supabase Dashboard > Authentication > Providers > Google** に Client ID / Secret を登録、`PUBLIC_GOOGLE_AUTH_ENABLED=true` を build 環境の `.env` に設定。本番 Workers の secret は不要（Supabase Auth が直接 Google と通信する）
 
 ### デプロイ後の動作確認
 
