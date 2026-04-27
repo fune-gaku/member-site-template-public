@@ -42,7 +42,7 @@
 | Vue コンポーネント         | `PascalCase.vue`                                                                             | `ProfileForm.vue` / `PostList.vue`       |
 | Astro レイアウト           | `PascalCase.astro`                                                                           | `Member.astro` / `Admin.astro`           |
 | Astro ページ               | `kebab-case.astro`                                                                           | `signin.astro` / `update-password.astro` |
-| TS モジュール（lib・util） | `kebab-case.ts`                                                                              | `safe-redirect.ts` / `auth-schemas.ts`   |
+| TS モジュール（lib・util） | `kebab-case.ts`                                                                              | `safe-redirect.ts` / `password-schema.ts` |
 | 型定義のみ                 | `*.d.ts`                                                                                     | `env.d.ts`                               |
 | テスト                     | `<topic>.test.ts`                                                                            | `actions-schema.test.ts`                 |
 | マイグレーション           | `<14桁タイムスタンプ>_<topic>.sql`（`supabase migration new <topic>` で自動採番、Issue #34） | `20260420205000_init.sql`                |
@@ -102,7 +102,7 @@
 
 ```typescript
 import { defineAction, ActionError } from "astro:actions";
-import { profileSchema } from "@/lib/auth-schemas";
+import { profileSchema } from "@/lib/password-schema";
 import { createClient } from "@/lib/supabase";
 
 export const updateProfile = defineAction({
@@ -143,7 +143,7 @@ export const updateProfile = defineAction({
 
 ### フロントエンド
 
-`src/lib/auth-schemas.ts` のように **Zod スキーマをライブラリ化** し、Vue コンポーネントとサーバー側 Action の両方から再利用する。
+`src/lib/password-schema.ts` のように **Zod スキーマをライブラリ化** し、Vue コンポーネントとサーバー側 Action の両方から再利用する。
 
 ```typescript
 import { z } from "astro/zod";
