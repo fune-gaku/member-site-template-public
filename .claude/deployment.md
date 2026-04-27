@@ -432,7 +432,7 @@ email + password に加えて Google OAuth ログインを追加する opt-in �
 
 > **本テンプレートのデフォルトは OFF**（`PUBLIC_GOOGLE_AUTH_ENABLED` 未設定 / `false` で UI 非表示 + Action は `NOT_FOUND` 相当）。利用企業ごとに以下の 3 層を揃えて opt-in する。
 
-> **identity linking モード**: Supabase デフォルトの **automatic linking** のまま（[公式 Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking)）。本テンプレは **Email confirmation = ON** が前提のため、両 identity が確認済 email である状態でしか自動リンクが起きず pre-account takeover の典型攻撃は塞がっている。`linkIdentity()` を使った「ログイン中ユーザーの後付け連携 UI」は本テンプレのスコープ外。
+> **identity linking モード**: Supabase デフォルトの **automatic linking** のまま（[公式 Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking)）。Supabase Auth は同じ email を持つ identity を automatic に link するが、リンクのタイミングで **未確認 identity（既存の email/password signup で email confirmation 未完了のもの等）を削除** する仕様（公式 docs 引用: _"when a new identity can be linked to an existing user, Supabase Auth will remove any other unconfirmed identities linked to an existing user"_）。本テンプレは **Email confirmation = ON** が前提のため、攻撃者が被害者の email で先回り signup しても "unconfirmed" 状態で留まり、被害者が後から Google OAuth で確認済 identity としてログインした時点で攻撃者の identity は purge される。`linkIdentity()` を使った「ログイン中ユーザーの後付け連携 UI」は本テンプレのスコープ外。
 >
 > **要求スコープ**: Supabase デフォルト（`openid email profile`）のみ。Drive / Calendar 等の追加スコープは要求しない（最小権限）。
 
@@ -504,7 +504,7 @@ PUBLIC_GOOGLE_AUTH_ENABLED=true
 
 #### Google OAuth を後から無効化する
 
-3 層を **同期して** OFF にする（順序：サーバ → クライアントの順）:
+3 層を **同期して** OFF にする（順序：**アプリ → サーバ** の順で切るとログイン破壊事故が無い。Turnstile とは順序が逆。Turnstile はサーバ ON / クライアント OFF だと「token 取れず全 fail」、Google OAuth はサーバ OFF / アプリ ON だと「ボタン押下で `provider is not enabled` 即時失敗」と失敗モードが反対方向のため）:
 
 1. **アプリ**: `PUBLIC_GOOGLE_AUTH_ENABLED=false` または env から削除して再ビルド・再デプロイ → ボタン非表示 + Action `NOT_FOUND`
 2. **本番**: Supabase Dashboard > Authentication > Providers > Google で **Enable Sign in with Google** を OFF + Save
