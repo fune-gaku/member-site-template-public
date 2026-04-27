@@ -430,6 +430,8 @@ npm run dev   # 3 層が揃っていれば widget が描画され、Auth が cap
 
 email + password に加えて Google OAuth ログインを追加する opt-in 機能（Issue #49）。会員サイトとしての登録摩擦低減と、パスワード起因リスク（credential stuffing / 弱パス / HIBP）の軽減が目的。
 
+> ⚠️ **本節の有効化は PR 2 / PR 3 マージ後**。Issue #49 は 3 PR 分割で進行中で、PR 1（本節を導入した PR）は **基盤・ドキュメント先行** のみ。`auth.signInWithGoogle` Action / signin / signup ボタン / `auth.changePassword` UI の provider 分岐などのコードは **PR 2（Action + callback）/ PR 3（UI + 既存フロー調整）** で追加される。本節は将来運用のための参照手順として先行整備したもので、PR 1 だけが入った状態で `PUBLIC_GOOGLE_AUTH_ENABLED=true` にしても下記の挙動は再現しない。3 PR 全マージ後に本節を頭から実施してください。
+
 > **本テンプレートのデフォルトは OFF**（`PUBLIC_GOOGLE_AUTH_ENABLED` 未設定 / `false` で UI 非表示 + Action は `NOT_FOUND` 相当）。利用企業ごとに以下の 3 層を揃えて opt-in する。
 
 > **identity linking モード**: Supabase デフォルトの **automatic linking** のまま（[公式 Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking)）。Supabase Auth は同じ email を持つ identity を automatic に link するが、リンクのタイミングで **未確認 identity（既存の email/password signup で email confirmation 未完了のもの等）を削除** する仕様（公式 docs 引用: _"when a new identity can be linked to an existing user, Supabase Auth will remove any other unconfirmed identities linked to an existing user"_）。本テンプレは **Email confirmation = ON** が前提のため、攻撃者が被害者の email で先回り signup しても "unconfirmed" 状態で留まり、被害者が後から Google OAuth で確認済 identity としてログインした時点で攻撃者の identity は purge される。`linkIdentity()` を使った「ログイン中ユーザーの後付け連携 UI」は本テンプレのスコープ外。
@@ -475,6 +477,8 @@ SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=<client-secret>
 ```
 
 `supabase/config.toml` を編集して `enabled = true` + `client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"` 構文で値を引き、`supabase stop && supabase start` で再起動。**ローカル動作確認が不要なら Step 1〜2（本番 Supabase Dashboard 側のみ）+ `PUBLIC_GOOGLE_AUTH_ENABLED=true` でビルドすれば足りる**。
+
+> ⚠️ **ローカルで Identity Linking の pre-account takeover 防御を再現したい場合**: 本テンプレのローカル `supabase/config.toml` は `[auth.email] enable_confirmations = false`（開発時の摩擦を減らすデフォルト）。これだと email/password signup が即時 confirmed になり、攻撃者の先回り signup が "unconfirmed" 状態で留まる前提（→ Google 初回ログイン時に purge される）が成立せず、上記「automatic linking + unconfirmed 削除」の保護機構をローカル検証できない。検証したい場合は config.toml の同フラグを一時的に `true` にして `supabase stop && supabase start` で再起動する（本番 Supabase Dashboard は Email confirmation = ON 前提なので production 側はこの問題なし）。
 
 #### 4. アプリ側の有効化
 
