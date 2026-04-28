@@ -163,7 +163,7 @@ if (!result.success) {
 
 ### バックエンド
 
-Astro Action の `input` に **同じ Zod スキーマ** を渡す。フロント検証は UX のための早期エラー、**バックエンド検証が真の防衛線**（DevTools / curl で迂回されても安全になるように）。ファイルアップロードに関する追加の多層防御（バケット側 `allowed_mime_types` + Action 側 `.refine()` + クライアント `accept`）は [security.md「ファイルアップロードのガイドライン」](./security.md#ファイルアップロードのガイドライン) を参照。
+Astro Action の `input` に **同じ Zod スキーマ** を渡す。フロント検証は UX のための早期エラー、**バックエンド検証が真の防衛線**（DevTools / curl で迂回されても安全になるように）。ファイルアップロードに関する追加の多層防御（バケット側 `allowed_mime_types` + Action 側 `.refine()` + クライアント `accept`）は [security-ops.md「ファイルアップロードのガイドライン」](./security-ops.md#ファイルアップロードのガイドライン) を参照。
 
 ---
 

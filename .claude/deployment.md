@@ -38,7 +38,7 @@
 
 ## デプロイ確認
 
-[README.md「10. 動作確認と以降の更新」](../README.md#cloudflare-workers-へのデプロイ) を参照。Cloudflare Dashboard > Workers & Pages > 該当 Worker > **Logs** で起動ログ確認、デプロイ後は [security.md「セキュリティヘッダの動作確認」](./security.md#セキュリティヘッダの動作確認) のヘッダ検証コマンドを必ず流す。
+[README.md「10. 動作確認と以降の更新」](../README.md#cloudflare-workers-へのデプロイ) を参照。Cloudflare Dashboard > Workers & Pages > 該当 Worker > **Logs** で起動ログ確認、デプロイ後は [security-ops.md「セキュリティヘッダの動作確認」](./security-ops.md#セキュリティヘッダの動作確認) のヘッダ検証コマンドを必ず流す。
 
 ---
 
@@ -479,7 +479,7 @@ npx wrangler rollback --name member-site-template <version-id>
 
 ### Supabase（Dashboard 設定）
 
-- [ ] [security.md「Supabase Dashboard セキュリティ設定チェックリスト」](./security.md#supabase-dashboard-セキュリティ設定チェックリスト) が完了
+- [ ] [security-ops.md「Supabase Dashboard セキュリティ設定チェックリスト」](./security-ops.md#supabase-dashboard-セキュリティ設定チェックリスト) が完了
 - [ ] [Email Templates](#supabase-auth-email-templates必須--issue-002--002-b) を `{{ .TokenHash }}` + `/auth/confirm` 方式に切替済
 - [ ] [Custom SMTP（Resend）](#supabase-auth-smtp-resend-設定本番必須) を有効化、Sender ドメインが `verified` で SPF / DKIM / DMARC 通過
 - [ ] [パスワードポリシー](#supabase-auth-パスワードポリシー必須) を Dashboard 側でも 8 文字以上＋複雑性で設定
@@ -496,8 +496,8 @@ npx wrangler rollback --name member-site-template <version-id>
 
 ### デプロイ後の動作確認
 
-- [ ] [security.md「セキュリティヘッダの動作確認」](./security.md#セキュリティヘッダの動作確認) の `curl -sI` を流して全ヘッダ付与を確認
-- [ ] [security.md「CSRF 対策（サインアウト経路）」](./security.md#csrf-対策サインアウト経路) の 3 コマンドが期待通り（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）
+- [ ] [security-ops.md「セキュリティヘッダの動作確認」](./security-ops.md#セキュリティヘッダの動作確認) の `curl -sI` を流して全ヘッダ付与を確認
+- [ ] [security-ops.md「CSRF 対策（サインアウト経路）」](./security-ops.md#csrf-対策サインアウト経路) の 3 コマンドが期待通り（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）
 - [ ] サインアップ → 確認メール到達 → 「続行」クリック → `/auth/update-password` 遷移 → サインインの一連が成功
 - [ ] [初期 admin の bootstrap](#初期-admin-の-bootstrap必須1-回限り) を完了（新規 Supabase プロジェクトの場合 1 回限り、SQL Editor で promotion）
 - [ ] `/admin/users` に admin ロールでアクセス可、member ロールでアクセス不可
@@ -513,4 +513,4 @@ npx wrangler rollback --name member-site-template <version-id>
 | Worker 設定                  | `wrangler.jsonc` を Git で管理。Secret は CLI で再投入（[deployment.md「デプロイ手順」](#デプロイ手順)） | 都度       |
 | Cloudflare KV / R2（採用時） | 各サービスの公式バックアップ機構に従う                                                                   | —          |
 
-無料プランから本番運用に移すときは、最低限 **Pro プランの PITR を有効化**（[security.md「Pro プラン以上で追加で有効化する項目」](./security.md#pro-プラン以上で追加で有効化する項目) 参照）。マイグレーション適用前には、Supabase Dashboard > **Database → Backups** から手動スナップショットを取って巻き戻し可能にしておく。
+無料プランから本番運用に移すときは、最低限 **Pro プランの PITR を有効化**（[security-ops.md「Pro プラン以上で追加で有効化する項目」](./security-ops.md#pro-プラン以上で追加で有効化する項目) 参照）。マイグレーション適用前には、Supabase Dashboard > **Database → Backups** から手動スナップショットを取って巻き戻し可能にしておく。
