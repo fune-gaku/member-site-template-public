@@ -2,28 +2,30 @@
 
 会員サイトを最短で立ち上げるためのテンプレート。Astro + Vue + Supabase + Cloudflare Workers で、認証 / プロフィール / 投稿 / 管理画面 / RLS / セキュリティヘッダがすべて初期実装済み。
 
-**人間は GUI 操作と Claude Code へのチャット指示だけ。CLI は Claude Code が代行します。**
+**初期セットアップは決まったコマンドをコピペするだけ。機能追加・カスタマイズは Claude Code に日本語で頼むだけ。**
 
-| 担当            | 操作                                                                                                |
-| --------------- | --------------------------------------------------------------------------------------------------- |
-| **人間**        | Supabase Dashboard / Cloudflare Dashboard / GitHub UI / ブラウザでの動作確認 / Claude Code への指示 |
-| **Claude Code** | git / npm / supabase CLI / wrangler CLI / `.env` と `.dev.vars` の作成 / コード変更全般             |
+| 担当            | 操作                                                                                                                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **人間**        | Supabase / Cloudflare / GitHub の Dashboard 操作 / ターミナルで決まったコマンドをコピペ実行 / `.env` と `.dev.vars` への秘密値の貼り付け / ブラウザでの動作確認 / Claude Code への指示 |
+| **Claude Code** | コード変更全般 / 機能追加 / リファクタリング / DB マイグレーション設計 / レビュー / git・gh の運用補助                                                                                 |
+
+> 🔒 **Supabase の Service Role key などの秘密値は、ユーザー自身がエディタで `.env` / `.dev.vars` に直接書き込みます**。チャット欄に貼ると会話履歴に残るリスクがあるため、Claude Code には渡さない運用です（プレースホルダや `.env.example` の編集は Claude Code に任せて OK）。
 
 ---
 
 ## 必要なもの
 
-- **[Claude Code](https://claude.com/claude-code)** — CLI 操作とコード変更を代行する AI エージェント
+- **[Claude Code](https://claude.com/claude-code)** — コード変更・機能追加・レビューを代行する AI エージェント（セットアップ後の機能開発フェーズで使用）
 - **[Supabase](https://supabase.com/dashboard) アカウント** — 無料プランで OK
 - **[Cloudflare](https://dash.cloudflare.com/) アカウント** — 無料プランで OK
 - **GitHub アカウント**
-- **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** がインストールされた PC — ローカル DB 用、Claude Code が起動する
+- **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** がインストールされた PC — ローカル DB 用（`npm run db:start` で利用）
 
 ---
 
 ## 30 分でローカルで動かす
 
-GUI 操作（人間）と Claude Code への指示（チャット）を交互に行います。CLI は Claude Code が代行するので、**ターミナルを自分で開く必要はありません**。
+GUI 操作（Dashboard）とターミナルへのコマンドコピペを交互に行います。コマンドは固定なので、内容を理解せずそのまま貼り付ければ動きます。機能追加やカスタマイズに入る段階から Claude Code を使います。
 
 ### Step 1: GitHub で自分のリポジトリを作る（GUI）
 
@@ -32,7 +34,7 @@ GUI 操作（人間）と Claude Code への指示（チャット）を交互に
 - **Repository name**: 任意（例: `my-club`）
 - **Public / Private**: どちらでも可（迷ったら Private 推奨）
 
-**"Create repository"** をクリックして数秒待つと、自分のリポジトリができあがります。次の Step に進む前に、リポジトリページ右上の緑色の **"Code"** ボタン → **"HTTPS"** タブで表示される URL（`https://github.com/<your-name>/<repo>.git`）をコピーしておきます。Step 3 で Claude Code に渡します。
+**"Create repository"** をクリックして数秒待つと、自分のリポジトリができあがります。次の Step に進む前に、リポジトリページ右上の緑色の **"Code"** ボタン → **"HTTPS"** タブで表示される URL（`https://github.com/<your-name>/<repo>.git`）をコピーしておきます。Step 3-1 の `git clone` コマンドで使います。
 
 ### Step 2: Supabase で新規プロジェクトを作る（GUI）
 
@@ -44,48 +46,97 @@ GUI 操作（人間）と Claude Code への指示（チャット）を交互に
    - **Region**: 利用者が多い地域に近い場所（日本なら **"Northeast Asia (Tokyo)"**）
 4. プロジェクトが **"Setting up project"** 状態になります → 1〜2 分待ちます
 
-完成したら、左サイドバーの **歯車アイコン (Project Settings) → API** を開きます。以下 3 つの値をメモ帳などにコピーしておきます（Step 3 で Claude Code に渡します）:
+完成したら、左サイドバーの **歯車アイコン (Project Settings) → API** を開きます。以下 3 つの値を **パスワードマネージャに保存** しておきます。**用途は本番デプロイ（Step 6〜7）のみで、ローカル開発では使いません** — ローカル開発は Step 3-2 で起動する Docker 上のローカル Supabase が独自の URL / キーを発行するので、それを `.env` / `.dev.vars` に書きます:
 
-| 欄の表示名             | 説明                                                                     |
-| ---------------------- | ------------------------------------------------------------------------ |
-| **"Project URL"**      | `https://<ref>.supabase.co` 形式                                         |
-| **"Publishable key"**  | `eyJ...` または `sb_publishable_...` で始まる長い文字列（公開してよい）  |
-| **"Service Role key"** | `eyJ...` で始まる長い文字列（**絶対に他人に見せない / コミットしない**） |
+| 欄の表示名             | 用途             | 説明                                                                     |
+| ---------------------- | ---------------- | ------------------------------------------------------------------------ |
+| **"Project URL"**      | 本番（Step 6-2） | `https://<ref>.supabase.co` 形式                                         |
+| **"Publishable key"**  | 本番（Step 6-2） | `eyJ...` または `sb_publishable_...` で始まる長い文字列（公開してよい）  |
+| **"Service Role key"** | 本番（Step 7）   | `eyJ...` で始まる長い文字列（**絶対に他人に見せない / コミットしない**） |
 
-> Service Role key の右にある 👁 アイコンを押すと値が表示されます。コピー後、メモ帳のウィンドウは早めに閉じてください。
+> Service Role key の右にある 👁 アイコンを押すと値が表示されます。コピー後、画面は早めに閉じてください。
 
-### Step 3: Claude Code にローカル開発の準備を依頼（チャット）
+> ⚠️ **本番値をローカル `.env` に入れない** — `src/lib/supabase.ts` は `import.meta.env.PUBLIC_SUPABASE_URL` をそのまま使うため、本番 Project URL を local `.env` に書くと `npm run dev` でも本番 Supabase に接続してしまい、テストデータが本番に書き込まれます。Service Role key も同様に local `.dev.vars` に入れると admin 系 Action が本番 DB に対して service role 権限で動作する危険があります。ローカル開発では Step 3-2 で得る **ローカル Supabase の URL / キー** だけを使ってください。
 
-PC のお好きな場所（例: `~/Developer/`）でターミナルを開き、`claude` を起動します。最初のメッセージとして以下をコピペで投げます。`<...>` の部分は Step 1・Step 2 でコピーした値に置き換えてください。
+### Step 3: ローカル開発環境を立ち上げる（ターミナル + エディタ）
+
+PC のお好きな場所（例: `~/Developer/`）でターミナルを開き、以下を順に実行します。コマンドは固定なので **そのままコピペで貼り付ければ OK** です。Step 2 で控えた本番値はここでは **使いません**。
+
+#### 3-1. リポジトリを clone して依存関係をインストール（ターミナル）
+
+`<Step 1 でコピーした URL>` の部分だけ自分の値に置き換えてください。
+
+```bash
+git clone <Step 1 でコピーした URL>
+cd <リポジトリ名>
+npm install
+cp .env.example .env
+cp .dev.vars.example .dev.vars
+```
+
+最後の 2 行で、空の `.env` と `.dev.vars` がリポジトリルートに作られます（次のステップで値を埋めます）。
+
+#### 3-2. ローカル Supabase を起動して URL / キーを取得（ターミナル）
+
+Docker Desktop を起動した状態で、リポジトリのルートで以下を実行します。
+
+```bash
+npm run db:start
+```
+
+初回は Docker image 取得で 1〜3 分かかります。完了すると、ターミナルに以下のような **ローカル Supabase の URL とキー** が表示されます:
 
 ```
-このリポジトリの初期セットアップをお願いします。
-
-1. <Step 1 でコピーした GitHub の URL> を clone してそのディレクトリに移動
-2. 依存関係をインストール（npm install）
-3. .env と .dev.vars を以下の値で作成
-4. ローカル DB を起動して全マイグレーションを適用
-5. 開発サーバを立ち上げ
-
-PUBLIC_SUPABASE_URL=<Step 2 の Project URL>
-PUBLIC_SUPABASE_PUBLISHABLE_KEY=<Step 2 の Publishable key>
-SUPABASE_SERVICE_ROLE_KEY=<Step 2 の Service Role key>
+         API URL: http://127.0.0.1:54321
+     GraphQL URL: http://127.0.0.1:54321/graphql/v1
+  S3 Storage URL: http://127.0.0.1:54321/storage/v1/s3
+          DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      Studio URL: http://127.0.0.1:54323
+    Inbucket URL: http://127.0.0.1:54324
+      JWT secret: super-secret-jwt-token-with-at-least-32-characters-long
+        anon key: eyJhbGciOi...（長い文字列）
+service_role key: eyJhbGciOi...（長い文字列）
+   Publishable key: sb_publishable_...
+       Secret key: sb_secret_...
 ```
 
-Claude Code は内部で以下を代行します:
+> 出力を消してしまった場合は `npx supabase status` で再表示できます。
 
-- `git clone <URL>` → `cd <repo>`
-- `npm install`
-- `.env`（公開値）と `.dev.vars`（Service Role key）の作成
-- `npm run db:start`（Docker 上のローカル Supabase 起動。初回は image 取得で 1〜3 分）
-- `npm run db:reset`（全マイグレーション適用）
-- `npm run dev`（開発サーバ起動）
+ここで表示される **API URL / Publishable key（または anon key）/ service_role key** が、次のステップで `.env` / `.dev.vars` に書く値です。**Step 2 の本番値は使いません。**
 
-途中で Docker Desktop が起動していないなどのエラーが出たら、Claude Code が指示してくれるのでそれに従ってください。
+#### 3-3. `.env` と `.dev.vars` に Step 3-2 の **ローカル値** を書き込む（エディタ）
+
+clone したリポジトリをお好みのエディタ（VS Code 等）で開き、以下 2 ファイルを編集します。**Service Role key などの秘密値は Claude Code のチャット欄には貼らず、自分でファイルに直接書き込みます**（会話履歴に残さないため）。
+
+`.env`（公開値、リポジトリルート）:
+
+```bash
+PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+PUBLIC_SUPABASE_PUBLISHABLE_KEY=<Step 3-2 で表示された Publishable key（または anon key）>
+```
+
+`.dev.vars`（ローカル開発用の秘密値、リポジトリルート）:
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=<Step 3-2 で表示された service_role key>
+```
+
+`.env` / `.dev.vars` はどちらも `.gitignore` 対象なので、誤ってコミットされる心配はありません。
+
+> ⚠️ **Step 2 の本番値（`https://<ref>.supabase.co` 形式の URL や hosted Service Role key）をここに書かない** — local の `.env` に本番値を入れると、`npm run dev` 起動時にアプリが本番 Supabase に接続し、テストデータが本番 DB に書き込まれます。Step 2 の値は Step 6〜7（Cloudflare Dashboard 登録時）でのみ使います。
+
+#### 3-4. マイグレーション適用と開発サーバ起動（ターミナル）
+
+```bash
+npm run db:reset    # 全マイグレーション適用（ローカル DB を初期化）
+npm run dev         # 開発サーバ起動
+```
+
+`npm run dev` がローカル URL（通常 <http://localhost:4321>）を表示したら成功です。
 
 ### Step 4: ブラウザで動作確認（GUI）
 
-開発サーバが起動すると、Claude Code がローカル URL を表示します（通常 <http://localhost:4321>）。ブラウザで開いて以下を確認します:
+Step 3-4 の `npm run dev` が表示するローカル URL（通常 <http://localhost:4321>）をブラウザで開いて、以下を確認します:
 
 - トップページの **"サインアップ"** リンクから仮のメール / パスワードで登録
 - `/member/dashboard` に到達できれば成功
@@ -104,7 +155,7 @@ Claude Code は内部で以下を代行します:
 
 ### Step 5: Supabase 本番セキュリティ設定（GUI）
 
-ローカル開発で使った Supabase プロジェクトをそのまま本番でも使う前提で進めます（別プロジェクトを使いたい場合は Step 2 を本番用にもう一度実施）。
+本番では Step 2 で作成した hosted Supabase プロジェクトを使います（ローカル開発で使った Docker 上のローカル Supabase は本番には関係ありません）。Step 2 のときに保存した Project URL / Publishable key / Service Role key をここから先で使います。
 
 Supabase Dashboard で以下 2 箇所を設定します。
 
@@ -173,11 +224,11 @@ Step 6 で作成された Worker の管理画面に移動し、ランタイム�
 3. **"Add"** をクリック → 種別の切り替えで **"Secret"** を選ぶ（"Variable" ではなく "Secret"）
 4. 以下を入力して **"Save"**:
 
-   | 項目        | 値                                                                                  |
-   | ----------- | ----------------------------------------------------------------------------------- |
-   | **Type**    | **Secret**（必ず Secret。Variable に入れると暗号化されず、漏洩リスクが高まる）      |
-   | **Name**    | `SUPABASE_SERVICE_ROLE_KEY`                                                         |
-   | **Value**   | Step 2 でコピーした Service Role key                                                |
+   | 項目      | 値                                                                             |
+   | --------- | ------------------------------------------------------------------------------ |
+   | **Type**  | **Secret**（必ず Secret。Variable に入れると暗号化されず、漏洩リスクが高まる） |
+   | **Name**  | `SUPABASE_SERVICE_ROLE_KEY`                                                    |
+   | **Value** | Step 2 でコピーした Service Role key                                           |
 
 > ⚠️ **2 系統の env を混同しないこと**:
 >
@@ -222,16 +273,16 @@ update profiles set role = 'admin' where user_id = (
 
 カスタマイズ・機能追加は **Claude Code に日本語で頼むだけ** で進められます。リポジトリ直下の [CLAUDE.md](CLAUDE.md) が起動時に自動で読み込まれ、Claude Code は規約（コーディング・命名・セキュリティ・DB マイグレーションの 7 ステップ等）に従って作業します。利用者がディレクトリ構造や CLI を覚える必要はありません。
 
-| やりたいこと                  | Claude Code への頼み方の例（コピペして編集）                                                                                                                                                          |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ブランドカラー・サイト名を変える | 「ブランドカラーを `#2563eb` に、サイト名を "○○ クラブ" に変えて。`src/styles/global.css` の `@theme` と各レイアウトのヘッダ見出しが対象」                                                              |
-| プロフィールに項目を追加      | 「プロフィールに自己紹介 (bio) を 200 文字までで保存できるようにして。CLAUDE.md の DB 変更 7 ステップに沿って migration / RLS / pgTAP テストまで作って、最後に `/db-check` を走らせて」                |
-| 新しい会員ページを作る        | 「`/member/events` ページを作って、admin だけが投稿できて会員全員が読める形にして。RLS と Astro Action の認可チェックも忘れずに」                                                                      |
-| Google ログインを追加         | 「Google OAuth を有効にしたい。`.claude/deployment-optional.md` の Google OAuth セクションを読んで、必要なコード変更とセットアップ手順を教えて」                                                       |
-| カスタムドメインを当てる      | 「`example.com` を Cloudflare Workers に紐付けたい。`.claude/deployment.md` のカスタムドメイン設定に沿って、Cloudflare Dashboard 側で何をすればいいか手順を教えて」                                    |
-| Dependabot PR の確認・マージ  | 「open になっている Dependabot PR を `/pr-triage` で分類して、patch / minor は安全に merge できるか教えて」                                                                                            |
-| 本番デプロイ前のセキュリティレビュー | PR を作ったあとに `/codex-cross-review <PR 番号>` を投げる（Codex × Claude Code の収束ループが LGTM までレビューを反復）                                                                              |
-| 「これってどうなってるの？」  | 「`/member/profile` ページが Supabase の何を読み書きしてるか、関連ファイルを辿って説明して」                                                                                                           |
+| やりたいこと                         | Claude Code への頼み方の例（コピペして編集）                                                                                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ブランドカラー・サイト名を変える     | 「ブランドカラーを `#2563eb` に、サイト名を "○○ クラブ" に変えて。`src/styles/global.css` の `@theme` と各レイアウトのヘッダ見出しが対象」                                              |
+| プロフィールに項目を追加             | 「プロフィールに自己紹介 (bio) を 200 文字までで保存できるようにして。CLAUDE.md の DB 変更 7 ステップに沿って migration / RLS / pgTAP テストまで作って、最後に `/db-check` を走らせて」 |
+| 新しい会員ページを作る               | 「`/member/events` ページを作って、admin だけが投稿できて会員全員が読める形にして。RLS と Astro Action の認可チェックも忘れずに」                                                       |
+| Google ログインを追加                | 「Google OAuth を有効にしたい。`.claude/deployment-optional.md` の Google OAuth セクションを読んで、必要なコード変更とセットアップ手順を教えて」                                        |
+| カスタムドメインを当てる             | 「`example.com` を Cloudflare Workers に紐付けたい。`.claude/deployment.md` のカスタムドメイン設定に沿って、Cloudflare Dashboard 側で何をすればいいか手順を教えて」                     |
+| Dependabot PR の確認・マージ         | 「open になっている Dependabot PR を `/pr-triage` で分類して、patch / minor は安全に merge できるか教えて」                                                                             |
+| 本番デプロイ前のセキュリティレビュー | PR を作ったあとに `/codex-cross-review <PR 番号>` を投げる（Codex × Claude Code の収束ループが LGTM までレビューを反復）                                                                |
+| 「これってどうなってるの？」         | 「`/member/profile` ページが Supabase の何を読み書きしてるか、関連ファイルを辿って説明して」                                                                                            |
 
 > 💡 上の例は **そのまま投げても動きます**。具体的に書くほど Claude Code の精度が上がるので、`<200 文字>` `<example.com>` のような部分を自分の数字・名前に置き換えて使ってください。詰まったら「`CLAUDE.md` の規約に従って」「公式ドキュメントを `WebFetch` で確認して」と添えるとさらに精度が上がります。
 
