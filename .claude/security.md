@@ -8,14 +8,15 @@
 
 セキュリティに関連する記述は本リポジトリ内で以下に分散している。役割で使い分ける:
 
-| ドキュメント                                                              | 役割                                                                                                                         |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 本ファイル                                                                | チェックリスト（実装済み / 将来課題） / 新規実装時のセルフチェック / **セキュリティレビュー手順（必須）** / 運用ハンドブック |
-| [database.md](./database.md#新規マイグレーション時のセルフチェックリスト) | RLS / Storage ポリシーの完全 SQL / マイグレーション運用 / 新規マイグレーション時のセルフチェック                             |
-| [deployment.md「セキュリティ設定」](./deployment.md#セキュリティ設定)     | Supabase Email Templates / Custom SMTP (Resend) / パスワードポリシー — 本番デプロイ時に必須の Dashboard 側設定               |
-| [development.md](./development.md)                                        | TypeScript / Vue / Tailwind の規約 / 命名規則 / エラーハンドリング・バリデーションの実装例                                   |
+| ドキュメント                                                              | 役割                                                                                                                                                                         |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 本ファイル                                                                | チェックリスト（実装済み / 将来課題） / 新規実装時のセルフチェック / 脅威モデル / コミット前チェックフロー / **セキュリティレビュー手順（必須）** — Claude Code 起動時に常駐 |
+| [security-ops.md](./security-ops.md)                                      | 運用ハンドブック（Supabase Dashboard 設定 / セキュリティヘッダ検証 / CSRF 検証 / ファイルアップロード詳細 / セッション寿命方針 / インシデント対応） — 必要時に Read          |
+| [database.md](./database.md#新規マイグレーション時のセルフチェックリスト) | RLS / Storage ポリシーの完全 SQL / マイグレーション運用 / 新規マイグレーション時のセルフチェック                                                                             |
+| [deployment.md「セキュリティ設定」](./deployment.md#セキュリティ設定)     | Supabase Email Templates / Custom SMTP (Resend) / パスワードポリシー — 本番デプロイ時に必須の Dashboard 側設定                                                               |
+| [development.md](./development.md)                                        | TypeScript / Vue / Tailwind の規約 / 命名規則 / エラーハンドリング・バリデーションの実装例                                                                                   |
 
-詳細は本ファイル内では繰り返さず、上記の一次情報を参照する方針。本ファイルの **「コーディング例の重複」「Phase 1 実装の全文 SQL/TS」「マイグレーション運用ルール」「Astro 6 環境変数」** の各セクションは、いずれも上記ドキュメントに集約された（git 履歴で復元可能）。
+詳細は本ファイル内では繰り返さず、上記の一次情報を参照する方針。Issue #90 で `security-ops.md` を分離し、`@import` で常駐させるべき項目（実装済みスナップショット・新規実装時セルフチェック・脅威モデル・コミット前フロー・レビュー手順）と、必要時にだけ展開する運用ハンドブックを分けた。
 
 ---
 
@@ -38,14 +39,14 @@
 - [x] `/member/*` 配下は認証必須（未認証時リダイレクト）
 - [x] `SUPABASE_SERVICE_ROLE_KEY` はサーバーのみで使用
 - [x] Admin クライアントは毎リクエスト生成（セッション漏洩防止）
-- [x] CSRF 対策：状態変更操作は POST のみ、`security.checkOrigin` 有効、`/auth/signout` GET 405 ガード + クロスオリジン POST 403 を自動テストでカバー（`tests/integration/signout-csrf.test.ts` / `tests/workers/csrf.test.ts`、→ [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)）
+- [x] CSRF 対策：状態変更操作は POST のみ、`security.checkOrigin` 有効、`/auth/signout` GET 405 ガード + クロスオリジン POST 403 を自動テストでカバー（`tests/integration/signout-csrf.test.ts` / `tests/workers/csrf.test.ts`、→ [security-ops.md「CSRF 対策（サインアウト経路）」](./security-ops.md#csrf-対策サインアウト経路)）
 - [x] OTP / PKCE の適切な分離：メールリンクは `/auth/confirm` のランディング経由でスキャナ GET 耐性を確保（→ [メール経由の認証フロー](./architecture.md#メール経由の認証フローissue-002--002-b)）
 - [x] Open Redirect 対策：`next` クエリは `safeNextPath` でサニタイズ（`src/lib/safe-redirect.ts`）
 - [x] Supabase メールテンプレートで `{{ .ConfirmationURL }}` は禁止、`{{ .TokenHash }}` + `/auth/confirm` 経由に統一
-- [x] Supabase Dashboard のセキュリティ設定を完了（→ [Supabase Dashboard セキュリティ設定チェックリスト](#supabase-dashboard-セキュリティ設定チェックリスト)）
+- [x] Supabase Dashboard のセキュリティ設定を完了（→ [security-ops.md「Supabase Dashboard セキュリティ設定チェックリスト」](./security-ops.md#supabase-dashboard-セキュリティ設定チェックリスト)）
 - [x] アカウント列挙対策：`auth.signIn` / `auth.signUp` / `auth.resetPassword` の全失敗ケースを統一応答（成功扱い or `UNAUTHORIZED` + 同一文言）に正規化し、メールアドレスの登録有無を判別不能にする（実装は `src/lib/auth-signin.ts` / `auth-signup.ts` / `auth-reset-password.ts`、テストで bytewise 同一を検証 — Issue #8 / #14）
 - [x] ログイン中のパスワード変更時に現在のパスワード再認証を要求：`auth.changePassword` Action は `signInWithPassword` で現パスワードを検証してから `updateUser` を呼ぶ。recovery 用 `auth.updatePassword` とは分離。盗難セッション Cookie 単独 / 共有 PC 攻撃での account takeover を抑止（OWASP Authentication Cheat Sheet / NIST SP 800-63B §5.2.10、実装は `src/lib/auth-change-password.ts` — Issue #19）
-- [x] Google OAuth ログイン（PKCE フロー）インフラ：`auth.signInWithGoogle` Action + `/auth/callback` の `exchangeCodeForSession` 経路 + signin/signup の SSR 条件分岐ボタン + `auth.changePassword` UI を email identity 持ちのみに表示する provider 分岐で opt-in 適用可能。**本テンプレートのデフォルトは OFF**（`PUBLIC_GOOGLE_AUTH_ENABLED` 未設定 / `false` で UI 非表示 + Action は `NOT_FOUND` 相当）。identity linking は Supabase デフォルトの **automatic linking** に委ねるが、**前提条件として Email confirmation = ON が必須**（[Supabase Dashboard セキュリティ設定チェックリスト](#supabase-dashboard-セキュリティ設定チェックリスト) の「Email confirmation: ON」を維持）。Supabase Auth は新しい identity が link されるタイミングで **未確認の既存 identity を削除する仕様**（公式: _"will remove any other unconfirmed identities linked to an existing user"_）。これにより攻撃者が被害者の email で先回り signup しても "unconfirmed" 状態で留まり、被害者が Google OAuth で確認済 identity としてログインした時点で攻撃者の identity は purge され、pre-account takeover を防ぐ（[Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking)）。要求スコープは Supabase デフォルトの `openid email profile` のみで Drive / Calendar 等は要求しない（最小権限）。`handle_new_user` トリガが OAuth-shaped `raw_user_meta_data` でも壊れず role が default の `member` になることは pgTAP で検証済み（`supabase/tests/database/050-handle-new-user-trigger.test.sql` Test 5+6+7）。セットアップ手順は [.claude/deployment-optional.md「Google OAuth セットアップ（任意）」](./deployment-optional.md#google-oauth-セットアップ任意) — Issue #49 / PR #59 / #63 / #64
+- [x] Google OAuth ログイン（PKCE フロー）インフラ：`auth.signInWithGoogle` Action + `/auth/callback` の `exchangeCodeForSession` 経路 + signin/signup の SSR 条件分岐ボタン + `auth.changePassword` UI を email identity 持ちのみに表示する provider 分岐で opt-in 適用可能。**本テンプレートのデフォルトは OFF**（`PUBLIC_GOOGLE_AUTH_ENABLED` 未設定 / `false` で UI 非表示 + Action は `NOT_FOUND` 相当）。identity linking は Supabase デフォルトの **automatic linking** に委ねるが、**前提条件として Email confirmation = ON が必須**（[security-ops.md「Supabase Dashboard セキュリティ設定チェックリスト」](./security-ops.md#supabase-dashboard-セキュリティ設定チェックリスト) の「Email confirmation: ON」を維持）。Supabase Auth は新しい identity が link されるタイミングで **未確認の既存 identity を削除する仕様**（公式: _"will remove any other unconfirmed identities linked to an existing user"_）。これにより攻撃者が被害者の email で先回り signup しても "unconfirmed" 状態で留まり、被害者が Google OAuth で確認済 identity としてログインした時点で攻撃者の identity は purge され、pre-account takeover を防ぐ（[Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking)）。要求スコープは Supabase デフォルトの `openid email profile` のみで Drive / Calendar 等は要求しない（最小権限）。`handle_new_user` トリガが OAuth-shaped `raw_user_meta_data` でも壊れず role が default の `member` になることは pgTAP で検証済み（`supabase/tests/database/050-handle-new-user-trigger.test.sql` Test 5+6+7）。セットアップ手順は [.claude/deployment-optional.md「Google OAuth セットアップ（任意）」](./deployment-optional.md#google-oauth-セットアップ任意) — Issue #49 / PR #59 / #63 / #64
 - [ ] **未実装（将来課題）**: admin role への MFA / TOTP 必須化。Supabase Auth は MFA factor をサポートしているため、admin が増えるタイミングで導入を検討する
 
 ### ✅ インジェクション対策
@@ -84,14 +85,14 @@
 - [x] 依存パッケージに既知の脆弱性がない（CI の `npm audit --audit-level=high` が PR と週次で自動チェック）
 - [x] Dependabot で依存パッケージの更新を週次で自動追跡（[.github/dependabot.yml](../.github/dependabot.yml)）
 - [x] gitleaks の pre-commit hook で秘密情報のコミットを自動ブロック（[.githooks/pre-commit](../.githooks/pre-commit)）
-- [x] セキュリティヘッダ（CSP / HSTS / X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy / Cross-Origin-Opener-Policy）を全レスポンスに付与（`src/lib/security-headers.ts`、→ [セキュリティヘッダの動作確認](#セキュリティヘッダの動作確認)）
+- [x] セキュリティヘッダ（CSP / HSTS / X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy / Cross-Origin-Opener-Policy）を全レスポンスに付与（`src/lib/security-headers.ts`、→ [security-ops.md「セキュリティヘッダの動作確認」](./security-ops.md#セキュリティヘッダの動作確認)）
 - [x] CORS 設定が適切（Cloudflare Workers が自動管理）
 - [x] HTTPS 強制（Cloudflare Workers が自動管理）
 - [x] セキュアな Cookie 設定（`@supabase/ssr` が自動管理）
 - [x] マイグレーション運用ルールを定義（→ [database.md「新規マイグレーション時のセルフチェックリスト」](./database.md#新規マイグレーション時のセルフチェックリスト)）
 - [x] Astro Actions のリクエストボディサイズ上限（一般 100KB / アップロード 6MB）を `src/middleware.ts` で `Content-Length` 検査し、超過時 413 / 欠損時 411 を返す（Issue #9）。`src/lib/request-size-limits.ts` の `UPLOAD_ACTION_PATHS` でアップロード Action を明示列挙
 - [ ] **未実装（将来課題）**: Astro Actions のレートリミット（書き込み系: `posts.create` / `auth.signUp` / `admin.inviteUser` 等）。当面は Supabase Auth 側の組込みレートと Cloudflare の DDoS 自動軽減に依存。本格運用時は Cloudflare Rate Limiting Rules で `/_actions/*` を制限する。なおボディサイズ上限は Issue #9 で実装済（CL ガード）
-- [ ] **未実装（将来課題）**: Storage `avatars` のユーザー別クォータ。1 ユーザーが履歴蓄積で容量を圧迫する可能性あり。当面は [運用: 既存オブジェクトの棚卸し](#運用-既存オブジェクトの棚卸し) のクエリで手動管理
+- [ ] **未実装（将来課題）**: Storage `avatars` のユーザー別クォータ。1 ユーザーが履歴蓄積で容量を圧迫する可能性あり。当面は [security-ops.md「運用: 既存オブジェクトの棚卸し」](./security-ops.md#運用-既存オブジェクトの棚卸し) のクエリで手動管理
 
 ---
 
@@ -116,7 +117,7 @@
 ### 新規ページ・ルートを追加するとき
 
 - [ ] 認証要否を `src/middleware.ts` のパス判定に反映（`/member/*` / `/admin/*` 配下なら自動で適用される）
-- [ ] 状態変更は GET ではなく POST + `<form action={actions.x.y}>` 経由（[CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路) と同じ原則）
+- [ ] 状態変更は GET ではなく POST + `<form action={actions.x.y}>` 経由（[security-ops.md「CSRF 対策（サインアウト経路）」](./security-ops.md#csrf-対策サインアウト経路) と同じ原則）
 - [ ] ハイドレーションが必要な Vue コンポーネントだけ `client:load` を付ける（最小限の JS 配信）
 - [ ] 新規の外部リソース（フォント / 画像ホスト / 外部 API）を読み込むなら、CSP に該当ホストを追加（`src/lib/security-headers.ts`）して DevTools で違反が出ないかを必ず確認
 - [ ] 認証情報を含む応答が CDN にキャッシュされないことを確認（`/_actions/*` や `/member/*` `/admin/*` で `Cache-Control: private, no-store` 相当の挙動になっているか）
@@ -146,7 +147,7 @@
 | SQLインジェクション             | 中           | Supabaseクライアント使用（パラメータ化クエリ）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 不正ファイルアップロード        | 中           | 拡張子・MIME・サイズ制限（5MB）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | セッションハイジャック          | 中           | Secure Cookie、HTTPS、トークン自動リフレッシュ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| CSRF攻撃                        | 低           | SameSite Cookie（`@supabase/ssr`）+ Astro Actions POST 限定 + `security.checkOrigin`（Origin/Referer 照合）。[CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路)参照                                                                                                                                                                                                                                                                                                                                                            |
+| CSRF攻撃                        | 低           | SameSite Cookie（`@supabase/ssr`）+ Astro Actions POST 限定 + `security.checkOrigin`（Origin/Referer 照合）。[security-ops.md「CSRF 対策（サインアウト経路）」](./security-ops.md#csrf-対策サインアウト経路)参照                                                                                                                                                                                                                                                                                                                         |
 | RLS バイパス                    | 高           | RLS を全テーブルで有効化、service_role キーはサーバーのみ                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | アカウント列挙                  | 中           | `auth.signIn` / `signUp` / `resetPassword` の全失敗ケースを統一応答に正規化（`auth-signin.ts` / `auth-signup.ts` / `auth-reset-password.ts`）— Issue #8 / #14                                                                                                                                                                                                                                                                                                                                                                           |
 | OAuth pre-account takeover      | 中           | 攻撃者が未確認の被害者 email で先にローカル signup → 被害者が後から Google OAuth で同 email を初回ログインしたとき identity が攻撃者アカウントに linkage される脅威。本テンプレは **Email confirmation = ON 前提**（Supabase Dashboard） + Supabase Auth が新しい identity を link するときに **未確認の既存 identity を削除する仕様**（公式: _"will remove any other unconfirmed identities linked to an existing user"_）に依拠して防ぐ（[Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking)）— Issue #49 |
@@ -199,7 +200,7 @@ Secret scanning / Push protection は Private + Free プランでは使えない
 | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Supabase Security Advisor / Performance Advisor                                                                                              | 月 1 回、マイグレーション適用直後   | Supabase Dashboard > Database > Advisors                                                                                                                |
 | [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) でのヘッダ再評価（A 以上維持） | 四半期に 1 回、または本番デプロイ後 | 本番 URL を入力                                                                                                                                         |
-| CSRF 本番 sanity check（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）                                                          | 本番デプロイ後                      | [CSRF 対策（サインアウト経路）](#csrf-対策サインアウト経路) のコマンド参照（回帰検出は自動テスト `npm run test` / `npm run test:workers` でカバー済み） |
+| CSRF 本番 sanity check（GET 405 / クロスオリジン POST 403 / 同一オリジン POST 200）                                                          | 本番デプロイ後                      | [security-ops.md「CSRF 対策（サインアウト経路）」](./security-ops.md#csrf-対策サインアウト経路) のコマンド参照（回帰検出は自動テスト `npm run test` / `npm run test:workers` でカバー済み） |
 
 ---
 
@@ -318,248 +319,6 @@ main マージの前提として、PR description（または PR 不経由のと
 - フォーマット専用コミット（`npm run format` / `npm run lint:fix` の結果のみで実質ロジック変更なし）
 
 判定が微妙な場合は **常に 3 段階を回す** を選択する。
-
----
-
-## インシデント対応
-
-### 環境変数が漏洩した場合
-
-1. **即座にSupabaseでAPIキーをローテーション**
-   - Supabase Dashboard > Settings > API > Reset Keys
-2. **Cloudflare Workers の Secret を更新**
-   - `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name member-site-template`
-3. Gitコミット履歴から削除（[git-filter-repo](https://github.com/newren/git-filter-repo) を使用）
-4. `.env` / `.dev.vars` が `.gitignore` に含まれているか再確認
-
-### 脆弱性が発見された場合
-
-1. `npm audit` で詳細確認
-2. `npm audit fix` で自動修正、不可なら `package.json` の `overrides` で固定するか代替パッケージへ
-3. 重大な脆弱性は本番運用への影響範囲を見極め、ブロック対応 / Issue 化を即決する
-
----
-
-> 以下は **運用ハンドブック**。日常コミット時には不要だが、関連作業（Supabase Dashboard 設定 / デプロイ後の検証 / CSRF テスト / ファイルアップロード機能の追加 等）に着手するときに展開して参照する。
-
----
-
-## Supabase Dashboard セキュリティ設定チェックリスト
-
-マイグレーション SQL に現れないが、**新規 Supabase プロジェクト構築時に Dashboard で必ず設定する項目**。Supabase 公式 [Going into Prod](https://supabase.com/docs/guides/deployment/going-into-prod) と [Password Security](https://supabase.com/docs/guides/auth/password-security) に基づく。
-
-### Auth 設定（Authentication > Providers > Email / Settings）
-
-| 項目                    | 推奨値                     | 理由                                                              |
-| ----------------------- | -------------------------- | ----------------------------------------------------------------- |
-| Email confirmation      | **ON**                     | メール到達性を保証、なりすまし登録防止                            |
-| OTP 有効期限            | **≤ 3600 秒（1 時間）**    | Supabase 公式推奨上限。超えると Security Advisor が警告           |
-| Minimum password length | **8 文字**                 | `src/lib/password-schema.ts` の Zod `passwordSchema` と一致させる |
-| Password requirements   | **数字 + 小文字 + 大文字** | アプリ側 Zod と一致させる（Zod で先に弾き、Dashboard で二重防御） |
-| Confirm email change    | **ON**                     | メール変更時の乗っ取り防止                                        |
-| Secure email change     | **ON**                     | 旧メール側での承認を要求                                          |
-
-### Sessions 設定（Authentication > Sessions）
-
-本テンプレートの方針は [セッション寿命方針（Remember Me 非採用）](#セッション寿命方針remember-me-非採用) 参照。プロジェクトの要件に応じて以下を設定:
-
-| 項目                    | 汎用会員サイト | 管理画面・金融系 |
-| ----------------------- | -------------- | ---------------- |
-| Time-box user sessions  | 30 日          | 24 時間以内      |
-| Inactivity timeout      | 適度な値       | 短め             |
-| Single session per user | OFF            | **ON**           |
-
-### 組織・プロジェクト側（Account > Security / Organization）
-
-| 項目                        | 推奨         | 備考                                     |
-| --------------------------- | ------------ | ---------------------------------------- |
-| Supabase アカウントの MFA   | **有効**     | 乗っ取られるとプロジェクトごと支配される |
-| Organization の複数 owner   | **2 名以上** | Bus factor 対策                          |
-| GitHub 連携アカウントの 2FA | **有効**     | 同上                                     |
-
-### Pro プラン以上で追加で有効化する項目
-
-無料プランでは使えないが、課金後に必ず有効化するもの:
-
-| 項目                               | プラン                   | 用途                                                                                 |
-| ---------------------------------- | ------------------------ | ------------------------------------------------------------------------------------ |
-| Leaked password protection（HIBP） | **Pro 以上**             | 流出済みパスワードを拒否。無料プランではアプリ層の `ENABLE_HIBP_CHECK=true` で代替中 |
-| Point in Time Recovery (PITR)      | **Pro 以上（アドオン）** | DB 障害時の任意時点復元                                                              |
-| Network restrictions               | **Pro 以上**             | DB 接続元 IP 制限                                                                    |
-
----
-
-## セキュリティヘッダの動作確認
-
-`src/middleware.ts` が全レスポンスに共通セキュリティヘッダ（CSP / HSTS / X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy / Cross-Origin-Opener-Policy）を付与している。定義は `src/lib/security-headers.ts` 参照。
-
-### ローカル環境での確認
-
-```bash
-# Astro 開発サーバーを起動
-npm run dev
-
-# 別ターミナルで付与されているか確認
-curl -sI http://localhost:4321/ \
-  | grep -iE 'content-security|strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy|cross-origin-opener'
-```
-
-期待される出力例:
-
-```
-content-security-policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; ...
-cross-origin-opener-policy: same-origin
-permissions-policy: accelerometer=(), camera=(), ...
-referrer-policy: strict-origin-when-cross-origin
-strict-transport-security: max-age=63072000; includeSubDomains; preload
-x-content-type-options: nosniff
-x-frame-options: DENY
-```
-
-### 本番環境（Cloudflare Workers）での確認
-
-```bash
-curl -sI https://member-site-template.your-subdomain.workers.dev/ \
-  | grep -iE 'content-security|strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy|cross-origin-opener'
-```
-
-### スキャナでの評価
-
-- [Mozilla Observatory](https://observatory.mozilla.org/) で **A 以上**
-- [securityheaders.com](https://securityheaders.com/) で **A 以上**
-
-### CSP 違反チェック
-
-ブラウザ DevTools の Console を開き、以下を操作しても CSP error が出ないことを確認:
-
-- サインアップ・サインイン・サインアウト
-- プロフィール画面でアバター画像を表示（`https://<ref>.supabase.co/...`）
-- 任意のページのハイドレーション
-
----
-
-## CSRF 対策（サインアウト経路）
-
-### 基本方針
-
-サインアウトのように **状態を変更する操作は必ず POST** とする（[RFC 9110 §9.2.1](https://www.rfc-editor.org/rfc/rfc9110#section-9.2.1) safe methods）。リンクベース CSRF（`<a href="/auth/signout">` を踏ませる／メーラーのプリフェッチ）による **意図しない強制ログアウト** を防ぐため、以下を徹底する：
-
-1. **Astro Action + `<form method="POST" action={actions.auth.signOut}>` のみを経由** して `supabase.auth.signOut()` を呼ぶ。
-2. `/auth/signout` ページは互換のため残すが、**GET には `405 Method Not Allowed`** を返す。
-3. `astro.config.mjs` の `security.checkOrigin` を **既定値 `true` のまま維持**。これで Astro がクロスオリジン POST を自動的に 403 で拒否する。
-4. ナビゲーションヘッダ（`Member.astro` / `Admin.astro`）やダッシュボードの「サインアウト」ボタンは全て form POST（Action 呼び出し）に統一する。`<a href="/auth/signout">` は作らない。
-
-### CSRF 検証（自動テスト + 本番デプロイ後の最終確認）
-
-**回帰検出は自動テストでカバー済み**（Issue #16）。`/auth/signout` や `auth.signOut` Action、`security.checkOrigin` 周辺を改修した場合は以下のコマンドで両系統を回す:
-
-```bash
-npm run test           # GET 405 ガード（tests/integration/signout-csrf.test.ts）
-npm run test:workers   # クロスオリジン POST 403（tests/workers/csrf.test.ts、実 workerd ランタイム）
-```
-
-| #   | 観点                                                  | 自動テスト                                                                          | 本番 curl |
-| --- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- | --------- |
-| 1   | GET / HEAD / その他 safe method → 405 + `Allow: POST` | [tests/integration/signout-csrf.test.ts](../tests/integration/signout-csrf.test.ts) | 下記 1    |
-| 2   | クロスオリジン POST → 403（`security.checkOrigin`）   | [tests/workers/csrf.test.ts](../tests/workers/csrf.test.ts)                         | 下記 2    |
-| 3   | 同一オリジン POST → 403 でない（CSRF を通過）         | 同上                                                                                | 下記 3    |
-
-**本番デプロイ直後**は、自動テストが通った前提で、デプロイされた実環境が同じ挙動を示すことだけを最終確認する（Cloudflare 側の CDN / WAF / Rate Limiting で挙動が変わっていないかの sanity check）:
-
-```bash
-# 1) 攻撃者視点: クロスオリジン GET（リンク踏ませ・メーラー URL プリフェッチを模擬）
-curl -i -X GET https://member-site-template.your-subdomain.workers.dev/auth/signout
-# 期待: HTTP/2 405 / Allow: POST （Cookie が付いていても sb-* の delete は起きない）
-
-# 2) 攻撃者視点: クロスオリジン POST（Origin ヘッダが別サイト）
-curl -i -X POST \
-  -H "Origin: https://evil.example.com" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  https://member-site-template.your-subdomain.workers.dev/_actions/auth.signOut
-# 期待: HTTP/2 403 （Astro security.checkOrigin が Origin/Referer 不一致で拒否）
-
-# 3) 同一オリジン POST（正規フロー、ダッシュボードのボタン相当）
-curl -i -X POST \
-  -H "Origin: https://member-site-template.your-subdomain.workers.dev" \
-  -H "Referer: https://member-site-template.your-subdomain.workers.dev/member/dashboard" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --cookie "sb-...=..." \
-  https://member-site-template.your-subdomain.workers.dev/_actions/auth.signOut
-# 期待: HTTP/2 200 / Set-Cookie: sb-...=; Max-Age=0 （セッション Cookie 削除）
-```
-
-### 受け入れ基準
-
-- [x] GET / HEAD / その他 safe method の `/auth/signout` が **405 Method Not Allowed** + `Allow: POST` を返す（自動: `tests/integration/signout-csrf.test.ts`）
-- [x] クロスオリジン POST が **403** で拒否される（自動: `tests/workers/csrf.test.ts`、`security.checkOrigin` の動作）
-- [x] 同一オリジン POST は **403 にならない**（CSRF を通過する。自動: `tests/workers/csrf.test.ts`）
-- [x] スパムメールの URL スキャナーが GET しても Cookie 削除が走らない（本番デプロイ直後に curl で確認）
-- [x] ダッシュボード・ナビゲーションヘッダのサインアウトがクリック 1 回で従来どおり動作する
-
----
-
-## ファイルアップロードのガイドライン
-
-`avatars` バケットのようなユーザーアップロードは多層防御を徹底する。重要度の高い順:
-
-1. **バケット設定（Supabase Storage）が真の防衛線** — `storage.buckets.allowed_mime_types` と `file_size_limit` を初期マイグレーション (`supabase/migrations/20260420205000_init.sql`) で必ず設定。Supabase 公式: _"Upload restrictions ... are defined at the bucket level"_
-2. **サーバ側（Astro Action の Zod）で早期検証** — `.refine()` で MIME / サイズを 400 応答で弾く。`upload()` 呼び出し時は `contentType: input.file.type` を明示し、クライアント送出を盲信しない
-3. **クライアント側検証は UX 目的のみ** — `<input accept="...">` と `file.type` は DevTools で迂回可能、単独でセキュリティ対策にしない
-
-### 許可する MIME タイプ
-
-`image/png` / `image/jpeg` / `image/webp` / `image/gif` のみ。**`image/svg+xml` は意図的に除外** — SVG は XML + JavaScript 実行コンテナのため、署名付き URL で開かれると `<ref>.supabase.co` 上で Stored XSS が成立し得る（[MDN: SVG restrictions](https://developer.mozilla.org/en-US/docs/Web/SVG/SVG_as_an_Image#restrictions)）。SVG が必要な場合は `Content-Disposition: attachment` 固定の別バケットを検討する。
-
-### ファイルサイズ
-
-上限 **5 MB**。`src/lib/avatar-upload.ts` の `MAX_AVATAR_SIZE` を真実の源として、バケット設定・Action・UI で共有する。
-
-### ファイル名サニタイゼーション
-
-`src/lib/avatar-upload.ts` の `sanitizeAvatarFileName()` を使う:
-
-- 日本語・絵文字・多言語 Unicode は保持（UX）
-- `/` `\` `:` `*` `?` `"` `<` `>` `|` と制御文字のみ `_` に置換（OS 互換 / パストラバーサル）
-- `..` は `_` に畳み込む（パストラバーサル対策）
-- 先頭末尾の空白・ドットはトリム（Windows の trailing-dot 解釈事故回避）
-
-### 運用: 既存オブジェクトの棚卸し
-
-バケット制限を後から追加した場合、過去にアップロードされたファイルはそのまま残る。違反オブジェクトを洗い出すクエリ:
-
-```sql
-select id, name, owner, metadata->>'mimetype' as mime, metadata->>'size' as size
-  from storage.objects
- where bucket_id = 'avatars'
-   and (
-     (metadata->>'size')::bigint > 5 * 1024 * 1024
-     or coalesce(metadata->>'mimetype', '') not in (
-       'image/png','image/jpeg','image/webp','image/gif'
-     )
-   );
-```
-
----
-
-## セッション寿命方針（Remember Me 非採用）
-
-本テンプレートは「ログイン状態を保持」（Remember Me）チェックボックスを採用しない。Supabase Auth はセッション寿命を **per-login で切り替える API を提供しておらず**、すべて **プロジェクト単位の設定**（Dashboard > Auth > Sessions）に一元化される設計のため、UI 上で選択肢を出すと挙動を分岐できず誤解を招く（Issue #009 で削除済）。
-
-寿命の制御軸（プロジェクト設定）:
-
-| 設定項目                | 用途                                                       |
-| ----------------------- | ---------------------------------------------------------- |
-| Time-box user sessions  | サインインから固定時間でセッションを強制失効               |
-| Inactivity timeout      | 一定時間リフレッシュされなかったセッションを失効           |
-| Single session per user | 同一ユーザーは最後にサインインしたセッションのみ有効に保つ |
-
-プロジェクト用途別の推奨値は [Supabase Dashboard セキュリティ設定チェックリスト](#supabase-dashboard-セキュリティ設定チェックリスト) の Sessions 表を参照。詳細・最新の挙動は [Supabase Sessions 公式ドキュメント](https://supabase.com/docs/guides/auth/sessions)。
-
-実装上の注意:
-
-- セッションリフレッシュは `@supabase/ssr` の `createServerClient` と `middleware.ts` の `supabase.auth.getUser()` が自動で行う（[認証フロー](./architecture.md#認証フロー)）
-- セッションを明示的に終了させたい場合は **サインアウト**（`supabase.auth.signOut()`）
-- Dashboard 設定の変更は **次回リフレッシュ時に評価される**（即時反映ではない）
 
 ---
 
