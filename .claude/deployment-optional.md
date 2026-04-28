@@ -7,7 +7,7 @@
 ## 収録機能
 
 - [Google OAuth セットアップ（任意）](#google-oauth-セットアップ任意) — email + password に加えて Google ログインを追加
-- [Workers Builds（任意 / GitHub 自動デプロイ）](#workers-builds任意--github-自動デプロイ) — `git push` / PR で Cloudflare 側のビルド・デプロイを自動化し、PR ごとに preview URL を発行
+- [Workers Builds（詳細 / GitHub 自動デプロイ）](#workers-builds詳細--github-自動デプロイ) — `git push` / PR で Cloudflare 側のビルド・デプロイを自動化し、PR ごとに preview URL を発行
 
 将来追加される opt-in 機能（別 IdP / SSO / 外部サービス連携など）も本ファイルに集約する方針。
 
