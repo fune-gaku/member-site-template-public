@@ -22,7 +22,6 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
       class="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
     >
       <p>
-        <span aria-hidden="true">⚠️</span>
         このランディングページは <strong>テンプレート紹介用</strong> です。 あなたのプロダクトに合わせて
         <code
           class="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs text-amber-900"
@@ -80,11 +79,10 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
           </p>
         </li>
         <li class="rounded-lg border border-gray-200 bg-white p-5">
-          <h3 class="mb-2 text-lg font-semibold text-gray-900">
-            Google OAuth (opt-in)
-          </h3>
+          <h3 class="mb-2 text-lg font-semibold text-gray-900">Google OAuth</h3>
           <p class="text-sm text-gray-700">
-            <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
+            opt-in。<code
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
               >PUBLIC_GOOGLE_AUTH_ENABLED</code
             > 未設定でデフォルト OFF。env と Supabase Dashboard を揃えたときだけ有効化。
           </p>
