@@ -28,7 +28,7 @@ member-site-template/
 │   ├── architecture.md                # 本ファイル：アーキテクチャ
 │   ├── database.md                    # データベース設計
 │   ├── deployment.md                  # デプロイ手順（必須項目のみ）
-│   ├── deployment-optional.md         # 任意機能（opt-in）セットアップ：Turnstile / Google OAuth 等
+│   ├── deployment-optional.md         # 任意機能（opt-in）セットアップ：Google OAuth 等
 │   ├── development.md                 # 開発ルール（@import で常時ロード）
 │   ├── security.md                    # セキュリティガイドライン（@import で常時ロード）
 │   ├── settings.json                  # Claude Code 共有設定（permission allowlist）

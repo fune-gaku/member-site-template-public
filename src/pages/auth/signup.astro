@@ -16,11 +16,7 @@ if (googleResult?.data?.url) {
 const googleErrorMessage = googleResult?.error?.message;
 ---
 
-<Auth
-  title="新規登録"
-  description="アカウントを作成して始めましょう"
-  enableTurnstile
->
+<Auth title="新規登録" description="アカウントを作成して始めましょう">
   <SignupForm client:load />
 
   {

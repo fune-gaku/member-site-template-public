@@ -14,7 +14,6 @@ describe("auth.signUp schema", () => {
   const schema = z.object({
     email: z.string().email(),
     password: z.string().min(6),
-    captchaToken: z.string().max(2048).optional(),
   });
 
   it("有効な入力を受け入れる", () => {
@@ -40,31 +39,12 @@ describe("auth.signUp schema", () => {
     });
     expect(result.success).toBe(false);
   });
-
-  it("Turnstile token は optional (Turnstile 無効環境でも通る)", () => {
-    const result = schema.safeParse({
-      email: "test@example.com",
-      password: "securePass123",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
-    const result = schema.safeParse({
-      email: "test@example.com",
-      password: "securePass123",
-      captchaToken: "x".repeat(2049),
-    });
-    expect(result.success).toBe(false);
-  });
 });
 
-describe("auth.signIn schema (Issue #8 / A3, Issue #21 Turnstile follow-up)", () => {
-  // actions/index.ts の signIn input と同じ形 (Issue #21 で Turnstile field を追加)
+describe("auth.signIn schema (Issue #8 / A3)", () => {
   const schema = z.object({
     email: z.string().email(),
     password: z.string(),
-    captchaToken: z.string().max(2048).optional(),
   });
 
   it("有効なメール + パスワードを受け入れる", () => {
@@ -79,32 +59,6 @@ describe("auth.signIn schema (Issue #8 / A3, Issue #21 Turnstile follow-up)", ()
     const result = schema.safeParse({
       email: "not-an-email",
       password: "anything",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("Turnstile token は optional (Turnstile 無効環境でも通る)", () => {
-    const result = schema.safeParse({
-      email: "user@example.com",
-      password: "anything",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("Turnstile token 付きでも通る (Turnstile 有効環境)", () => {
-    const result = schema.safeParse({
-      email: "user@example.com",
-      password: "anything",
-      captchaToken: "valid-token",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
-    const result = schema.safeParse({
-      email: "user@example.com",
-      password: "anything",
-      captchaToken: "x".repeat(2049),
     });
     expect(result.success).toBe(false);
   });
@@ -161,11 +115,9 @@ describe("auth.signInWithGoogle schema (Issue #49)", () => {
   });
 });
 
-describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
-  // actions/index.ts の resetPassword input と同じ形
+describe("auth.resetPassword schema", () => {
   const schema = z.object({
     email: z.string().email(),
-    captchaToken: z.string().max(2048).optional(),
   });
 
   it("有効なメールアドレスを受け入れる", () => {
@@ -175,27 +127,6 @@ describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
 
   it("メールアドレス以外を拒否する", () => {
     const result = schema.safeParse({ email: "invalid" });
-    expect(result.success).toBe(false);
-  });
-
-  it("Turnstile token は optional (Turnstile 無効環境でも通る)", () => {
-    const result = schema.safeParse({ email: "test@example.com" });
-    expect(result.success).toBe(true);
-  });
-
-  it("Turnstile token 付きでも通る", () => {
-    const result = schema.safeParse({
-      email: "test@example.com",
-      captchaToken: "valid-token",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
-    const result = schema.safeParse({
-      email: "test@example.com",
-      captchaToken: "x".repeat(2049),
-    });
     expect(result.success).toBe(false);
   });
 });
@@ -383,16 +314,13 @@ describe("Issue #9: 文字列フィールドの .max() 多層防御", () => {
   const signInSchema = z.object({
     email: z.string().email().max(254),
     password: z.string().max(200),
-    captchaToken: z.string().max(2048).optional(),
   });
   const signUpSchema = z.object({
     email: z.string().email().max(254),
     password: z.string().min(8),
-    captchaToken: z.string().max(2048).optional(),
   });
   const resetPasswordSchema = z.object({
     email: z.string().email().max(254),
-    captchaToken: z.string().max(2048).optional(),
   });
   const confirmOtpSchema = z.object({
     token_hash: z.string().min(1).max(512),

@@ -27,11 +27,7 @@ if (googleResult?.data?.url) {
 const googleErrorMessage = googleResult?.error?.message;
 ---
 
-<Auth
-  title="サインイン"
-  description="アカウントにログインしてください"
-  enableTurnstile
->
+<Auth title="サインイン" description="アカウントにログインしてください">
   <LoginForm client:load next={nextPath} />
 
   {

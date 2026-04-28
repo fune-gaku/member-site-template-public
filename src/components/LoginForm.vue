@@ -2,8 +2,6 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
-import TurnstileWidget from "./TurnstileWidget.vue";
-
 // `next` は signin.astro 側で safeNextPath() による検証済みの値を受け取る。
 // クライアント側で window.location.search から直接読むと Open Redirect
 // （CWE-601）を踏むため、必ず props 経由で受け取ること。
@@ -11,43 +9,25 @@ const props = withDefaults(defineProps<{ next?: string }>(), {
   next: "/member/dashboard",
 });
 
-// 公開 site key。未設定なら Turnstile を表示しない (opt-in)。
-const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
-
 const email = ref("");
 const password = ref("");
 const isLoading = ref(false);
 const error = ref("");
-const turnstileToken = ref("");
-const turnstileLoaderError = ref(false);
-const turnstileWidget = ref<InstanceType<typeof TurnstileWidget> | null>(null);
 
 async function handleSubmit() {
   error.value = "";
-
-  if (turnstileSiteKey && !turnstileToken.value) {
-    error.value =
-      "ボット対策のチェックを完了してください (チェックボックスをタップ)";
-    return;
-  }
-
   isLoading.value = true;
 
   try {
     const formData = new FormData();
     formData.append("email", email.value);
     formData.append("password", password.value);
-    if (turnstileToken.value) {
-      formData.append("captchaToken", turnstileToken.value);
-    }
 
     const { data: _data, error: actionError } =
       await actions.auth.signIn(formData);
 
     if (actionError) {
       error.value = actionError.message;
-      // 失敗時は token を捨てて widget を再要求 (token は 1 回限り)
-      turnstileWidget.value?.reset();
     } else {
       // ログイン成功時、サーバ検証済みの next へリダイレクト
       window.location.href = props.next;
@@ -55,7 +35,6 @@ async function handleSubmit() {
   } catch (e) {
     console.error("Login error:", e);
     error.value = "予期しないエラーが発生しました";
-    turnstileWidget.value?.reset();
   } finally {
     isLoading.value = false;
   }
@@ -102,24 +81,6 @@ async function handleSubmit() {
           placeholder="パスワードを入力"
           :disabled="isLoading"
         />
-      </div>
-
-      <div v-if="turnstileSiteKey" class="space-y-2">
-        <div class="flex justify-center">
-          <TurnstileWidget
-            ref="turnstileWidget"
-            :site-key="turnstileSiteKey"
-            @update:token="turnstileToken = $event"
-            @loader-error="turnstileLoaderError = true"
-          />
-        </div>
-        <p
-          v-if="turnstileLoaderError"
-          role="alert"
-          class="text-center text-xs text-red-700"
-        >
-          ボット対策の読み込みに失敗しました。広告ブロッカーや拡張機能を一時的に無効にして、ページを再読み込みしてください。
-        </p>
       </div>
 
       <div class="flex justify-end text-sm">
