@@ -290,18 +290,70 @@ describe("/robots.txt endpoint (Issue #70 — dynamic from PUBLIC_SITE_URL)", ()
   });
 });
 
-describe("Index page with Vue component", () => {
-  it("Vue renderer を含むコンテナで top page が描画される", async () => {
+describe("Index page (developer LP, Issue #87)", () => {
+  // top page は Claude Code 前提の開発者向け LP。テンプレ利用者は最終的に
+  // src/pages/index.astro を自プロダクトの LP に差し替える前提で、最上部に
+  // 常設バナーを置いている。
+
+  it("Hero に Claude Code とテンプレートを差し替える趣旨が含まれる", async () => {
     const renderers = await loadRenderers([vueContainerRenderer()]);
     const container = await AstroContainer.create({ renderers });
-
-    // index.astro を import してレンダリング
     const { default: IndexPage } = await import("../../src/pages/index.astro");
     const result = await container.renderToString(IndexPage);
 
-    // ログイン・サインアップの導線があること
-    expect(result.toLowerCase()).toMatch(
-      /sign[-\s]?(in|up)|ログイン|サインアップ/,
+    expect(result).toContain("Claude Code");
+    expect(result).toContain("置き換えてください");
+    expect(result).toContain("src/pages/index.astro");
+  });
+
+  it("What's inside で RLS / CSRF / Codex / DB 7 ステップに触れる", async () => {
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+    const { default: IndexPage } = await import("../../src/pages/index.astro");
+    const result = await container.renderToString(IndexPage);
+
+    expect(result).toContain("RLS");
+    expect(result).toContain("CSRF");
+    expect(result).toContain("Codex");
+    // 7 ステップは数字とテキストの両方を保持してコピー揺れを検知
+    expect(result).toMatch(/7\s*ステップ/);
+  });
+
+  it("Use this template / README / GitHub への導線が出力される", async () => {
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+    const { default: IndexPage } = await import("../../src/pages/index.astro");
+    const result = await container.renderToString(IndexPage);
+
+    expect(result).toContain(
+      "https://github.com/fune-gaku/member-site-template/generate",
     );
+    expect(result).toContain(
+      "https://github.com/fune-gaku/member-site-template/blob/main/README.md",
+    );
+    expect(result).toContain("https://github.com/fune-gaku/member-site-template");
+  });
+
+  it("動くデモを見るセクションに signup / signin の既存導線が残る", async () => {
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+    const { default: IndexPage } = await import("../../src/pages/index.astro");
+    const result = await container.renderToString(IndexPage);
+
+    expect(result).toContain('href="/auth/signup"');
+    expect(result).toContain('href="/auth/signin"');
+  });
+
+  it("見出しは h1 が 1 個だけで階層が崩れていない (a11y)", async () => {
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+    const { default: IndexPage } = await import("../../src/pages/index.astro");
+    const result = await container.renderToString(IndexPage);
+
+    const h1Count = (result.match(/<h1\b/g) ?? []).length;
+    expect(h1Count).toBe(1);
+    // h2 / h3 が h1 の下に存在し、h4 や h5 にスキップしていない
+    expect(result).toMatch(/<h2\b/);
+    expect(result).toMatch(/<h3\b/);
   });
 });
