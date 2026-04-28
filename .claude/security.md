@@ -422,7 +422,7 @@ x-frame-options: DENY
 ### 本番環境（Cloudflare Workers）での確認
 
 ```bash
-curl -sI https://member-site-template.fune-gaku.workers.dev/ \
+curl -sI https://member-site-template.your-subdomain.workers.dev/ \
   | grep -iE 'content-security|strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy|cross-origin-opener'
 ```
 
@@ -471,23 +471,23 @@ npm run test:workers   # クロスオリジン POST 403（tests/workers/csrf.tes
 
 ```bash
 # 1) 攻撃者視点: クロスオリジン GET（リンク踏ませ・メーラー URL プリフェッチを模擬）
-curl -i -X GET https://member-site-template.fune-gaku.workers.dev/auth/signout
+curl -i -X GET https://member-site-template.your-subdomain.workers.dev/auth/signout
 # 期待: HTTP/2 405 / Allow: POST （Cookie が付いていても sb-* の delete は起きない）
 
 # 2) 攻撃者視点: クロスオリジン POST（Origin ヘッダが別サイト）
 curl -i -X POST \
   -H "Origin: https://evil.example.com" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  https://member-site-template.fune-gaku.workers.dev/_actions/auth.signOut
+  https://member-site-template.your-subdomain.workers.dev/_actions/auth.signOut
 # 期待: HTTP/2 403 （Astro security.checkOrigin が Origin/Referer 不一致で拒否）
 
 # 3) 同一オリジン POST（正規フロー、ダッシュボードのボタン相当）
 curl -i -X POST \
-  -H "Origin: https://member-site-template.fune-gaku.workers.dev" \
-  -H "Referer: https://member-site-template.fune-gaku.workers.dev/member/dashboard" \
+  -H "Origin: https://member-site-template.your-subdomain.workers.dev" \
+  -H "Referer: https://member-site-template.your-subdomain.workers.dev/member/dashboard" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   --cookie "sb-...=..." \
-  https://member-site-template.fune-gaku.workers.dev/_actions/auth.signOut
+  https://member-site-template.your-subdomain.workers.dev/_actions/auth.signOut
 # 期待: HTTP/2 200 / Set-Cookie: sb-...=; Max-Age=0 （セッション Cookie 削除）
 ```
 

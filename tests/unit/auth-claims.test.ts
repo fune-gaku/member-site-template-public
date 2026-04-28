@@ -16,7 +16,7 @@ describe("getAuthUser (= auth.getClaims wrapper)", () => {
       data: {
         claims: {
           sub: "user-123",
-          email: "michio@example.com",
+          email: "test@example.com",
           aud: "authenticated",
         },
       },
@@ -24,7 +24,7 @@ describe("getAuthUser (= auth.getClaims wrapper)", () => {
     }));
 
     const user = await getAuthUser(supabase);
-    expect(user).toEqual({ id: "user-123", email: "michio@example.com" });
+    expect(user).toEqual({ id: "user-123", email: "test@example.com" });
   });
 
   it("email クレームが無いケースでも id だけ返す", async () => {

@@ -37,7 +37,7 @@ function makeClient(result: {
 }
 
 const REDIRECT_TO =
-  "https://member-site-template.fune-gaku.workers.dev/auth/callback?next=%2Fmember%2Fdashboard";
+  "https://member-site-template.your-subdomain.workers.dev/auth/callback?next=%2Fmember%2Fdashboard";
 
 describe("performSignInWithGoogle (Issue #49)", () => {
   it("成功時は { url } を返す", async () => {

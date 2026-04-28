@@ -24,7 +24,7 @@ const allowedDomains = process.env.ALLOWED_HOSTS
 // テンプレ利用者は .env (本番は .env.production / CI 環境変数) で上書きする。
 const siteUrl =
   process.env.PUBLIC_SITE_URL ??
-  "https://member-site-template.fune-gaku.workers.dev";
+  "https://member-site-template.your-subdomain.workers.dev";
 
 // https://astro.build/config
 export default defineConfig({

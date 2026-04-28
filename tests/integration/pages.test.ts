@@ -277,7 +277,7 @@ describe("/robots.txt endpoint (Issue #70 — dynamic from PUBLIC_SITE_URL)", ()
     const body = await response.text();
     expect(body).toContain("Sitemap: https://app.acme.test/sitemap-index.xml");
     expect(body).not.toContain("example.com");
-    expect(body).not.toContain("fune-gaku.workers.dev");
+    expect(body).not.toContain("your-subdomain.workers.dev");
   });
 
   it("site が undefined のときは 500 を返す (crawler に壊れた robots を渡さない)", async () => {

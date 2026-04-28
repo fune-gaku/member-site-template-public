@@ -370,7 +370,7 @@ PR #48 で `profiles.role` への column-level UPDATE 権限を `authenticated` 
 
 ```
 1. 本番 URL の /auth/signup にアクセス
-   例: https://member-site-template.fune-gaku.workers.dev/auth/signup
+   例: https://member-site-template.your-subdomain.workers.dev/auth/signup
 2. admin 用のメールアドレスでサインアップ
 3. 確認メールが届く（Resend 経由）→ メール内のリンクをクリック
    → /auth/confirm 経由で session 確立 → /member/dashboard にリダイレクト

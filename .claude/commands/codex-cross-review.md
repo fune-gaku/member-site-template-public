@@ -358,4 +358,4 @@ CI status: <現状>
 ## 実行例
 
 - `/codex-cross-review 42` — 同 repo の PR #42 を対象に
-- `/codex-cross-review https://github.com/fune-gaku/member-site-template/pull/42` — フル URL 指定
+- `/codex-cross-review https://github.com/<owner>/<repo>/pull/42` — フル URL 指定

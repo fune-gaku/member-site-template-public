@@ -14,7 +14,7 @@ describe("CSRF: cross-origin POST guard via Astro security.checkOrigin", () => {
   it("クロスオリジン POST /_actions/auth.signOut は 403 を返す", async () => {
     const body = new URLSearchParams();
     const response = await SELF.fetch(
-      "https://member-site-template.fune-gaku.workers.dev/_actions/auth.signOut",
+      "https://member-site-template.your-subdomain.workers.dev/_actions/auth.signOut",
       {
         method: "POST",
         headers: {
@@ -34,7 +34,7 @@ describe("CSRF: cross-origin POST guard via Astro security.checkOrigin", () => {
     // 攻撃者がリンク踏ませで強制 OAuth リダイレクトを起こせないことの回帰テスト。
     const body = new URLSearchParams();
     const response = await SELF.fetch(
-      "https://member-site-template.fune-gaku.workers.dev/_actions/auth.signInWithGoogle",
+      "https://member-site-template.your-subdomain.workers.dev/_actions/auth.signInWithGoogle",
       {
         method: "POST",
         headers: {
@@ -51,11 +51,11 @@ describe("CSRF: cross-origin POST guard via Astro security.checkOrigin", () => {
   it("同一オリジン POST /_actions/auth.signOut は 403 を返さない（CSRF を通過する）", async () => {
     const body = new URLSearchParams();
     const url =
-      "https://member-site-template.fune-gaku.workers.dev/_actions/auth.signOut";
+      "https://member-site-template.your-subdomain.workers.dev/_actions/auth.signOut";
     const response = await SELF.fetch(url, {
       method: "POST",
       headers: {
-        Origin: "https://member-site-template.fune-gaku.workers.dev",
+        Origin: "https://member-site-template.your-subdomain.workers.dev",
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body,

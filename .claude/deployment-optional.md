@@ -28,7 +28,7 @@
 
 1. **Cloudflare Dashboard > Turnstile > Add Site**
 2. **Site name**: 任意（例: `member-site-template`）
-3. **Domain**: 本番ドメイン（例: `member-site-template.fune-gaku.workers.dev`）。複数登録可
+3. **Domain**: 本番ドメイン（例: `member-site-template.your-subdomain.workers.dev`）。複数登録可
 4. **Widget mode**: **Managed**（推奨。難易度を Cloudflare が自動判定）
 5. 発行された **Site Key**（公開）と **Secret Key**（秘密）を控える
 
@@ -115,7 +115,7 @@ email + password に加えて Google OAuth ログインを追加する opt-in �
 2. **+ Create Credentials > OAuth client ID** を選択。Application type は **Web application**
 3. **Name**: 任意（例: `member-site-template`）
 4. **Authorized JavaScript origins** を追加:
-   - 本番: `https://<your-domain>`（例: `https://member-site-template.fune-gaku.workers.dev` または Custom Domain）
+   - 本番: `https://<your-domain>`（例: `https://member-site-template.your-subdomain.workers.dev` または Custom Domain）
    - ローカル: `http://localhost:4321`（Astro dev サーバー）
 5. **Authorized redirect URIs** を追加（**Supabase Auth の callback URL であり、アプリの `/auth/callback` ではない**点に注意）:
    - 本番: `https://<project-ref>.supabase.co/auth/v1/callback`（`<project-ref>` は Supabase Dashboard > Settings > General > Reference ID）

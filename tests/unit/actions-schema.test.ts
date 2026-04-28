@@ -19,7 +19,7 @@ describe("auth.signUp schema", () => {
 
   it("有効な入力を受け入れる", () => {
     const result = schema.safeParse({
-      email: "redacted@example.com",
+      email: "test@example.com",
       password: "securePass123",
     });
     expect(result.success).toBe(true);
@@ -35,7 +35,7 @@ describe("auth.signUp schema", () => {
 
   it("短すぎるパスワードを拒否する", () => {
     const result = schema.safeParse({
-      email: "redacted@example.com",
+      email: "test@example.com",
       password: "abc",
     });
     expect(result.success).toBe(false);
@@ -43,7 +43,7 @@ describe("auth.signUp schema", () => {
 
   it("Turnstile token は optional (Turnstile 無効環境でも通る)", () => {
     const result = schema.safeParse({
-      email: "redacted@example.com",
+      email: "test@example.com",
       password: "securePass123",
     });
     expect(result.success).toBe(true);
@@ -51,7 +51,7 @@ describe("auth.signUp schema", () => {
 
   it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
     const result = schema.safeParse({
-      email: "redacted@example.com",
+      email: "test@example.com",
       password: "securePass123",
       captchaToken: "x".repeat(2049),
     });
@@ -169,7 +169,7 @@ describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
   });
 
   it("有効なメールアドレスを受け入れる", () => {
-    const result = schema.safeParse({ email: "redacted@example.com" });
+    const result = schema.safeParse({ email: "test@example.com" });
     expect(result.success).toBe(true);
   });
 
@@ -179,13 +179,13 @@ describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
   });
 
   it("Turnstile token は optional (Turnstile 無効環境でも通る)", () => {
-    const result = schema.safeParse({ email: "redacted@example.com" });
+    const result = schema.safeParse({ email: "test@example.com" });
     expect(result.success).toBe(true);
   });
 
   it("Turnstile token 付きでも通る", () => {
     const result = schema.safeParse({
-      email: "redacted@example.com",
+      email: "test@example.com",
       captchaToken: "valid-token",
     });
     expect(result.success).toBe(true);
@@ -193,7 +193,7 @@ describe("auth.resetPassword schema (Issue #21 Turnstile follow-up)", () => {
 
   it("Turnstile token が長すぎる場合は拒否 (DoS 対策)", () => {
     const result = schema.safeParse({
-      email: "redacted@example.com",
+      email: "test@example.com",
       captchaToken: "x".repeat(2049),
     });
     expect(result.success).toBe(false);
