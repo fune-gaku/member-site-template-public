@@ -1,20 +1,18 @@
 ---
 import Base from "../layouts/Base.astro";
 
-// Issue #87: clone 直後の第一印象でテンプレの差別化 (Claude Code 前提のセキュリティ・
-// 運用設計) を伝えるため、開発者向け LP に置き換えた。テンプレ利用者は最終的に
-// このページを自プロダクトの LP に差し替える前提で、最上部に常設バナーを置く。
-// バナー閉じる UI は意図的に付けない (毎回出すことに意味がある)。
+// このページはテンプレ利用者が自プロダクトの LP に差し替える前提。最上部に
+// 常設バナーを置く意図はそのまま (毎回出すことに意味がある)。
 const REPO_URL = "https://github.com/fune-gaku/member-site-template-public";
 const README_URL = `${REPO_URL}/blob/main/README.md`;
 const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
 ---
 
 <Base
-  title="会員サイトテンプレート | Claude Code で本番運用に耐える会員サイトを最短で"
-  description="Astro 6 + Vue 3 + Supabase + Cloudflare Workers の会員サイトテンプレート。RLS / CSRF / Codex × Claude Code 収束レビュー / DB 7 ステップ / pgTAP まで組み込み済み。"
+  title="会員サイトテンプレート"
+  description="Astro 6 + Vue 3 + Supabase + Cloudflare Workers の会員サイトテンプレート。"
 >
-  <!-- ① Template Notice Banner (常設、純 Astro) -->
+  <!-- ① Template Notice Banner (常設) -->
   <aside
     role="note"
     aria-label="テンプレート利用者向けの注意"
@@ -24,7 +22,6 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
       class="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
     >
       <p>
-        <span aria-hidden="true">⚠️</span>
         このランディングページは <strong>テンプレート紹介用</strong> です。 あなたのプロダクトに合わせて
         <code
           class="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs text-amber-900"
@@ -40,476 +37,167 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
     </div>
   </aside>
 
-  <!-- ② Hero -->
-  <!-- 背景は brand-600 → brand-700 のグラデーション。WCAG AA (4.5:1) を確保するため
-       brand-500 始端を使わない (white on brand-500 = 3.48:1 で fail)。
-       white on brand-600 = 5.15:1, on brand-700 = 7.24:1。Codex review iter-1 P1。 -->
-  <section
-    class="from-brand-600 to-brand-700 relative bg-gradient-to-br text-white"
-  >
-    <div class="mx-auto max-w-7xl px-4 py-20 sm:px-6 md:py-28 lg:px-8">
-      <div class="text-center">
-        <p
-          class="mb-4 text-sm font-semibold tracking-wider text-white uppercase"
-        >
-          Claude Code 前提の会員サイトテンプレート
-        </p>
-        <h1 class="mb-6 text-4xl font-bold md:text-6xl">
-          Claude Code で、<br class="md:hidden" />
-          本番運用に耐える<br />
-          会員サイトを最短で。
-        </h1>
-        <p class="mx-auto mb-10 max-w-3xl text-lg text-white md:text-xl">
-          Astro 6 / Vue 3 / Supabase / Cloudflare Workers に加え、
-          セキュリティ・テスト・レビュー収束ループまで 組み込み済み。clone
-          してすぐ実装に入れます。
-        </p>
-        <div
-          class="flex flex-col items-center justify-center gap-4 sm:flex-row"
-        >
-          <a
-            href={USE_TEMPLATE_URL}
-            class="text-brand-700 hover:bg-brand-50 inline-flex items-center gap-2 rounded-lg bg-white px-8 py-4 text-lg font-semibold shadow-lg transition"
-          >
-            <svg
-              class="h-5 w-5"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
-              ></path>
-            </svg>
-            Use this template
-          </a>
-          <a
-            href={README_URL}
-            class="bg-brand-600 hover:bg-brand-800 inline-flex items-center gap-2 rounded-lg border-2 border-white px-8 py-4 text-lg font-semibold text-white transition"
-          >
-            README を読む
-          </a>
-        </div>
-      </div>
+  <!-- ② タイトル + 一行 -->
+  <section class="bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <h1 class="text-3xl font-bold text-gray-900 md:text-4xl">
+        会員サイトテンプレート
+      </h1>
+      <p class="mt-4 text-lg text-gray-700">
+        Astro 6 + Vue 3 + Supabase + Cloudflare Workers
+        の会員サイトテンプレート。Claude Code
+        前提のプロジェクト規約と運用ルールを <code
+          class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-base"
+          >.claude/</code
+        > 配下に同梱。
+      </p>
     </div>
   </section>
 
-  <!-- ③ What's Inside -->
-  <section class="bg-white py-20">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="mb-16 text-center">
-        <h2 class="mb-4 text-3xl font-bold text-gray-900 md:text-4xl">
-          何が入っているか
-        </h2>
-        <p class="mx-auto max-w-2xl text-lg text-gray-600">
-          公開会員サイトを運用するために必要な「面倒で間違えやすい設計」を
-          先に組み込んであります。
-        </p>
-      </div>
-
-      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <!-- Card 1: RLS + 権限昇格対策 -->
-        <article
-          class="rounded-xl border border-gray-200 bg-white p-6 transition hover:shadow-lg"
-        >
-          <div
-            class="bg-brand-100 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              ></path>
-            </svg>
-          </div>
-          <h3 class="mb-2 text-xl font-semibold text-gray-900">
-            RLS + 権限昇格対策
-          </h3>
-          <p class="text-gray-600">
-            全テーブルで RLS 有効化済み。<code
-              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+  <!-- ③ 機能 -->
+  <section class="border-t border-gray-200 bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <h2 class="mb-8 text-2xl font-bold text-gray-900 md:text-3xl">機能</h2>
+      <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <li class="rounded-lg border border-gray-200 bg-white p-5">
+          <h3 class="mb-2 text-lg font-semibold text-gray-900">RLS</h3>
+          <p class="text-sm text-gray-700">
+            全テーブルで RLS 有効化。<code
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
               >profiles.role</code
-            > は table-level UPDATE 剥奪 + column-level 再付与で privilege escalation
-            を遮断。pgTAP で退行検知。
+            > は table-level UPDATE 剥奪 + column-level 再付与。pgTAP で退行検知。
           </p>
-        </article>
-
-        <!-- Card 2: CSRF 自動テスト -->
-        <article
-          class="rounded-xl border border-gray-200 bg-white p-6 transition hover:shadow-lg"
-        >
-          <div
-            class="bg-brand-100 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              ></path>
-            </svg>
-          </div>
-          <h3 class="mb-2 text-xl font-semibold text-gray-900">
-            CSRF 多層防御
-          </h3>
-          <p class="text-gray-600">
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-5">
+          <h3 class="mb-2 text-lg font-semibold text-gray-900">CSRF</h3>
+          <p class="text-sm text-gray-700">
             Astro <code
-              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
               >security.checkOrigin</code
-            > + 状態変更は POST 限定 + GET 405 / クロスオリジン POST 403 を実 workerd
+            > + 状態変更は POST 限定。GET 405 / クロスオリジン POST 403 を実 workerd
             ランタイムで自動テスト。
           </p>
-        </article>
-
-        <!-- Card 3: Google OAuth opt-in -->
-        <article
-          class="rounded-xl border border-gray-200 bg-white p-6 transition hover:shadow-lg"
-        >
-          <div
-            class="bg-brand-100 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          <h3 class="mb-2 text-xl font-semibold text-gray-900">
-            Google OAuth は opt-in
-          </h3>
-          <p class="text-gray-600">
-            Google ログインはコード上は完備済みでデフォルト OFF。env と
-            Dashboard
-            を揃えたときだけ有効化されるので、要らないプロジェクトは最小構成で出荷できます。
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-5">
+          <h3 class="mb-2 text-lg font-semibold text-gray-900">Google OAuth</h3>
+          <p class="text-sm text-gray-700">
+            opt-in。<code
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
+              >PUBLIC_GOOGLE_AUTH_ENABLED</code
+            > 未設定でデフォルト OFF。env と Supabase Dashboard を揃えたときだけ有効化。
           </p>
-        </article>
-
-        <!-- Card 4: Codex × Claude Code 収束レビュー -->
-        <article
-          class="rounded-xl border border-gray-200 bg-white p-6 transition hover:shadow-lg"
-        >
-          <div
-            class="bg-brand-100 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              ></path>
-            </svg>
-          </div>
-          <h3 class="mb-2 text-xl font-semibold text-gray-900">
-            Codex × Claude Code 収束レビュー
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-5">
+          <h3 class="mb-2 text-lg font-semibold text-gray-900">
+            Codex × Claude Code レビュー
           </h3>
-          <p class="text-gray-600">
-            <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+          <p class="text-sm text-gray-700">
+            <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
               >/codex-cross-review &lt;PR&gt;</code
-            > で OpenAI Codex と Claude Code が双方 LGTM するまで反復。RLS 漏れ・権限昇格経路を二重チェックしてからマージ。
+            > で OpenAI Codex と Claude Code が双方 LGTM するまで反復。
           </p>
-        </article>
-
-        <!-- Card 5: DB 変更の 7 ステップ + pgTAP -->
-        <article
-          class="rounded-xl border border-gray-200 bg-white p-6 transition hover:shadow-lg"
-        >
-          <div
-            class="bg-brand-100 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
-              ></path>
-            </svg>
-          </div>
-          <h3 class="mb-2 text-xl font-semibold text-gray-900">
-            DB 変更の 7 ステップ + pgTAP
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-5">
+          <h3 class="mb-2 text-lg font-semibold text-gray-900">
+            DB マイグレーションの 7 ステップ + pgTAP
           </h3>
-          <p class="text-gray-600">
-            マイグレーションは <code
-              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+          <p class="text-sm text-gray-700">
+            <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
               >supabase migration new</code
-            > → <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+            > → <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
               >/db-check</code
-            > → dry-run → cross-review の手順を CLAUDE.md に明記。RLS / トリガー /
-            列レベル grant は pgTAP で退行検知。
+            > → dry-run → cross-review。RLS / トリガー / 列レベル grant は pgTAP で検証。
           </p>
-        </article>
-
-        <!-- Card 6: Cloudflare Workers エッジ + per-Worker secret -->
-        <article
-          class="rounded-xl border border-gray-200 bg-white p-6 transition hover:shadow-lg"
-        >
-          <div
-            class="bg-brand-100 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
-          >
-            <svg
-              class="text-brand-600 h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-              ></path>
-            </svg>
-          </div>
-          <h3 class="mb-2 text-xl font-semibold text-gray-900">
-            Cloudflare Workers エッジ配信
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-5">
+          <h3 class="mb-2 text-lg font-semibold text-gray-900">
+            Cloudflare Workers
           </h3>
-          <p class="text-gray-600">
-            SSR を Cloudflare Workers で世界中のエッジに配信。<code
-              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+          <p class="text-sm text-gray-700">
+            SSR を Cloudflare Workers で配信。<code
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
               >wrangler secret put</code
             > で per-Worker secret 管理、<code
-              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs"
               >SUPABASE_SERVICE_ROLE_KEY</code
-            > はサーバー側だけに置きます。
+            > はサーバー側のみ。
           </p>
-        </article>
-      </div>
+        </li>
+      </ul>
     </div>
   </section>
 
-  <!-- ④ Claude Code との相性 -->
-  <section class="bg-gray-50 py-20">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="mb-12 text-center">
-        <h2 class="mb-4 text-3xl font-bold text-gray-900 md:text-4xl">
-          Claude Code との相性
-        </h2>
-        <p class="mx-auto max-w-2xl text-lg text-gray-600">
-          <code class="rounded bg-gray-200 px-1.5 py-0.5 font-mono text-base"
-            >.claude/</code
-          > にプロジェクトの設計と運用ルールを集約。Claude Code が clone 直後から「このプロジェクト固有の判断基準」で動けます。
-        </p>
-      </div>
-
-      <div class="grid gap-8 md:grid-cols-2">
-        <!-- .claude/*.md の役割 -->
-        <div class="rounded-xl border border-gray-200 bg-white p-6">
-          <h3 class="mb-4 text-xl font-semibold text-gray-900">
-            <code class="font-mono text-base">.claude/*.md</code> の役割
-          </h3>
-          <ul class="space-y-3 text-gray-700">
-            <li class="flex gap-3">
-              <code
-                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
-                >CLAUDE.md</code
-              >
-              <span>プロジェクト全体の地図と開発フロー</span>
-            </li>
-            <li class="flex gap-3">
-              <code
-                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
-                >security.md</code
-              >
-              <span>チェックリスト / レビュー手順 / 運用ハンドブック</span>
-            </li>
-            <li class="flex gap-3">
-              <code
-                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
-                >development.md</code
-              >
-              <span>TypeScript / Vue / 命名規則 / エラーハンドリング</span>
-            </li>
-            <li class="flex gap-3">
-              <code
-                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
-                >architecture.md</code
-              >
-              <span>認証フロー / ディレクトリ構成 / パフォーマンス方針</span>
-            </li>
-            <li class="flex gap-3">
-              <code
-                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
-                >database.md</code
-              >
-              <span>スキーマ / RLS の完全 SQL / マイグレーション運用</span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- 組み込み skill -->
-        <div class="rounded-xl border border-gray-200 bg-white p-6">
-          <h3 class="mb-4 text-xl font-semibold text-gray-900">
-            組み込み skill
-          </h3>
-          <ul class="space-y-3 text-gray-700">
-            <li class="flex flex-col gap-1">
-              <code class="text-brand-700 font-mono text-sm font-semibold"
-                >/codex-cross-review &lt;PR&gt;</code
-              >
-              <span class="text-sm">
-                Codex × Claude Code の二人レビュー収束ループ。LGTM + CI green
-                までユーザー承認待ち。
-              </span>
-            </li>
-            <li class="flex flex-col gap-1">
-              <code class="text-brand-700 font-mono text-sm font-semibold"
-                >/db-check</code
-              >
-              <span class="text-sm">
-                ローカル DB を reset → lint → test
-                の順に検証。マイグレーション編集後の自己点検に。
-              </span>
-            </li>
-            <li class="flex flex-col gap-1">
-              <code class="text-brand-700 font-mono text-sm font-semibold"
-                >/security-review</code
-              >
-              <span class="text-sm">
-                pending changes に対して認証・認可・XSS・CSRF・SQLi
-                等を自動レビュー。
-              </span>
-            </li>
-            <li class="flex flex-col gap-1">
-              <code class="text-brand-700 font-mono text-sm font-semibold"
-                >/pr-triage</code
-              >
-              <span class="text-sm">
-                open PR を Dependabot のリスク分類と機能 PR に仕分けて triage
-                レポートを出す。
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ⑤ Tech Stack -->
-  <section class="bg-white py-20">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="mb-12 text-center">
-        <h2 class="mb-4 text-3xl font-bold text-gray-900 md:text-4xl">
-          技術スタック
-        </h2>
-        <p class="text-lg text-gray-600">
-          公式推奨の最新パターンを採用、メジャーバージョン追従に強い構成
-        </p>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-        <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
-          <div class="mb-2 text-3xl" aria-hidden="true">🚀</div>
-          <h3 class="font-semibold text-gray-900">Astro 6</h3>
-        </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
-          <div class="mb-2 text-3xl" aria-hidden="true">💚</div>
-          <h3 class="font-semibold text-gray-900">Vue 3</h3>
-        </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
-          <div class="mb-2 text-3xl" aria-hidden="true">⚡</div>
-          <h3 class="font-semibold text-gray-900">Supabase</h3>
-        </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
-          <div class="mb-2 text-3xl" aria-hidden="true">☁️</div>
-          <h3 class="font-semibold text-gray-900">Cloudflare</h3>
-        </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
-          <div class="mb-2 text-3xl" aria-hidden="true">🎨</div>
-          <h3 class="font-semibold text-gray-900">Tailwind 4</h3>
-        </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
-          <div class="mb-2 text-3xl" aria-hidden="true">🧪</div>
-          <h3 class="font-semibold text-gray-900">Vitest 4</h3>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ⑥ 動くデモを見る (既存導線) -->
-  <section class="bg-brand-600 py-20">
-    <div class="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-      <h2 class="mb-4 text-3xl font-bold text-white md:text-4xl">
-        動くデモを見る
+  <!-- ④ 技術スタック -->
+  <section class="border-t border-gray-200 bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <h2 class="mb-8 text-2xl font-bold text-gray-900 md:text-3xl">
+        技術スタック
       </h2>
-      <p class="mb-8 text-lg text-white">
-        実装パターンを実際に触りたい方は、テストアカウントを作成してダッシュボード・プロフィール・管理者画面を確認できます。
-      </p>
-      <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
-        <a
-          href="/auth/signup"
-          class="text-brand-700 hover:bg-brand-50 inline-block rounded-lg bg-white px-8 py-4 text-lg font-semibold shadow-lg transition"
-        >
-          サインアップ
-        </a>
-        <a
-          href="/auth/signin"
-          class="hover:bg-brand-700 inline-block rounded-lg border-2 border-white px-8 py-4 text-lg font-semibold text-white transition"
-        >
-          サインイン
-        </a>
-      </div>
+      <ul
+        class="grid grid-cols-2 gap-3 text-sm font-medium text-gray-900 sm:grid-cols-3 lg:grid-cols-6"
+      >
+        <li class="rounded-lg border border-gray-200 bg-white p-4 text-center">
+          Astro 6
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-4 text-center">
+          Vue 3
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-4 text-center">
+          Supabase
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-4 text-center">
+          Cloudflare Workers
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-4 text-center">
+          Tailwind CSS 4
+        </li>
+        <li class="rounded-lg border border-gray-200 bg-white p-4 text-center">
+          Vitest 4
+        </li>
+      </ul>
     </div>
   </section>
 
-  <!-- ⑦ Footer -->
-  <footer class="border-t border-gray-200 bg-gray-50 py-10">
-    <div
-      class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 text-sm text-gray-600 sm:flex-row sm:px-6 lg:px-8"
-    >
-      <p>
-        &copy; 2026 member-site-template. <span aria-hidden="true">·</span> MIT License.
-      </p>
-      <nav class="flex gap-6">
-        <a href={REPO_URL} class="hover:text-brand-700 hover:underline">
-          GitHub
-        </a>
-        <a href={README_URL} class="hover:text-brand-700 hover:underline">
-          README
-        </a>
-        <a
-          href={`${REPO_URL}/blob/main/.claude/security.md`}
-          class="hover:text-brand-700 hover:underline"
-        >
-          Security
-        </a>
-      </nav>
+  <!-- ⑤ デモ / README / GitHub へのリンク -->
+  <section class="border-t border-gray-200 bg-gray-50">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <h2 class="mb-8 text-2xl font-bold text-gray-900 md:text-3xl">リンク</h2>
+      <ul class="space-y-3 text-base">
+        <li>
+          <a href={USE_TEMPLATE_URL} class="text-brand-700 hover:underline"
+            >Use this template</a
+          >
+          <span class="text-gray-600">
+            — このリポジトリをテンプレートにして自分のリポジトリを作る</span
+          >
+        </li>
+        <li>
+          <a href={README_URL} class="text-brand-700 hover:underline">README</a>
+          <span class="text-gray-600"> — セットアップ・本番デプロイ手順</span>
+        </li>
+        <li>
+          <a href={REPO_URL} class="text-brand-700 hover:underline">GitHub</a>
+          <span class="text-gray-600"> — ソースコードと Issues</span>
+        </li>
+        <li>
+          <a href="/auth/signup" class="text-brand-700 hover:underline"
+            >サインアップ</a
+          >
+          <span class="text-gray-600"> — 動くデモのアカウント作成</span>
+        </li>
+        <li>
+          <a href="/auth/signin" class="text-brand-700 hover:underline"
+            >サインイン</a
+          >
+          <span class="text-gray-600"> — 既存アカウントでログイン</span>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="border-t border-gray-200 bg-white py-8">
+    <div class="mx-auto max-w-7xl px-4 text-sm text-gray-600 sm:px-6 lg:px-8">
+      <p>&copy; 2026 member-site-template. MIT License.</p>
     </div>
   </footer>
 </Base>
