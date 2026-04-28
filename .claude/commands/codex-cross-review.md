@@ -115,12 +115,12 @@ codex exec --sandbox workspace-write \
 
 `codex exec` がエラーで落ちた場合は記録してループを止め、ユーザーに手動再実行を依頼。
 
-review ファイルが書かれなかった場合の fallback（protocol 違反として記録、LOG 全体を投稿に回して可視化）。**生 LOG には Codex CLI の tool trace（`workdir: $HOME/...` 等）が含まれ得るので、公開 PR コメントに乗る前に `$HOME` を `~` に redact する**:
+review ファイルが書かれなかった場合の fallback（protocol 違反として記録、LOG 全体を投稿に回して可視化）。**生 LOG には Codex CLI の tool trace（`workdir: $HOME/...` 等）が含まれ得るので、公開 PR コメントに乗る前に `$HOME` を `~` に redact する**。`sed` だと `$HOME` が regex として解釈されメタ文字（`.` `[` `*` 等）を含むパスで置換漏れが起きるため、Perl の `\Q...\E` で literal escape する:
 
 ```bash
 if [ ! -s "$REVIEW" ]; then
   echo "[warn] Codex did not write $REVIEW, falling back to sanitized LOG" >&2
-  sed "s|$HOME|~|g" "$LOG" > "$REVIEW"
+  perl -pe 's/\Q$ENV{HOME}\E/~/g' "$LOG" > "$REVIEW"
 fi
 VERDICT=$(grep -m1 -E '^CODEX VERDICT:' "$REVIEW" || grep -m1 -E '^CODEX VERDICT:' "$LOG")
 ```
