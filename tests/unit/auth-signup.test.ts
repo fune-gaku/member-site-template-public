@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  CAPTCHA_FAILED_MESSAGE,
-  SIGNUP_GENERIC_SUCCESS_MESSAGE,
-} from "../../src/lib/auth-errors";
+import { SIGNUP_GENERIC_SUCCESS_MESSAGE } from "../../src/lib/auth-errors";
 import {
   performSignUp,
   type SignUpCapableClient,
@@ -14,11 +11,6 @@ import {
  *
  * 既登録メール / 未登録メール / SMTP 失敗 / 内部例外いずれの場合も
  * **常に同一の `success: true` + 統一メッセージ** に正規化されることを検証する。
- *
- * Issue #52: Cloudflare Turnstile 検証を Supabase Auth に委譲したため、CAPTCHA
- * 失敗 (`error.code === "captcha_failed"`) は **統一応答に巻き込まずに**
- * `BAD_REQUEST` で個別エラーとして返すこと（bot 検知失敗は enumeration vector
- * ではない）も assert する。
  *
  * これは Action 側の真の防衛線。テストで挙動を直接 assert することで、
  * リファクタで誤って handler が enumeration vector を再露出しないように守る。
@@ -61,19 +53,6 @@ describe("performSignUp (Issue #14)", () => {
     });
   });
 
-  it("captchaToken を渡すと options.captchaToken に流す (Issue #52)", async () => {
-    const client = makeClient({ type: "ok" });
-    await performSignUp(client, { ...VALID_INPUT, captchaToken: "tk-456" });
-    expect(client.auth.signUp).toHaveBeenCalledWith({
-      email: VALID_INPUT.email,
-      password: VALID_INPUT.password,
-      options: {
-        emailRedirectTo: VALID_INPUT.options.emailRedirectTo,
-        captchaToken: "tk-456",
-      },
-    });
-  });
-
   it.each([
     {
       name: "既登録メール (`User already registered`) ※ enumeration vector",
@@ -105,7 +84,6 @@ describe("performSignUp (Issue #14)", () => {
         success: true,
         message: SIGNUP_GENERIC_SUCCESS_MESSAGE,
       });
-      // 元エラーは Workers Logs に残す前提
       expect(errorSpy).toHaveBeenCalledWith(
         "auth.signUp error (suppressed for enumeration):",
         supabaseError,
@@ -113,28 +91,6 @@ describe("performSignUp (Issue #14)", () => {
       errorSpy.mockRestore();
     },
   );
-
-  it("captcha_failed は BAD_REQUEST + 個別メッセージに分離される (Issue #52)", async () => {
-    const supabaseError = {
-      message: "captcha protection: request disallowed (...)",
-      code: "captcha_failed",
-    };
-    const client = makeClient({ type: "error", error: supabaseError });
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {
-      // suppress
-    });
-
-    await expect(performSignUp(client, VALID_INPUT)).rejects.toMatchObject({
-      code: "BAD_REQUEST",
-      message: CAPTCHA_FAILED_MESSAGE,
-    });
-
-    expect(errorSpy).toHaveBeenCalledWith(
-      "auth.signUp captcha_failed:",
-      supabaseError,
-    );
-    errorSpy.mockRestore();
-  });
 
   it("予期しない例外でも success: true に吸収される", async () => {
     const cause = new Error("network down");
@@ -158,7 +114,6 @@ describe("performSignUp (Issue #14)", () => {
   it("複数の異なる失敗を順に渡しても応答は同一 (区別不能)", async () => {
     // enumeration 観点では、攻撃者が応答を比較しても情報が抽出できないことが
     // 重要。message と success が **bytewise に同一** であることを assert する。
-    // (captcha_failed は別経路に分離されているのでここでは含めない)
     const errors = [
       { message: "User already registered" },
       { message: "Error sending confirmation email" },

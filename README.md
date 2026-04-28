@@ -261,7 +261,7 @@ update profiles set role = 'admin' where user_id = (
 - [.claude/security.md](.claude/security.md) — セキュリティチェックリスト・レビュー手順
 - [.claude/development.md](.claude/development.md) — コーディング規約・命名規則
 - [.claude/deployment.md](.claude/deployment.md) — 本番デプロイ詳細（必須項目）
-- [.claude/deployment-optional.md](.claude/deployment-optional.md) — Workers Builds / Turnstile / Google OAuth など任意機能
+- [.claude/deployment-optional.md](.claude/deployment-optional.md) — Workers Builds / Google OAuth など任意機能
 
 ---
 

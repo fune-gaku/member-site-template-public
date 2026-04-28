@@ -347,10 +347,9 @@ JWT expiry を短く設定するほど失効ラグが縮まるが、refresh ト�
 
 「使うときだけ追加で必要になる」opt-in 機能のセットアップ手順は [.claude/deployment-optional.md](./deployment-optional.md) に集約してある。該当機能を使わない場合は本ファイルの手順だけで本番デプロイまで完結する（`cp .env.example .env && npm install && npm run dev` から本番デプロイまで `deployment.md` だけ読めばよい）。
 
-| 機能                                                                                | 用途                                                           | デフォルト |
-| ----------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------- |
-| [Cloudflare Turnstile](./deployment-optional.md#cloudflare-turnstile任意--bot-対策) | `auth.signUp` / `signIn` / `resetPassword` の 3 経路に CAPTCHA | OFF        |
-| [Google OAuth](./deployment-optional.md#google-oauth-セットアップ任意)              | email + password に加えて Google ログインを追加                | OFF        |
+| 機能                                                                   | 用途                                            | デフォルト |
+| ---------------------------------------------------------------------- | ----------------------------------------------- | ---------- |
+| [Google OAuth](./deployment-optional.md#google-oauth-セットアップ任意) | email + password に加えて Google ログインを追加 | OFF        |
 
 将来追加される opt-in 機能（別 IdP / SSO / 外部サービス連携など）も `deployment-optional.md` に集約する方針。
 
@@ -493,7 +492,6 @@ npx wrangler rollback --name member-site-template <version-id>
 - [ ] 公開値 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` が **ビルド時の `.env`（または `.env.production`）** に本番値で入っている。`wrangler.jsonc` の `vars` に書いても効かないので注意（[README「8. 本番公開値の供給」](../README.md#8-本番公開値の供給ビルド時-inline) 参照）
 - [ ] `compatibility_flags` に `nodejs_compat` が含まれている
 - [ ] Custom Domain を使うなら Supabase 側 `Site URL` / `Redirect URLs` を更新済
-- [ ] **Turnstile を有効化する場合のみ**: [Cloudflare Turnstile（任意 / bot 対策）](./deployment-optional.md#cloudflare-turnstile任意--bot-対策) の手順で **Supabase Dashboard > Auth > Bot and Abuse Protection** に Secret Key を登録、`PUBLIC_TURNSTILE_SITE_KEY` を build 環境の `.env` に設定。本番 Workers の secret は不要（Supabase Auth が直接検証する）
 - [ ] **Google OAuth を有効化する場合のみ**: [Google OAuth セットアップ（任意）](./deployment-optional.md#google-oauth-セットアップ任意) の手順で Google Cloud Console に OAuth client を作成、**Supabase Dashboard > Authentication > Providers > Google** に Client ID / Secret を登録、`PUBLIC_GOOGLE_AUTH_ENABLED=true` を build 環境の `.env` に設定。本番 Workers の secret は不要（Supabase Auth が直接 Google と通信する）
 
 ### デプロイ後の動作確認

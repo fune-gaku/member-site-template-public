@@ -209,22 +209,6 @@ token_verifications = 30
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 
-# Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
-# Issue #52: Cloudflare Turnstile を Supabase Auth (GoTrue) で公式検証する仕組み。
-# 本テンプレートではデフォルト OFF。bot 対策が必要なプロジェクトで `enabled = true` に
-# 切り替えて使う opt-in 方式（本番側は Supabase Dashboard > Auth > Bot and Abuse
-# Protection で Turnstile を有効化 + Secret Key を登録する別系統。詳細は
-# .claude/deployment-optional.md「Cloudflare Turnstile（任意 / bot 対策）」参照）。
-#
-# secret = "env(...)" は Supabase CLI が プロジェクトルート `.env` から解決する仕様
-# （CLI が `supabase/` から repo root まで walk）。enabled = true にする時は
-# `.env` に `TURNSTILE_SECRET_KEY` と `PUBLIC_TURNSTILE_SITE_KEY` を設定すること。
-# 公式: https://supabase.com/docs/guides/auth/auth-captcha
-[auth.captcha]
-enabled = false
-provider = "turnstile"
-secret = "env(TURNSTILE_SECRET_KEY)"
-
 [auth.email]
 # Allow/disallow new user signups via email to your project.
 enable_signup = true

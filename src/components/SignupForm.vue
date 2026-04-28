@@ -7,10 +7,6 @@ import {
   validatePasswordStrength,
 } from "../lib/password-schema";
 
-import TurnstileWidget from "./TurnstileWidget.vue";
-
-const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
-
 const email = ref("");
 const password = ref("");
 const confirmPassword = ref("");
@@ -18,9 +14,6 @@ const isLoading = ref(false);
 const error = ref("");
 const success = ref(false);
 const successMessage = ref("");
-const turnstileToken = ref("");
-const turnstileLoaderError = ref(false);
-const turnstileWidget = ref<InstanceType<typeof TurnstileWidget> | null>(null);
 
 async function handleSubmit() {
   error.value = "";
@@ -36,27 +29,17 @@ async function handleSubmit() {
     return;
   }
 
-  if (turnstileSiteKey && !turnstileToken.value) {
-    error.value =
-      "ボット対策のチェックを完了してください (チェックボックスをタップ)";
-    return;
-  }
-
   isLoading.value = true;
 
   try {
     const formData = new FormData();
     formData.append("email", email.value);
     formData.append("password", password.value);
-    if (turnstileToken.value) {
-      formData.append("captchaToken", turnstileToken.value);
-    }
 
     const { data, error: actionError } = await actions.auth.signUp(formData);
 
     if (actionError) {
       error.value = actionError.message;
-      turnstileWidget.value?.reset();
     } else if (data) {
       // performSignUp は既登録メールでも success: true + 統一メッセージを返すため、
       // UI からは登録有無を判別できない (Issue #14)。
@@ -66,7 +49,6 @@ async function handleSubmit() {
   } catch (e) {
     console.error("Signup error:", e);
     error.value = "予期しないエラーが発生しました";
-    turnstileWidget.value?.reset();
   } finally {
     isLoading.value = false;
   }
@@ -144,24 +126,6 @@ async function handleSubmit() {
           placeholder="パスワードを再入力"
           :disabled="isLoading"
         />
-      </div>
-
-      <div v-if="turnstileSiteKey" class="space-y-2">
-        <div class="flex justify-center">
-          <TurnstileWidget
-            ref="turnstileWidget"
-            :site-key="turnstileSiteKey"
-            @update:token="turnstileToken = $event"
-            @loader-error="turnstileLoaderError = true"
-          />
-        </div>
-        <p
-          v-if="turnstileLoaderError"
-          role="alert"
-          class="text-center text-xs text-red-700"
-        >
-          ボット対策の読み込みに失敗しました。広告ブロッカーや拡張機能を一時的に無効にして、ページを再読み込みしてください。
-        </p>
       </div>
 
       <button

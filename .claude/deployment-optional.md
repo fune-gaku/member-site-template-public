@@ -6,94 +6,10 @@
 
 ## 収録機能
 
-- [Cloudflare Turnstile（任意 / bot 対策）](#cloudflare-turnstile任意--bot-対策) — `auth.signUp` / `auth.signIn` / `auth.resetPassword` の 3 経路に CAPTCHA を入れる
 - [Google OAuth セットアップ（任意）](#google-oauth-セットアップ任意) — email + password に加えて Google ログインを追加
 - [Workers Builds（任意 / GitHub 自動デプロイ）](#workers-builds任意--github-自動デプロイ) — `git push` / PR で Cloudflare 側のビルド・デプロイを自動化し、PR ごとに preview URL を発行
 
 将来追加される opt-in 機能（別 IdP / SSO / 外部サービス連携など）も本ファイルに集約する方針。
-
----
-
-## Cloudflare Turnstile（任意 / bot 対策）
-
-`auth.signUp` / `auth.signIn` / `auth.resetPassword` の 3 経路に CAPTCHA を入れる opt-in 機能。**検証は Supabase Auth (GoTrue) の公式機能** が直接行う設計（Issue #52 で `src/lib/turnstile.ts` の自前 siteverify を廃止し、`captchaToken` を `supabase-js` の `options.captchaToken` に流すだけの薄い経路に統一した）。
-
-> **本テンプレートのデフォルトは OFF**（[supabase/config.toml](../supabase/config.toml) の `[auth.captcha].enabled = false`、本番 Supabase Dashboard も OFF 想定）。bot 対策が必要なプロジェクトで以下の 3 層をすべて ON に揃えて opt-in する。
-
-クライアント widget は [src/components/TurnstileWidget.vue](../src/components/TurnstileWidget.vue) が Cloudflare CDN script で描画し、token を 3 フォーム共通で Action に submit する仕組みは残置されているため、**3 層を ON にするだけで再有効化できる**。
-
-> ⚠️ **既存プロジェクトを default OFF へ移行するときの注意**: 本番 (Supabase hosted Auth) の runtime 設定は **Dashboard が真実の source of truth** であり、`supabase/config.toml` は **ローカル CLI 開発専用**。すでに本番で Dashboard の Bot and Abuse Protection を ON にしている場合、本テンプレートを default OFF に切り替えても、**マージ単体では本番 Auth の captcha enforcement は OFF にならない**。本番でも OFF にしたい場合は下記 [Turnstile を後から無効化する](#turnstile-を後から無効化する) の順序で Dashboard を OFF にする操作を別途実施すること（クライアント側の `PUBLIC_TURNSTILE_SITE_KEY` を先に消すと本番ログインが全滅するので順序厳守）。
-
-### 1. Cloudflare Dashboard で Turnstile サイトを発行
-
-1. **Cloudflare Dashboard > Turnstile > Add Site**
-2. **Site name**: 任意（例: `member-site-template`）
-3. **Domain**: 本番ドメイン（例: `member-site-template.your-subdomain.workers.dev`）。複数登録可
-4. **Widget mode**: **Managed**（推奨。難易度を Cloudflare が自動判定）
-5. 発行された **Site Key**（公開）と **Secret Key**（秘密）を控える
-
-> `.env.example` には Cloudflare 公式の常時 pass テストキーが既定で入っているため、**ローカル開発はこの手順をスキップしても動く**。本番ドメインで実 bot 対策を有効化する時のみ実キーを発行する。
-
-### 2. Supabase Dashboard で Turnstile を有効化（本番）
-
-Supabase Auth が secret を直接持つため、本番では **Cloudflare Workers の secret 登録は不要**。Supabase Dashboard 側で 1 回設定すれば済む。
-
-1. **Supabase Dashboard > Authentication > Settings > Bot and Abuse Protection**
-2. **Enable CAPTCHA protection** を ON
-3. **Choose CAPTCHA provider** で **Cloudflare Turnstile** を選択
-4. **CAPTCHA secret** に Step 1 で発行した **Secret Key** を貼り付け
-5. **Save** で確定
-
-> 公式: [Enable CAPTCHA Protection (Supabase Docs)](https://supabase.com/docs/guides/auth/auth-captcha)
-
-### 3. ローカル開発
-
-`supabase/config.toml` の `[auth.captcha]` を `enabled = true` に切り替えると、`supabase start` 起動時に Auth コンテナへ secret を注入する。`secret = "env(TURNSTILE_SECRET_KEY)"` 構文は Supabase CLI が **プロジェクトルートの `.env`** から値を解決する仕様（[公式: Managing Config](https://supabase.com/docs/guides/local-development/managing-config)：_"This will detect any values stored in an `.env` file at the root of your project directory."_）。
-
-```toml
-# supabase/config.toml (デフォルト OFF。enabled を true にして使う)
-[auth.captcha]
-enabled = true
-provider = "turnstile"
-secret = "env(TURNSTILE_SECRET_KEY)"
-```
-
-ローカル開発で Turnstile 検証を効かせる場合は **プロジェクトルートの `.env`**（`PUBLIC_TURNSTILE_SITE_KEY` 等と同じファイル）に Cloudflare のテストキー（[公式テスト用キー一覧](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）または実 secret を置く。`.env` は repo root の `.gitignore` で ignore 対象。
-
-```bash
-# .env (プロジェクトルート、Vite と Supabase CLI 双方が読み取る)
-PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA  # 常時 pass のテスト site key
-TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA  # 常時 pass のテスト secret
-```
-
-`supabase/config.toml` を変更したら `supabase stop && supabase start` で再起動して Auth コンテナに反映する。
-
-> 📝 **補足**: Supabase CLI v2 の `loadNestedEnv` は `supabase/` から repo root まで walk するため `supabase/.env` も解決される。本テンプレでは secret は **プロジェクトルート `.env`** に置く方針（公式 docs 表記 + 既存 `.gitignore` 設定との整合）だが、開発者が誤って `supabase/.env` に置いた場合の事故防止に `supabase/.gitignore` で `.env` も defensive に ignore してある。
-
-### 4. 動作確認
-
-ローカル:
-
-```bash
-npm run dev   # 3 層が揃っていれば widget が描画され、Auth が captchaToken を verify する
-```
-
-本番デプロイ後:
-
-- [ ] `/auth/signup` を開いて Turnstile widget が表示される（site key を build 時に inline）
-- [ ] widget を pass せず submit → 400 系で UI 上「メールアドレスまたはパスワードが正しくありません」相当（実際の Auth 応答は `unexpected_failure` 500 だが [auth-signin.ts](../src/lib/auth-signin.ts) で UNAUTHORIZED に正規化、enumeration 防御として正しい挙動）
-- [ ] widget pass 後 → 通常通りサインアップ・サインイン・パスワードリセットができる
-- [ ] アカウント列挙対策（Issue #8 / #14）の bytewise 同一応答が **Turnstile 失敗ケースを除いて** 維持されている（`tests/unit/auth-{signin,signup,reset-password}.test.ts` で自動検証）
-
-### Turnstile を後から無効化する
-
-3 層を **同期して** OFF にする（順序：サーバ → クライアントの順で切るとログイン破壊事故が無い）:
-
-1. **本番**: Supabase Dashboard > Authentication > Settings > Bot and Abuse Protection で **Enable CAPTCHA protection** を OFF + Save
-2. **ローカル**: `supabase/config.toml` で `[auth.captcha].enabled = false` + `supabase stop && supabase start`
-3. **クライアント (任意)**: `PUBLIC_TURNSTILE_SITE_KEY` を `.env` / build 環境から削除すると widget も消える（残しても無害だが UI ノイズ回避で削除推奨）
-
-> ⚠️ **やってはいけない順序**: クライアント (層 3) を先に消してサーバ (層 1) が ON のままにすると、widget が出ないため誰も `captchaToken` を取得できず、**全 sign-in / sign-up / reset-password が UNAUTHORIZED で失敗** する。必ずサーバ側から先に切ること。
 
 ---
 
@@ -174,12 +90,12 @@ PUBLIC_GOOGLE_AUTH_ENABLED=true
 - [ ] ボタンをクリックして Google アカウント選択 → 同意 → `/member/dashboard` に到達する
 - [ ] 同じ email アドレスで既に email/password アカウントがある場合、Email confirmation 済みであれば自動で identity がリンクされる（[Identity Linking docs](https://supabase.com/docs/guides/auth/auth-identity-linking)）
 - [ ] `PUBLIC_GOOGLE_AUTH_ENABLED=false` または未設定でビルドすると、ボタンが非表示で `auth.signInWithGoogle` Action が `NOT_FOUND` を返す
-- [ ] 既存の email/password サインイン・サインアップ・パスワードリセットが回帰なく動作する（CSRF / Turnstile / アカウント列挙対策の自動テストすべて green）
+- [ ] 既存の email/password サインイン・サインアップ・パスワードリセットが回帰なく動作する（CSRF / アカウント列挙対策の自動テストすべて green）
 - [ ] Mozilla Observatory / securityheaders.com で **A 以上維持**（CSP に Google ロゴ画像等を追加した場合は再評価）
 
 ### Google OAuth を後から無効化する
 
-3 層を **同期して** OFF にする（順序：**アプリ → サーバ** の順で切るとログイン破壊事故が無い。Turnstile とは順序が逆。Turnstile はサーバ ON / クライアント OFF だと「token 取れず全 fail」、Google OAuth はサーバ OFF / アプリ ON だと「ボタン押下で `provider is not enabled` 即時失敗」と失敗モードが反対方向のため）:
+3 層を **同期して** OFF にする（順序：**アプリ → サーバ** の順で切るとログイン破壊事故が無い。サーバ OFF / アプリ ON だと「ボタン押下で `provider is not enabled` 即時失敗」になるため）:
 
 1. **アプリ**: `PUBLIC_GOOGLE_AUTH_ENABLED=false` または env から削除して再ビルド・再デプロイ → ボタン非表示 + Action `NOT_FOUND`
 2. **本番**: Supabase Dashboard > Authentication > Providers > Google で **Enable Sign in with Google** を OFF + Save
@@ -242,7 +158,6 @@ PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
 PUBLIC_SITE_URL=https://<your-domain>
 # 任意機能を有効化している場合のみ
-PUBLIC_TURNSTILE_SITE_KEY=<turnstile-site-key>
 PUBLIC_GOOGLE_AUTH_ENABLED=true
 ```
 
