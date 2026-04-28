@@ -7,7 +7,7 @@
 ## 収録機能
 
 - [Google OAuth セットアップ（任意）](#google-oauth-セットアップ任意) — email + password に加えて Google ログインを追加
-- [Workers Builds（任意 / GitHub 自動デプロイ）](#workers-builds任意--github-自動デプロイ) — `git push` / PR で Cloudflare 側のビルド・デプロイを自動化し、PR ごとに preview URL を発行
+- [Workers Builds（詳細 / GitHub 自動デプロイ）](#workers-builds詳細--github-自動デプロイ) — `git push` / PR で Cloudflare 側のビルド・デプロイを自動化し、PR ごとに preview URL を発行
 
 将来追加される opt-in 機能（別 IdP / SSO / 外部サービス連携など）も本ファイルに集約する方針。
 
@@ -54,7 +54,7 @@ email + password に加えて Google OAuth ログインを追加する opt-in �
 
 ### 3. ローカル開発（任意 / 動作確認をしたい場合）
 
-ローカル Supabase でも Google OAuth を試したい場合は `supabase/config.toml` の `[auth.external.google]` セクションを有効化する（Supabase CLI が Auth コンテナへ Client ID/Secret を注入する）。プロジェクトルート `.env` に:
+ローカル Supabase でも Google OAuth を試したい場合は `supabase/config.toml` の `[auth.external.google]` セクションを有効化する（Supabase CLI が Auth コンテナへ Client ID/Secret を注入する）。プロジェクトルート `.env` に以下を追加する。**`SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` は OAuth Client Secret（秘密値）なので、ユーザー自身がエディタで `.env` に直接書き込む**（Claude Code には貼らない）:
 
 ```bash
 # .env (プロジェクトルート、Vite と Supabase CLI 双方が読み取る)
@@ -105,9 +105,9 @@ PUBLIC_GOOGLE_AUTH_ENABLED=true
 
 ---
 
-## Workers Builds（任意 / GitHub 自動デプロイ）
+## Workers Builds（詳細 / GitHub 自動デプロイ）
 
-Cloudflare 公式の **Workers Builds**（GitHub 連携の自動デプロイ + PR preview）を opt-in で導入する手順（Issue #71）。`git push` / PR を起点に Cloudflare 側でビルド・デプロイが走るので、テンプレ利用者が手元で `wrangler deploy` を打たずに済む。
+README Step 6 の本番デプロイで使う Cloudflare 公式の **Workers Builds**（GitHub 連携の自動デプロイ + PR preview）について、README が省略した詳細・代替経路・無効化手順を集約する（Issue #71）。`git push` / PR を起点に Cloudflare 側でビルド・デプロイが走るので、テンプレ利用者が手元で `wrangler deploy` を打たずに済む。
 
 ### 何ができるか
 
@@ -116,11 +116,13 @@ Cloudflare 公式の **Workers Builds**（GitHub 連携の自動デプロイ + P
 - 各開発者の PC に `CLOUDFLARE_API_TOKEN` を配布する必要がない（GitHub App ベースの OAuth 連携）
 - 既存 GitHub Actions（[.github/workflows/test.yml](../.github/workflows/test.yml) 等）と共存可能。Workers Builds は **Cloudflare 側のビルド & デプロイ**、GitHub Actions は **GitHub 側のテスト & lint** という棲み分け
 
-> **本テンプレートのデフォルトは OFF**（README の手順は `npx wrangler deploy` の手動実行を default 経路としている）。Workers Builds と手動 `wrangler deploy` は共存可能で、どちらか一方を完全に選ぶ必要はないが、運用ルールが分散すると事故りやすいので **チームごとにどちらをメイン経路にするか決めて統一する** のを推奨。
+> **本テンプレートは README Step 6 で Workers Builds を main 経路として採用済み**（"Import a repository" 経由で GitHub と連携し、`git push` で自動デプロイ）。手動 `npx wrangler deploy`（`npm run deploy` script 経由）も併用可能だが、運用ルールが分散すると事故りやすいので **チームごとにどちらをメイン経路にするか決めて統一する** のを推奨。
 
 ### 1. Cloudflare Dashboard で Worker と GitHub リポジトリを連携
 
-**初回デプロイ後の既存 Worker に後付けする場合**（README の Step 9「初回デプロイ」が一度でも走った状態を想定）:
+**標準経路（README Step 6-1）**: README の手順（**Workers & Pages > Create > Import a repository** から GitHub App をインストールしてリポジトリを選択）に従えばよい。**Worker 名は [wrangler.jsonc](../wrangler.jsonc) の `name` フィールドと一致させる** こと（不一致だとビルド失敗。例: `member-site-template`）。
+
+**代替経路: 既に手動 `wrangler deploy` で Worker を作成済みの場合の後付け連携**:
 
 1. **Cloudflare Dashboard > Workers & Pages > 該当 Worker（例: `member-site-template`）**
 2. **Settings > Builds > Connect** をクリック
@@ -128,26 +130,20 @@ Cloudflare 公式の **Workers Builds**（GitHub 連携の自動デプロイ + P
 4. **Repository access** は **Only select repositories** を選び、本テンプレを fork したリポジトリだけを許可（最小権限）
 5. **Branch** は `main` を指定（本番ブランチ）
 
-**まだ `wrangler deploy` を一度も走らせていない場合**:
-
-1. **Workers & Pages > Create application > Import a repository** から GitHub App をインストールしてリポジトリを選択
-2. ただし **Worker 名は [wrangler.jsonc](../wrangler.jsonc) の `name` フィールドと一致させる** こと（不一致だとビルド失敗。例: `member-site-template`）
-3. 後続の Build / Runtime 設定（Step 2 / Step 3）は同じ
-
 > 公式: GitHub 連携は **Cloudflare Workers and Pages GitHub App** で行われ、`CLOUDFLARE_API_TOKEN` は **不要**。Repository access は GitHub Apps の設定画面から後で `Only select repositories` に変更できる（[GitHub Integration](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/github-integration/)）。
 
 ### 2. Build 設定（Cloudflare Dashboard）
 
 Worker > Settings > Builds で以下を設定:
 
-| 項目                 | 推奨値                 | 備考                                                                                                                                     |
-| -------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Branch**           | `main`                 | ここに設定したブランチが「本番」扱い。それ以外のブランチは preview                                                                       |
-| **Build command**    | `npm run build`        | テストを deploy gate にしたい場合は `npm test && npm run build` に変える（テスト失敗で deploy が止まる）                                 |
-| **Deploy command**   | `npx wrangler deploy`  | 本番ブランチ用。Cloudflare のデフォルト                                                                                                  |
-| **Non-production deploy command** | （空のままで OK） | 空だと Cloudflare デフォルトの `npx wrangler versions upload` が使われ、preview URL のみ発行される                                       |
-| **Root directory**   | （空 / `/`）           | このテンプレはモノレポではないので空でよい                                                                                               |
-| **Node.js version**  | `22` 以上              | [.nvmrc](../.nvmrc) と一致させる                                                                                                         |
+| 項目                              | 推奨値                | 備考                                                                                                     |
+| --------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Branch**                        | `main`                | ここに設定したブランチが「本番」扱い。それ以外のブランチは preview                                       |
+| **Build command**                 | `npm run build`       | テストを deploy gate にしたい場合は `npm test && npm run build` に変える（テスト失敗で deploy が止まる） |
+| **Deploy command**                | `npx wrangler deploy` | 本番ブランチ用。Cloudflare のデフォルト                                                                  |
+| **Non-production deploy command** | （空のままで OK）     | 空だと Cloudflare デフォルトの `npx wrangler versions upload` が使われ、preview URL のみ発行される       |
+| **Root directory**                | （空 / `/`）          | このテンプレはモノレポではないので空でよい                                                               |
+| **Node.js version**               | `22` 以上             | [.nvmrc](../.nvmrc) と一致させる                                                                         |
 
 ### 3. Build variables（公開値のみ。秘匿値はここに書かない）
 
@@ -161,31 +157,33 @@ PUBLIC_SITE_URL=https://<your-domain>
 PUBLIC_GOOGLE_AUTH_ENABLED=true
 ```
 
-> **何が「Build variables」に入るべきか**: `import.meta.env.PUBLIC_*` で参照される値（Vite が `astro build` 時にバンドルへ inline するもの）。README Step 8 (b) の `.env.production` ローカル運用と同じ役割を Workers Builds 側で担う。
+> **何が「Build variables」に入るべきか**: `import.meta.env.PUBLIC_*` で参照される値（Vite が `astro build` 時にバンドルへ inline するもの）。本テンプレでは README Step 6-2 で登録するこの 3〜4 個の `PUBLIC_*` がすべて。
 
 > ⚠️ **`SUPABASE_SERVICE_ROLE_KEY` などの runtime secret を Build variables に書かないこと**。Cloudflare 公式が明示しているとおり、Build variables は **ビルド中のみ** 利用可能で **Workers ランタイムには引き継がれない**（[Configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)）。誤って書いてもビルドは通るが、本番リクエストで `env.SUPABASE_SERVICE_ROLE_KEY` が `undefined` になり、admin 機能が全滅する。
 
-### 4. Runtime secrets（秘匿値は引き続き `wrangler secret put`）
+### 4. Runtime secrets（README Step 7 の Dashboard 経路 + CLI 代替）
 
-Workers ランタイムが直接読む秘匿値は **Workers Builds とは別系統** の per-Worker Secret に登録する。README Step 7 と同じ手順を 1 度だけ実施すれば、以降の Workers Builds 経由のデプロイでも引き継がれる。
+Workers ランタイムが直接読む秘匿値は **Workers Builds の Build variables とは別系統** の per-Worker Secret として登録する。**標準経路は README Step 7 の Dashboard 操作**（Settings > Variables and Secrets > Add > Secret）で、1 度登録すれば以降の Workers Builds 経由のデプロイでも引き継がれる。
+
+CLI 代替として `wrangler secret put` でも同じ per-Worker Secret に書き込める（CI / 自動化スクリプトから登録したい場合に便利）:
 
 ```bash
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name member-site-template
 ```
 
-| 用途                     | 場所                                                                                                                              | 例                                                |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| ビルド時に inline         | Workers Builds の **Build variables**（Dashboard）                                                                                | `PUBLIC_SUPABASE_URL` / `PUBLIC_SITE_URL`         |
-| ランタイム読み取り（秘密）| `wrangler secret put` または Dashboard > Settings > **Variables and Secrets > Add > Secret**（**Bindings > Secrets Store ではない**） | `SUPABASE_SERVICE_ROLE_KEY`                       |
+| 用途                       | 場所                                                                                                                                                          | 例                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| ビルド時に inline          | Workers Builds の **Build variables**（Dashboard）                                                                                                            | `PUBLIC_SUPABASE_URL` / `PUBLIC_SITE_URL` |
+| ランタイム読み取り（秘密） | Dashboard > Settings > **Variables and Secrets > Add > Secret** または `wrangler secret put`（**Bindings > Secrets Store ではない**） | `SUPABASE_SERVICE_ROLE_KEY`               |
 
-> 詳細は README の `wrangler secret put` セクション（Step 7）と「Secret が登録したはずなのに undefined になる」トラブルシューティングを参照。**per-Worker Secret と Secrets Store は別物**で、本テンプレのコードは前者に同期アクセスする設計。
+> 詳細は README Step 7（Dashboard 経路 + 「Secret が登録したはずなのに undefined になる」トラブルシューティング）を参照。**per-Worker Secret と Secrets Store は別物**で、本テンプレのコードは前者に同期アクセスする設計。
 
 ### 5. 既存 GitHub Actions との関係
 
-| 層                     | 仕組み                                                                                                                                                                                            | 役割                                                                  |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| GitHub Actions         | [test.yml](../.github/workflows/test.yml) / [npm-audit.yml](../.github/workflows/npm-audit.yml) / [db-test.yml](../.github/workflows/db-test.yml)                                                 | PR / push 時に **GitHub のランナー** で test / lint / audit を回す    |
-| Cloudflare Workers Builds | Dashboard 設定                                                                                                                                                                                  | PR / push 時に **Cloudflare のビルダー** でビルド & デプロイ          |
+| 層                        | 仕組み                                                                                                                                            | 役割                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| GitHub Actions            | [test.yml](../.github/workflows/test.yml) / [npm-audit.yml](../.github/workflows/npm-audit.yml) / [db-test.yml](../.github/workflows/db-test.yml) | PR / push 時に **GitHub のランナー** で test / lint / audit を回す |
+| Cloudflare Workers Builds | Dashboard 設定                                                                                                                                    | PR / push 時に **Cloudflare のビルダー** でビルド & デプロイ       |
 
 両方が並列で走り、両方 green になることが望ましい運用。Workers Builds 側は Cloudflare のインフラに直結しているのでビルド成果物がそのまま preview URL になり、GitHub Actions 側は GitHub 上で test 結果を可視化する。
 
@@ -195,13 +193,13 @@ npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name member-site-template
 
 Cloudflare が build 中に自動注入する環境変数（[Configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)）:
 
-| 変数                       | 内容                            |
-| -------------------------- | ------------------------------- |
-| `CI`                       | `true`                          |
-| `WORKERS_CI`               | `1`                             |
-| `WORKERS_CI_BUILD_UUID`    | 現在のビルド ID                 |
-| `WORKERS_CI_COMMIT_SHA`    | コミットハッシュ                |
-| `WORKERS_CI_BRANCH`        | ブランチ名                      |
+| 変数                    | 内容             |
+| ----------------------- | ---------------- |
+| `CI`                    | `true`           |
+| `WORKERS_CI`            | `1`              |
+| `WORKERS_CI_BUILD_UUID` | 現在のビルド ID  |
+| `WORKERS_CI_COMMIT_SHA` | コミットハッシュ |
+| `WORKERS_CI_BRANCH`     | ブランチ名       |
 
 例えば preview ブランチだけで挙動を変えたい場合は `WORKERS_CI_BRANCH !== 'main'` でビルドスクリプトを分岐できる。本テンプレでは現状利用していない。
 

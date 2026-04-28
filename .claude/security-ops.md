@@ -72,6 +72,49 @@
 
 ---
 
+## Supabase Advisor で残る想定済み警告と対応
+
+Supabase Dashboard > Database > Advisors > Security に出る警告のうち、**本テンプレートで対応方針が確定しているもの** をここに集約する。テンプレ利用者が初めて Advisor を開いて警告を見たときに「真正なバグ」と勘違いしないための索引。
+
+### Leaked Password Protection Disabled
+
+> Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.
+
+| プラン   | 対応                                                                                                                                                                                                            | 結果                                              |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| **Free** | アプリ層 `ENABLE_HIBP_CHECK=true` で代替する（[`src/lib/pwned-password.ts`](../src/lib/pwned-password.ts) が HIBP k-Anonymity API へ照会）                                                                      | Advisor の警告は **出続ける**（プランの仕様）     |
+| **Pro 以上** | Dashboard > Authentication > Attack Protection > **Enable leaked password protection** を ON。アプリ層 `ENABLE_HIBP_CHECK` は **OFF（unset または `false`）** にして二重実行を避ける             | Advisor の警告が消える                            |
+
+#### Free → Pro へ移行したときのスイッチング手順
+
+二重実行（Dashboard ON + アプリ層 ON）は実装上 **アプリ層 `assertNotPwned` が Supabase Auth より前に走る** ため（[src/actions/index.ts](../src/actions/index.ts) の `signUp` / `updatePassword` / `changePassword` / admin `createUser` 全経路）、(1) アプリ層が先に reject して Pro Dashboard の Leaked Password Protection が動作観察できなくなる、(2) パスワードが pwned かどうかに関わらず HIBP API 1 往復ぶんのレイテンシが必ず乗る — の 2 つの不整合が発生する。Pro 化後は必ずアプリ層を OFF にして単一経路に揃える。
+
+1. Supabase Dashboard > Authentication > Attack Protection > **Enable leaked password protection** を **ON**
+2. Cloudflare Workers の Secret から `ENABLE_HIBP_CHECK` を **削除** (または `false`)
+   ```bash
+   npx wrangler secret delete ENABLE_HIBP_CHECK
+   ```
+3. ローカル `.dev.vars` でも `ENABLE_HIBP_CHECK` 行を削除 / コメントアウト
+4. 動作確認: **Zod スキーマを通過しつつ HIBP 登録済み** のパスワード（例 `Password1`、HIBP 件数 3,451,129）でサインアップ → Supabase Auth まで到達した上で Dashboard 側 Leaked Password Protection によって reject されることを確認。`password123`（小文字のみ）など [`src/lib/password-schema.ts`](../src/lib/password-schema.ts) の大文字要件を満たさない値はサーバ到達前に Zod で弾かれて検証にならないので注意
+5. Advisor を Run しなおし、`Leaked Password Protection Disabled` 警告が消えていることを確認
+
+#### 設計判断
+
+- **アプリ層フォールバック方式**: Free プランで Dashboard 機能を使えない代わりに、アプリ層で HIBP k-Anonymity API（SHA-1 prefix のみ送信）を呼ぶ。SHA-1 完全ハッシュ・平文は外部に送られない
+- **API 障害時はフェイルオープン**: 可用性を優先し、HIBP API 不通時は登録をブロックしない。Supabase 側のパスワードポリシー（最小長 + 文字種）が二重防御として残る
+- **`ENABLE_HIBP_CHECK` のデフォルト**: テンプレ初期値は **未設定（OFF 相当）**。利用者がプランに応じて opt-in する方針。`.dev.vars.example` にコメントアウト形で記載
+
+> 公式ドキュメント:
+>
+> - [Password Security | Supabase Docs](https://supabase.com/docs/guides/auth/password-security)
+> - [Have I Been Pwned: Pwned Passwords API (k-Anonymity)](https://haveibeenpwned.com/API/v3#PwnedPasswords)
+
+### 他に Advisor で出る警告
+
+このテンプレートでは Issue #27（`handle_new_user()` の REST 公開遮断）対応で `lint 0028 / 0029` を解消済み。それ以外で **「想定外」** の警告が新たに出た場合は、本ドキュメントに追記するか、対応 Issue を切ること。
+
+---
+
 ## セキュリティヘッダの動作確認
 
 `src/middleware.ts` が全レスポンスに共通セキュリティヘッダ（CSP / HSTS / X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy / Cross-Origin-Opener-Policy）を付与している。定義は `src/lib/security-headers.ts` 参照。

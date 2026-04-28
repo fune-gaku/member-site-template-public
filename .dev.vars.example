@@ -1,1 +1,9 @@
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-for-local-dev
+
+# HIBP 漏洩パスワード検査のアプリ層フォールバック（任意 / Free プラン推奨）
+# Free プランでは Supabase Dashboard の Leaked Password Protection が使えないため、
+# `true` にするとアプリ層 (src/lib/pwned-password.ts) が HIBP k-Anonymity API へ
+# 照会して既知漏洩パスワードを reject する。
+# Pro 以上で Dashboard 側を ON にしている場合は **設定しない**（二重実行を避けるため）。
+# 詳細: .claude/security-ops.md「Supabase Advisor で残る想定済み警告と対応」
+# ENABLE_HIBP_CHECK=true
