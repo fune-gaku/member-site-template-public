@@ -290,18 +290,84 @@ describe("/robots.txt endpoint (Issue #70 — dynamic from PUBLIC_SITE_URL)", ()
   });
 });
 
-describe("Index page with Vue component", () => {
-  it("Vue renderer を含むコンテナで top page が描画される", async () => {
+describe("Index page (developer LP, Issue #87)", () => {
+  // top page は Claude Code 前提の開発者向け LP。テンプレ利用者は最終的に
+  // src/pages/index.astro を自プロダクトの LP に差し替える前提で、最上部に
+  // 常設バナーを置いている。
+
+  it("Hero に Claude Code とテンプレートを差し替える趣旨が含まれる", async () => {
     const renderers = await loadRenderers([vueContainerRenderer()]);
     const container = await AstroContainer.create({ renderers });
-
-    // index.astro を import してレンダリング
     const { default: IndexPage } = await import("../../src/pages/index.astro");
     const result = await container.renderToString(IndexPage);
 
-    // ログイン・サインアップの導線があること
-    expect(result.toLowerCase()).toMatch(
-      /sign[-\s]?(in|up)|ログイン|サインアップ/,
+    expect(result).toContain("Claude Code");
+    expect(result).toContain("置き換えてください");
+    expect(result).toContain("src/pages/index.astro");
+  });
+
+  it("What's inside で RLS / CSRF / Codex / DB 7 ステップに触れる", async () => {
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+    const { default: IndexPage } = await import("../../src/pages/index.astro");
+    const result = await container.renderToString(IndexPage);
+
+    expect(result).toContain("RLS");
+    expect(result).toContain("CSRF");
+    expect(result).toContain("Codex");
+    // 7 ステップは数字とテキストの両方を保持してコピー揺れを検知
+    expect(result).toMatch(/7\s*ステップ/);
+  });
+
+  it("Use this template / README / GitHub への導線が出力される", async () => {
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+    const { default: IndexPage } = await import("../../src/pages/index.astro");
+    const result = await container.renderToString(IndexPage);
+
+    expect(result).toContain(
+      "https://github.com/fune-gaku/member-site-template/generate",
     );
+    expect(result).toContain(
+      "https://github.com/fune-gaku/member-site-template/blob/main/README.md",
+    );
+    expect(result).toContain(
+      "https://github.com/fune-gaku/member-site-template",
+    );
+  });
+
+  it("動くデモを見るセクションに signup / signin の既存導線が残る", async () => {
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+    const { default: IndexPage } = await import("../../src/pages/index.astro");
+    const result = await container.renderToString(IndexPage);
+
+    expect(result).toContain('href="/auth/signup"');
+    expect(result).toContain('href="/auth/signin"');
+  });
+
+  it("見出しは h1 が 1 個で h1→h2→h3 の階層を skip しない (a11y, WCAG 2.1 SC 1.3.1)", async () => {
+    const renderers = await loadRenderers([vueContainerRenderer()]);
+    const container = await AstroContainer.create({ renderers });
+    const { default: IndexPage } = await import("../../src/pages/index.astro");
+    const result = await container.renderToString(IndexPage);
+
+    // 全 heading を出現順に列挙し、レベルだけ取り出す。
+    const levels = Array.from(result.matchAll(/<h([1-6])\b/g)).map((m) =>
+      Number(m[1]),
+    );
+
+    // h1 はちょうど 1 個 (LP の主見出しは Hero の "Claude Code で..." だけ)
+    expect(levels.filter((l) => l === 1)).toHaveLength(1);
+    // 最初の見出しは h1
+    expect(levels[0]).toBe(1);
+    // h4 / h5 / h6 は使わない (このページには h1〜h3 で十分構造化できる前提)
+    expect(levels.filter((l) => l >= 4)).toHaveLength(0);
+    // 任意の隣接ペアでレベルを 2 段階以上 jump しない
+    // (h2 の直後に h4 みたいに親レベルを skip しない)
+    for (let i = 1; i < levels.length; i++) {
+      const jump = levels[i] - levels[i - 1];
+      expect(jump).toBeLessThanOrEqual(1);
+    }
   });
 });
