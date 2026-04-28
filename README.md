@@ -176,6 +176,8 @@ Supabase Dashboard で以下 2 箇所を設定します。
 
 その他の Dashboard 設定（OTP expiry / Sessions / MFA など）も同ドキュメントの **本番環境チェックリスト** に集約されています。
 
+> 💡 **Supabase Advisor で `Leaked Password Protection Disabled` 警告が出ている場合** — Free プランの仕様で Dashboard 機能が使えないだけ（バグではない）。本テンプレートはアプリ層フォールバック（`ENABLE_HIBP_CHECK=true` で HIBP API 照会）を備えているので、警告は **想定内** として扱って問題ない。プラン別の対応方針・Pro 移行時のスイッチング手順は [.claude/security-ops.md「Supabase Advisor で残る想定済み警告と対応」](.claude/security-ops.md#supabase-advisor-で残る想定済み警告と対応) を参照。
+
 ### Step 6: Cloudflare Workers にデプロイ（GUI）
 
 Cloudflare 公式の **Workers Builds**（GitHub 連携で自動デプロイ）を使います。Cloudflare には **ビルド時の env**（Vite が `astro build` 中に読む）と **ランタイムの env**（Worker が本番リクエストで `env.X` として読む）の 2 系統があり、登録場所が分かれています。Step 6 でビルド時を、Step 7 でランタイムを設定します。
