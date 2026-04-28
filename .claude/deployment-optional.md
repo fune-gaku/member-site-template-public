@@ -54,7 +54,7 @@ email + password に加えて Google OAuth ログインを追加する opt-in �
 
 ### 3. ローカル開発（任意 / 動作確認をしたい場合）
 
-ローカル Supabase でも Google OAuth を試したい場合は `supabase/config.toml` の `[auth.external.google]` セクションを有効化する（Supabase CLI が Auth コンテナへ Client ID/Secret を注入する）。プロジェクトルート `.env` に:
+ローカル Supabase でも Google OAuth を試したい場合は `supabase/config.toml` の `[auth.external.google]` セクションを有効化する（Supabase CLI が Auth コンテナへ Client ID/Secret を注入する）。プロジェクトルート `.env` に以下を追加する。**`SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` は OAuth Client Secret（秘密値）なので、ユーザー自身がエディタで `.env` に直接書き込む**（Claude Code には貼らない）:
 
 ```bash
 # .env (プロジェクトルート、Vite と Supabase CLI 双方が読み取る)

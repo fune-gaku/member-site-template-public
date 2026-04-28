@@ -2,28 +2,30 @@
 
 会員サイトを最短で立ち上げるためのテンプレート。Astro + Vue + Supabase + Cloudflare Workers で、認証 / プロフィール / 投稿 / 管理画面 / RLS / セキュリティヘッダがすべて初期実装済み。
 
-**人間は GUI 操作と Claude Code へのチャット指示だけ。CLI は Claude Code が代行します。**
+**初期セットアップは決まったコマンドをコピペするだけ。機能追加・カスタマイズは Claude Code に日本語で頼むだけ。**
 
-| 担当            | 操作                                                                                                |
-| --------------- | --------------------------------------------------------------------------------------------------- |
-| **人間**        | Supabase Dashboard / Cloudflare Dashboard / GitHub UI / ブラウザでの動作確認 / Claude Code への指示 |
-| **Claude Code** | git / npm / supabase CLI / wrangler CLI / `.env` と `.dev.vars` の作成 / コード変更全般             |
+| 担当            | 操作                                                                                                                                                |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **人間**        | Supabase / Cloudflare / GitHub の Dashboard 操作 / ターミナルで決まったコマンドをコピペ実行 / `.env` と `.dev.vars` への秘密値の貼り付け / ブラウザでの動作確認 / Claude Code への指示 |
+| **Claude Code** | コード変更全般 / 機能追加 / リファクタリング / DB マイグレーション設計 / レビュー / git・gh の運用補助                                              |
+
+> 🔒 **Supabase の Service Role key などの秘密値は、ユーザー自身がエディタで `.env` / `.dev.vars` に直接書き込みます**。チャット欄に貼ると会話履歴に残るリスクがあるため、Claude Code には渡さない運用です（プレースホルダや `.env.example` の編集は Claude Code に任せて OK）。
 
 ---
 
 ## 必要なもの
 
-- **[Claude Code](https://claude.com/claude-code)** — CLI 操作とコード変更を代行する AI エージェント
+- **[Claude Code](https://claude.com/claude-code)** — コード変更・機能追加・レビューを代行する AI エージェント（セットアップ後の機能開発フェーズで使用）
 - **[Supabase](https://supabase.com/dashboard) アカウント** — 無料プランで OK
 - **[Cloudflare](https://dash.cloudflare.com/) アカウント** — 無料プランで OK
 - **GitHub アカウント**
-- **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** がインストールされた PC — ローカル DB 用、Claude Code が起動する
+- **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** がインストールされた PC — ローカル DB 用（`npm run db:start` で利用）
 
 ---
 
 ## 30 分でローカルで動かす
 
-GUI 操作（人間）と Claude Code への指示（チャット）を交互に行います。CLI は Claude Code が代行するので、**ターミナルを自分で開く必要はありません**。
+GUI 操作（Dashboard）とターミナルへのコマンドコピペを交互に行います。コマンドは固定なので、内容を理解せずそのまま貼り付ければ動きます。機能追加やカスタマイズに入る段階から Claude Code を使います。
 
 ### Step 1: GitHub で自分のリポジトリを作る（GUI）
 
@@ -32,7 +34,7 @@ GUI 操作（人間）と Claude Code への指示（チャット）を交互に
 - **Repository name**: 任意（例: `my-club`）
 - **Public / Private**: どちらでも可（迷ったら Private 推奨）
 
-**"Create repository"** をクリックして数秒待つと、自分のリポジトリができあがります。次の Step に進む前に、リポジトリページ右上の緑色の **"Code"** ボタン → **"HTTPS"** タブで表示される URL（`https://github.com/<your-name>/<repo>.git`）をコピーしておきます。Step 3 で Claude Code に渡します。
+**"Create repository"** をクリックして数秒待つと、自分のリポジトリができあがります。次の Step に進む前に、リポジトリページ右上の緑色の **"Code"** ボタン → **"HTTPS"** タブで表示される URL（`https://github.com/<your-name>/<repo>.git`）をコピーしておきます。Step 3-1 の `git clone` コマンドで使います。
 
 ### Step 2: Supabase で新規プロジェクトを作る（GUI）
 
@@ -44,7 +46,7 @@ GUI 操作（人間）と Claude Code への指示（チャット）を交互に
    - **Region**: 利用者が多い地域に近い場所（日本なら **"Northeast Asia (Tokyo)"**）
 4. プロジェクトが **"Setting up project"** 状態になります → 1〜2 分待ちます
 
-完成したら、左サイドバーの **歯車アイコン (Project Settings) → API** を開きます。以下 3 つの値をメモ帳などにコピーしておきます（Step 3 で Claude Code に渡します）:
+完成したら、左サイドバーの **歯車アイコン (Project Settings) → API** を開きます。以下 3 つの値をメモ帳などにコピーしておきます（Step 3-2 で **あなた自身が `.env` / `.dev.vars` に貼り付けます**。Claude Code のチャット欄には貼りません）:
 
 | 欄の表示名             | 説明                                                                     |
 | ---------------------- | ------------------------------------------------------------------------ |
@@ -54,38 +56,58 @@ GUI 操作（人間）と Claude Code への指示（チャット）を交互に
 
 > Service Role key の右にある 👁 アイコンを押すと値が表示されます。コピー後、メモ帳のウィンドウは早めに閉じてください。
 
-### Step 3: Claude Code にローカル開発の準備を依頼（チャット）
+### Step 3: ローカル開発環境を立ち上げる（ターミナル + エディタ）
 
-PC のお好きな場所（例: `~/Developer/`）でターミナルを開き、`claude` を起動します。最初のメッセージとして以下をコピペで投げます。`<...>` の部分は Step 1・Step 2 でコピーした値に置き換えてください。
+PC のお好きな場所（例: `~/Developer/`）でターミナルを開き、以下を順に実行します。コマンドは固定なので **そのままコピペで貼り付ければ OK** です。
 
+#### 3-1. リポジトリを clone して依存関係をインストール（ターミナル）
+
+`<Step 1 でコピーした URL>` の部分だけ自分の値に置き換えてください。
+
+```bash
+git clone <Step 1 でコピーした URL>
+cd <リポジトリ名>
+npm install
+cp .env.example .env
+cp .dev.vars.example .dev.vars
 ```
-このリポジトリの初期セットアップをお願いします。
 
-1. <Step 1 でコピーした GitHub の URL> を clone してそのディレクトリに移動
-2. 依存関係をインストール（npm install）
-3. .env と .dev.vars を以下の値で作成
-4. ローカル DB を起動して全マイグレーションを適用
-5. 開発サーバを立ち上げ
+最後の 2 行で、空の `.env` と `.dev.vars` がリポジトリルートに作られます（次のステップで値を埋めます）。
 
+#### 3-2. `.env` と `.dev.vars` に Step 2 の値を書き込む（エディタ）
+
+clone したリポジトリをお好みのエディタ（VS Code 等）で開き、以下 2 ファイルを編集します。**Service Role key などの秘密値は Claude Code のチャット欄には貼らず、自分でファイルに直接書き込みます**（会話履歴に残さないため）。
+
+`.env`（公開値、リポジトリルート）:
+
+```bash
 PUBLIC_SUPABASE_URL=<Step 2 の Project URL>
 PUBLIC_SUPABASE_PUBLISHABLE_KEY=<Step 2 の Publishable key>
+```
+
+`.dev.vars`（ローカル開発用の秘密値、リポジトリルート）:
+
+```bash
 SUPABASE_SERVICE_ROLE_KEY=<Step 2 の Service Role key>
 ```
 
-Claude Code は内部で以下を代行します:
+`.env` / `.dev.vars` はどちらも `.gitignore` 対象なので、誤ってコミットされる心配はありません。
 
-- `git clone <URL>` → `cd <repo>`
-- `npm install`
-- `.env`（公開値）と `.dev.vars`（Service Role key）の作成
-- `npm run db:start`（Docker 上のローカル Supabase 起動。初回は image 取得で 1〜3 分）
-- `npm run db:reset`（全マイグレーション適用）
-- `npm run dev`（開発サーバ起動）
+#### 3-3. ローカル DB と開発サーバを起動（ターミナル）
 
-途中で Docker Desktop が起動していないなどのエラーが出たら、Claude Code が指示してくれるのでそれに従ってください。
+Docker Desktop を起動した状態で、リポジトリのルートで以下を実行します。
+
+```bash
+npm run db:start    # Docker 上のローカル Supabase 起動。初回は image 取得で 1〜3 分
+npm run db:reset    # 全マイグレーション適用
+npm run dev         # 開発サーバ起動
+```
+
+`npm run dev` がローカル URL（通常 <http://localhost:4321>）を表示したら成功です。Docker Desktop が起動していないと `npm run db:start` が失敗するので、その場合は Docker Desktop を起動してから再実行してください。
 
 ### Step 4: ブラウザで動作確認（GUI）
 
-開発サーバが起動すると、Claude Code がローカル URL を表示します（通常 <http://localhost:4321>）。ブラウザで開いて以下を確認します:
+Step 3-3 の `npm run dev` が表示するローカル URL（通常 <http://localhost:4321>）をブラウザで開いて、以下を確認します:
 
 - トップページの **"サインアップ"** リンクから仮のメール / パスワードで登録
 - `/member/dashboard` に到達できれば成功
