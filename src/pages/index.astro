@@ -25,8 +25,7 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
     >
       <p>
         <span aria-hidden="true">⚠️</span>
-        このランディングページは <strong>テンプレート紹介用</strong> です。
-        あなたのプロダクトに合わせて
+        このランディングページは <strong>テンプレート紹介用</strong> です。 あなたのプロダクトに合わせて
         <code
           class="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs text-amber-900"
           >src/pages/index.astro</code
@@ -42,13 +41,16 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
   </aside>
 
   <!-- ② Hero -->
+  <!-- 背景は brand-600 → brand-700 のグラデーション。WCAG AA (4.5:1) を確保するため
+       brand-500 始端を使わない (white on brand-500 = 3.48:1 で fail)。
+       white on brand-600 = 5.15:1, on brand-700 = 7.24:1。Codex review iter-1 P1。 -->
   <section
-    class="from-brand-500 to-brand-700 relative bg-gradient-to-br text-white"
+    class="from-brand-600 to-brand-700 relative bg-gradient-to-br text-white"
   >
     <div class="mx-auto max-w-7xl px-4 py-20 sm:px-6 md:py-28 lg:px-8">
       <div class="text-center">
         <p
-          class="text-brand-100 mb-4 text-sm font-semibold tracking-wider uppercase"
+          class="mb-4 text-sm font-semibold tracking-wider text-white uppercase"
         >
           Claude Code 前提の会員サイトテンプレート
         </p>
@@ -57,12 +59,14 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
           本番運用に耐える<br />
           会員サイトを最短で。
         </h1>
-        <p class="text-brand-100 mx-auto mb-10 max-w-3xl text-lg md:text-xl">
+        <p class="mx-auto mb-10 max-w-3xl text-lg text-white md:text-xl">
           Astro 6 / Vue 3 / Supabase / Cloudflare Workers に加え、
-          セキュリティ・テスト・レビュー収束ループまで
-          組み込み済み。clone してすぐ実装に入れます。
+          セキュリティ・テスト・レビュー収束ループまで 組み込み済み。clone
+          してすぐ実装に入れます。
         </p>
-        <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
+        <div
+          class="flex flex-col items-center justify-center gap-4 sm:flex-row"
+        >
           <a
             href={USE_TEMPLATE_URL}
             class="text-brand-700 hover:bg-brand-50 inline-flex items-center gap-2 rounded-lg bg-white px-8 py-4 text-lg font-semibold shadow-lg transition"
@@ -131,8 +135,10 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
           </h3>
           <p class="text-gray-600">
             全テーブルで RLS 有効化済み。<code
-              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm">profiles.role</code
-            > は table-level UPDATE 剥奪 + column-level 再付与で privilege escalation を遮断。pgTAP で退行検知。
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+              >profiles.role</code
+            > は table-level UPDATE 剥奪 + column-level 再付与で privilege escalation
+            を遮断。pgTAP で退行検知。
           </p>
         </article>
 
@@ -162,7 +168,11 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
             CSRF 多層防御
           </h3>
           <p class="text-gray-600">
-            Astro <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm">security.checkOrigin</code> + 状態変更は POST 限定 + GET 405 / クロスオリジン POST 403 を実 workerd ランタイムで自動テスト。
+            Astro <code
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+              >security.checkOrigin</code
+            > + 状態変更は POST 限定 + GET 405 / クロスオリジン POST 403 を実 workerd
+            ランタイムで自動テスト。
           </p>
         </article>
 
@@ -184,15 +194,16 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
           </div>
           <h3 class="mb-2 text-xl font-semibold text-gray-900">
             Turnstile / Google OAuth は opt-in
           </h3>
           <p class="text-gray-600">
-            CAPTCHA / Google ログインはコード上は完備済みでデフォルト OFF。env と Dashboard を揃えたときだけ有効化されるので、要らないプロジェクトは最小構成で出荷できます。
+            CAPTCHA / Google ログインはコード上は完備済みでデフォルト OFF。env
+            と Dashboard
+            を揃えたときだけ有効化されるので、要らないプロジェクトは最小構成で出荷できます。
           </p>
         </article>
 
@@ -222,7 +233,9 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
             Codex × Claude Code 収束レビュー
           </h3>
           <p class="text-gray-600">
-            <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm">/codex-cross-review &lt;PR&gt;</code> で OpenAI Codex と Claude Code が双方 LGTM するまで反復。RLS 漏れ・権限昇格経路を二重チェックしてからマージ。
+            <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+              >/codex-cross-review &lt;PR&gt;</code
+            > で OpenAI Codex と Claude Code が双方 LGTM するまで反復。RLS 漏れ・権限昇格経路を二重チェックしてからマージ。
           </p>
         </article>
 
@@ -253,10 +266,12 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
           </h3>
           <p class="text-gray-600">
             マイグレーションは <code
-              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm">supabase migration new</code
-            > → <code
-              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm">/db-check</code
-            > → dry-run → cross-review の手順を CLAUDE.md に明記。RLS / トリガー / 列レベル grant は pgTAP で退行検知。
+              class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+              >supabase migration new</code
+            > → <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
+              >/db-check</code
+            > → dry-run → cross-review の手順を CLAUDE.md に明記。RLS / トリガー /
+            列レベル grant は pgTAP で退行検知。
           </p>
         </article>
 
@@ -321,23 +336,38 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
           </h3>
           <ul class="space-y-3 text-gray-700">
             <li class="flex gap-3">
-              <code class="font-mono text-sm font-semibold whitespace-nowrap text-brand-700">CLAUDE.md</code>
+              <code
+                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
+                >CLAUDE.md</code
+              >
               <span>プロジェクト全体の地図と開発フロー</span>
             </li>
             <li class="flex gap-3">
-              <code class="font-mono text-sm font-semibold whitespace-nowrap text-brand-700">security.md</code>
+              <code
+                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
+                >security.md</code
+              >
               <span>チェックリスト / レビュー手順 / 運用ハンドブック</span>
             </li>
             <li class="flex gap-3">
-              <code class="font-mono text-sm font-semibold whitespace-nowrap text-brand-700">development.md</code>
+              <code
+                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
+                >development.md</code
+              >
               <span>TypeScript / Vue / 命名規則 / エラーハンドリング</span>
             </li>
             <li class="flex gap-3">
-              <code class="font-mono text-sm font-semibold whitespace-nowrap text-brand-700">architecture.md</code>
+              <code
+                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
+                >architecture.md</code
+              >
               <span>認証フロー / ディレクトリ構成 / パフォーマンス方針</span>
             </li>
             <li class="flex gap-3">
-              <code class="font-mono text-sm font-semibold whitespace-nowrap text-brand-700">database.md</code>
+              <code
+                class="text-brand-700 font-mono text-sm font-semibold whitespace-nowrap"
+                >database.md</code
+              >
               <span>スキーマ / RLS の完全 SQL / マイグレーション運用</span>
             </li>
           </ul>
@@ -350,35 +380,39 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
           </h3>
           <ul class="space-y-3 text-gray-700">
             <li class="flex flex-col gap-1">
-              <code class="font-mono text-sm font-semibold text-brand-700"
+              <code class="text-brand-700 font-mono text-sm font-semibold"
                 >/codex-cross-review &lt;PR&gt;</code
               >
               <span class="text-sm">
-                Codex × Claude Code の二人レビュー収束ループ。LGTM + CI green までユーザー承認待ち。
+                Codex × Claude Code の二人レビュー収束ループ。LGTM + CI green
+                までユーザー承認待ち。
               </span>
             </li>
             <li class="flex flex-col gap-1">
-              <code class="font-mono text-sm font-semibold text-brand-700"
+              <code class="text-brand-700 font-mono text-sm font-semibold"
                 >/db-check</code
               >
               <span class="text-sm">
-                ローカル DB を reset → lint → test の順に検証。マイグレーション編集後の自己点検に。
+                ローカル DB を reset → lint → test
+                の順に検証。マイグレーション編集後の自己点検に。
               </span>
             </li>
             <li class="flex flex-col gap-1">
-              <code class="font-mono text-sm font-semibold text-brand-700"
+              <code class="text-brand-700 font-mono text-sm font-semibold"
                 >/security-review</code
               >
               <span class="text-sm">
-                pending changes に対して認証・認可・XSS・CSRF・SQLi 等を自動レビュー。
+                pending changes に対して認証・認可・XSS・CSRF・SQLi
+                等を自動レビュー。
               </span>
             </li>
             <li class="flex flex-col gap-1">
-              <code class="font-mono text-sm font-semibold text-brand-700"
+              <code class="text-brand-700 font-mono text-sm font-semibold"
                 >/pr-triage</code
               >
               <span class="text-sm">
-                open PR を Dependabot のリスク分類と機能 PR に仕分けて triage レポートを出す。
+                open PR を Dependabot のリスク分類と機能 PR に仕分けて triage
+                レポートを出す。
               </span>
             </li>
           </ul>
@@ -402,27 +436,27 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
       <div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
           <div class="mb-2 text-3xl" aria-hidden="true">🚀</div>
-          <h4 class="font-semibold text-gray-900">Astro 6</h4>
+          <h3 class="font-semibold text-gray-900">Astro 6</h3>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
           <div class="mb-2 text-3xl" aria-hidden="true">💚</div>
-          <h4 class="font-semibold text-gray-900">Vue 3</h4>
+          <h3 class="font-semibold text-gray-900">Vue 3</h3>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
           <div class="mb-2 text-3xl" aria-hidden="true">⚡</div>
-          <h4 class="font-semibold text-gray-900">Supabase</h4>
+          <h3 class="font-semibold text-gray-900">Supabase</h3>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
           <div class="mb-2 text-3xl" aria-hidden="true">☁️</div>
-          <h4 class="font-semibold text-gray-900">Cloudflare</h4>
+          <h3 class="font-semibold text-gray-900">Cloudflare</h3>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
           <div class="mb-2 text-3xl" aria-hidden="true">🎨</div>
-          <h4 class="font-semibold text-gray-900">Tailwind 4</h4>
+          <h3 class="font-semibold text-gray-900">Tailwind 4</h3>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-5 text-center">
           <div class="mb-2 text-3xl" aria-hidden="true">🧪</div>
-          <h4 class="font-semibold text-gray-900">Vitest 4</h4>
+          <h3 class="font-semibold text-gray-900">Vitest 4</h3>
         </div>
       </div>
     </div>
@@ -434,7 +468,7 @@ const USE_TEMPLATE_URL = `${REPO_URL}/generate`;
       <h2 class="mb-4 text-3xl font-bold text-white md:text-4xl">
         動くデモを見る
       </h2>
-      <p class="text-brand-100 mb-8 text-lg">
+      <p class="mb-8 text-lg text-white">
         実装パターンを実際に触りたい方は、テストアカウントを作成してダッシュボード・プロフィール・管理者画面を確認できます。
       </p>
       <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">

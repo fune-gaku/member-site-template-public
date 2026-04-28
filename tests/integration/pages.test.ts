@@ -331,7 +331,9 @@ describe("Index page (developer LP, Issue #87)", () => {
     expect(result).toContain(
       "https://github.com/fune-gaku/member-site-template/blob/main/README.md",
     );
-    expect(result).toContain("https://github.com/fune-gaku/member-site-template");
+    expect(result).toContain(
+      "https://github.com/fune-gaku/member-site-template",
+    );
   });
 
   it("動くデモを見るセクションに signup / signin の既存導線が残る", async () => {
@@ -344,16 +346,28 @@ describe("Index page (developer LP, Issue #87)", () => {
     expect(result).toContain('href="/auth/signin"');
   });
 
-  it("見出しは h1 が 1 個だけで階層が崩れていない (a11y)", async () => {
+  it("見出しは h1 が 1 個で h1→h2→h3 の階層を skip しない (a11y, WCAG 2.1 SC 1.3.1)", async () => {
     const renderers = await loadRenderers([vueContainerRenderer()]);
     const container = await AstroContainer.create({ renderers });
     const { default: IndexPage } = await import("../../src/pages/index.astro");
     const result = await container.renderToString(IndexPage);
 
-    const h1Count = (result.match(/<h1\b/g) ?? []).length;
-    expect(h1Count).toBe(1);
-    // h2 / h3 が h1 の下に存在し、h4 や h5 にスキップしていない
-    expect(result).toMatch(/<h2\b/);
-    expect(result).toMatch(/<h3\b/);
+    // 全 heading を出現順に列挙し、レベルだけ取り出す。
+    const levels = Array.from(result.matchAll(/<h([1-6])\b/g)).map((m) =>
+      Number(m[1]),
+    );
+
+    // h1 はちょうど 1 個 (LP の主見出しは Hero の "Claude Code で..." だけ)
+    expect(levels.filter((l) => l === 1)).toHaveLength(1);
+    // 最初の見出しは h1
+    expect(levels[0]).toBe(1);
+    // h4 / h5 / h6 は使わない (このページには h1〜h3 で十分構造化できる前提)
+    expect(levels.filter((l) => l >= 4)).toHaveLength(0);
+    // 任意の隣接ペアでレベルを 2 段階以上 jump しない
+    // (h2 の直後に h4 みたいに親レベルを skip しない)
+    for (let i = 1; i < levels.length; i++) {
+      const jump = levels[i] - levels[i - 1];
+      expect(jump).toBeLessThanOrEqual(1);
+    }
   });
 });
