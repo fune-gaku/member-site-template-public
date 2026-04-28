@@ -13,7 +13,7 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
 const injectTurnstileLoader = enableTurnstile && Boolean(turnstileSiteKey);
 ---
 
-<Base title={title} description={description}>
+<Base title={title} description={description} noIndex>
   {
     injectTurnstileLoader && (
       <Fragment slot="head">

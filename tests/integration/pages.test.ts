@@ -29,6 +29,44 @@ describe("Base layout", () => {
   });
 });
 
+describe("Base layout — noIndex meta (Issue #70)", () => {
+  // 認証必須エリア / 認証フローページは検索エンジンにインデックスされないように
+  // <meta name="robots" content="noindex, nofollow"> を出す。robots.txt と
+  // @astrojs/sitemap filter に加えた 3 層目の防御。
+  const NOINDEX_META_RE =
+    /<meta[^>]+name="robots"[^>]+content="noindex, nofollow"/;
+
+  it("noIndex 未指定時は robots meta を出さない (一般公開ページ)", async () => {
+    const container = await AstroContainer.create();
+    const result = await container.renderToString(Base, {
+      props: { title: "公開ページ" },
+      slots: { default: "<p>x</p>" },
+    });
+
+    expect(result).not.toMatch(NOINDEX_META_RE);
+  });
+
+  it("noIndex=true で robots meta が出る", async () => {
+    const container = await AstroContainer.create();
+    const result = await container.renderToString(Base, {
+      props: { title: "非公開ページ", noIndex: true },
+      slots: { default: "<p>x</p>" },
+    });
+
+    expect(result).toMatch(NOINDEX_META_RE);
+  });
+
+  it("Auth レイアウトは noIndex を渡している (signin / signup / reset-password 等)", async () => {
+    const container = await AstroContainer.create();
+    const result = await container.renderToString(Auth, {
+      props: { title: "サインイン" },
+      slots: { default: "<form />" },
+    });
+
+    expect(result).toMatch(NOINDEX_META_RE);
+  });
+});
+
 describe("Auth layout — Turnstile loader opt-in (PR #32 / Issue #31)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

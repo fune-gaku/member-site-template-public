@@ -46,13 +46,16 @@ cp .dev.vars.example .dev.vars
 
 ### 環境変数
 
-| ファイル    | 変数                              | 用途                                                      |
-| ----------- | --------------------------------- | --------------------------------------------------------- |
-| `.env`      | `PUBLIC_SUPABASE_URL`             | Supabase Project URL（公開値）                            |
-| `.env`      | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/publishable key（公開値）                   |
-| `.dev.vars` | `SUPABASE_SERVICE_ROLE_KEY`       | Supabase Service Role Key（ローカル開発時のみ。**秘匿**） |
+| ファイル    | 変数                              | 用途                                                                                                     |
+| ----------- | --------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `.env`      | `PUBLIC_SUPABASE_URL`             | Supabase Project URL（公開値）                                                                           |
+| `.env`      | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/publishable key（公開値）                                                                  |
+| `.env`      | `PUBLIC_SITE_URL`                 | 公開先 URL（`https://...`）。`@astrojs/sitemap` が必須とし、`<link rel="canonical">` 等の絶対 URL に使用 |
+| `.dev.vars` | `SUPABASE_SERVICE_ROLE_KEY`       | Supabase Service Role Key（ローカル開発時のみ。**秘匿**）                                                |
 
-取得元は [Supabase Dashboard > Settings > API](https://supabase.com/dashboard) です。
+Supabase の値の取得元は [Supabase Dashboard > Settings > API](https://supabase.com/dashboard) です。
+
+> **公開ドメインを変えたら 2 か所**: `.env` の `PUBLIC_SITE_URL` と [public/robots.txt](public/robots.txt) の `Sitemap:` 行を自プロジェクトのドメインに書き換えてください（Issue #70）。`PUBLIC_SITE_URL` 未設定時はテンプレ既定の `https://member-site-template.fune-gaku.workers.dev` に fallback します。
 
 > `.env` / `.dev.vars` は `.gitignore` 済み。**絶対にコミットしない**こと。
 

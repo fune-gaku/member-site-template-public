@@ -1,0 +1,10 @@
+# Issue #70: 認証必須ルートを検索エンジンから除外。
+# 多層防御 (robots.txt + sitemap filter + <meta name="robots" noindex>) の 1 層。
+# テンプレ利用者は本ファイルの Sitemap: 行を自プロジェクトの公開 URL に書き換えること。
+User-agent: *
+Disallow: /member/
+Disallow: /admin/
+Disallow: /auth/
+Allow: /
+
+Sitemap: https://member-site-template.fune-gaku.workers.dev/sitemap-index.xml
