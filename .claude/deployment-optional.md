@@ -8,6 +8,7 @@
 
 - [Cloudflare Turnstile（任意 / bot 対策）](#cloudflare-turnstile任意--bot-対策) — `auth.signUp` / `auth.signIn` / `auth.resetPassword` の 3 経路に CAPTCHA を入れる
 - [Google OAuth セットアップ（任意）](#google-oauth-セットアップ任意) — email + password に加えて Google ログインを追加
+- [Workers Builds（任意 / GitHub 自動デプロイ）](#workers-builds任意--github-自動デプロイ) — `git push` / PR で Cloudflare 側のビルド・デプロイを自動化し、PR ごとに preview URL を発行
 
 将来追加される opt-in 機能（別 IdP / SSO / 外部サービス連携など）も本ファイルに集約する方針。
 
@@ -185,3 +186,127 @@ PUBLIC_GOOGLE_AUTH_ENABLED=true
 3. **Google Cloud Console（任意）**: 不要になった OAuth client を削除、または「Disabled」に変更
 
 > ⚠️ **やってはいけない順序**: Supabase Dashboard を先に OFF にしてアプリ側 `PUBLIC_GOOGLE_AUTH_ENABLED=true` のままにすると、ボタンは表示されるが押下時に `provider is not enabled` エラーで失敗する。必ずアプリ側を先に切ること。
+
+---
+
+## Workers Builds（任意 / GitHub 自動デプロイ）
+
+Cloudflare 公式の **Workers Builds**（GitHub 連携の自動デプロイ + PR preview）を opt-in で導入する手順（Issue #71）。`git push` / PR を起点に Cloudflare 側でビルド・デプロイが走るので、テンプレ利用者が手元で `wrangler deploy` を打たずに済む。
+
+### 何ができるか
+
+- `main` への push → 本番環境に自動デプロイ（`npx wrangler deploy` 相当）
+- 非本番ブランチ / PR への push → **preview URL を自動発行**（`npx wrangler versions upload` 相当で、active deployment には promote されない）
+- 各開発者の PC に `CLOUDFLARE_API_TOKEN` を配布する必要がない（GitHub App ベースの OAuth 連携）
+- 既存 GitHub Actions（[.github/workflows/test.yml](../.github/workflows/test.yml) 等）と共存可能。Workers Builds は **Cloudflare 側のビルド & デプロイ**、GitHub Actions は **GitHub 側のテスト & lint** という棲み分け
+
+> **本テンプレートのデフォルトは OFF**（README の手順は `npx wrangler deploy` の手動実行を default 経路としている）。Workers Builds と手動 `wrangler deploy` は共存可能で、どちらか一方を完全に選ぶ必要はないが、運用ルールが分散すると事故りやすいので **チームごとにどちらをメイン経路にするか決めて統一する** のを推奨。
+
+### 1. Cloudflare Dashboard で Worker と GitHub リポジトリを連携
+
+**初回デプロイ後の既存 Worker に後付けする場合**（README の Step 9「初回デプロイ」が一度でも走った状態を想定）:
+
+1. **Cloudflare Dashboard > Workers & Pages > 該当 Worker（例: `member-site-template`）**
+2. **Settings > Builds > Connect** をクリック
+3. プロバイダ（**GitHub**）を選択し、**Cloudflare Workers and Pages** GitHub App をインストール
+4. **Repository access** は **Only select repositories** を選び、本テンプレを fork したリポジトリだけを許可（最小権限）
+5. **Branch** は `main` を指定（本番ブランチ）
+
+**まだ `wrangler deploy` を一度も走らせていない場合**:
+
+1. **Workers & Pages > Create application > Import a repository** から GitHub App をインストールしてリポジトリを選択
+2. ただし **Worker 名は [wrangler.jsonc](../wrangler.jsonc) の `name` フィールドと一致させる** こと（不一致だとビルド失敗。例: `member-site-template`）
+3. 後続の Build / Runtime 設定（Step 2 / Step 3）は同じ
+
+> 公式: GitHub 連携は **Cloudflare Workers and Pages GitHub App** で行われ、`CLOUDFLARE_API_TOKEN` は **不要**。Repository access は GitHub Apps の設定画面から後で `Only select repositories` に変更できる（[GitHub Integration](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/github-integration/)）。
+
+### 2. Build 設定（Cloudflare Dashboard）
+
+Worker > Settings > Builds で以下を設定:
+
+| 項目                 | 推奨値                 | 備考                                                                                                                                     |
+| -------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Branch**           | `main`                 | ここに設定したブランチが「本番」扱い。それ以外のブランチは preview                                                                       |
+| **Build command**    | `npm run build`        | テストを deploy gate にしたい場合は `npm test && npm run build` に変える（テスト失敗で deploy が止まる）                                 |
+| **Deploy command**   | `npx wrangler deploy`  | 本番ブランチ用。Cloudflare のデフォルト                                                                                                  |
+| **Non-production deploy command** | （空のままで OK） | 空だと Cloudflare デフォルトの `npx wrangler versions upload` が使われ、preview URL のみ発行される                                       |
+| **Root directory**   | （空 / `/`）           | このテンプレはモノレポではないので空でよい                                                                                               |
+| **Node.js version**  | `22` 以上              | [.nvmrc](../.nvmrc) と一致させる                                                                                                         |
+
+### 3. Build variables（公開値のみ。秘匿値はここに書かない）
+
+Worker > Settings > Builds > **Build variables and secrets** に **ビルド時に Vite が読む公開値** を登録する。
+
+```
+PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
+PUBLIC_SITE_URL=https://<your-domain>
+# 任意機能を有効化している場合のみ
+PUBLIC_TURNSTILE_SITE_KEY=<turnstile-site-key>
+PUBLIC_GOOGLE_AUTH_ENABLED=true
+```
+
+> **何が「Build variables」に入るべきか**: `import.meta.env.PUBLIC_*` で参照される値（Vite が `astro build` 時にバンドルへ inline するもの）。README Step 8 (b) の `.env.production` ローカル運用と同じ役割を Workers Builds 側で担う。
+
+> ⚠️ **`SUPABASE_SERVICE_ROLE_KEY` などの runtime secret を Build variables に書かないこと**。Cloudflare 公式が明示しているとおり、Build variables は **ビルド中のみ** 利用可能で **Workers ランタイムには引き継がれない**（[Configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)）。誤って書いてもビルドは通るが、本番リクエストで `env.SUPABASE_SERVICE_ROLE_KEY` が `undefined` になり、admin 機能が全滅する。
+
+### 4. Runtime secrets（秘匿値は引き続き `wrangler secret put`）
+
+Workers ランタイムが直接読む秘匿値は **Workers Builds とは別系統** の per-Worker Secret に登録する。README Step 7 と同じ手順を 1 度だけ実施すれば、以降の Workers Builds 経由のデプロイでも引き継がれる。
+
+```bash
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name member-site-template
+```
+
+| 用途                     | 場所                                                                                                                              | 例                                                |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| ビルド時に inline         | Workers Builds の **Build variables**（Dashboard）                                                                                | `PUBLIC_SUPABASE_URL` / `PUBLIC_SITE_URL`         |
+| ランタイム読み取り（秘密）| `wrangler secret put` または Dashboard > Settings > **Variables and Secrets > Add > Secret**（**Bindings > Secrets Store ではない**） | `SUPABASE_SERVICE_ROLE_KEY`                       |
+
+> 詳細は README の `wrangler secret put` セクション（Step 7）と「Secret が登録したはずなのに undefined になる」トラブルシューティングを参照。**per-Worker Secret と Secrets Store は別物**で、本テンプレのコードは前者に同期アクセスする設計。
+
+### 5. 既存 GitHub Actions との関係
+
+| 層                     | 仕組み                                                                                                                                                                                            | 役割                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| GitHub Actions         | [test.yml](../.github/workflows/test.yml) / [npm-audit.yml](../.github/workflows/npm-audit.yml) / [db-test.yml](../.github/workflows/db-test.yml)                                                 | PR / push 時に **GitHub のランナー** で test / lint / audit を回す    |
+| Cloudflare Workers Builds | Dashboard 設定                                                                                                                                                                                  | PR / push 時に **Cloudflare のビルダー** でビルド & デプロイ          |
+
+両方が並列で走り、両方 green になることが望ましい運用。Workers Builds 側は Cloudflare のインフラに直結しているのでビルド成果物がそのまま preview URL になり、GitHub Actions 側は GitHub 上で test 結果を可視化する。
+
+> **テストを deploy gate にしたい場合**: Workers Builds の Build command を `npm test && npm run build` に変えると、テスト失敗時に deploy が走らない（Cloudflare のビルダー上で `npm test` が再実行される）。GitHub Actions の `test.yml` と二重にテストが走る形になるが、Cloudflare 側も自前で test 結果を見て deploy を止める分、防御層が増える。CI 時間を短縮したい場合は GitHub Actions 側でブランチ保護ルールに `test` を required check として登録し、Workers Builds 側は `npm run build` のみに絞る運用でも良い。
+
+### 6. ビルド時に使える環境変数（参考）
+
+Cloudflare が build 中に自動注入する環境変数（[Configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)）:
+
+| 変数                       | 内容                            |
+| -------------------------- | ------------------------------- |
+| `CI`                       | `true`                          |
+| `WORKERS_CI`               | `1`                             |
+| `WORKERS_CI_BUILD_UUID`    | 現在のビルド ID                 |
+| `WORKERS_CI_COMMIT_SHA`    | コミットハッシュ                |
+| `WORKERS_CI_BRANCH`        | ブランチ名                      |
+
+例えば preview ブランチだけで挙動を変えたい場合は `WORKERS_CI_BRANCH !== 'main'` でビルドスクリプトを分岐できる。本テンプレでは現状利用していない。
+
+### 7. 動作確認
+
+- [ ] 適当な branch を切って push → Cloudflare Dashboard > Workers & Pages > 該当 Worker > **Builds** タブにビルド履歴が現れる
+- [ ] preview ブランチのビルドが成功すると、ビルド詳細から **preview URL**（`https://<hash>-member-site-template.<subdomain>.workers.dev` 形式）が開ける
+- [ ] preview URL でログイン・プロフィール更新等が動く（runtime secret が引き継がれている確認）
+- [ ] PR を `main` にマージ → 本番 URL が新しいバージョンに置き換わる
+- [ ] [Mozilla Observatory](https://observatory.mozilla.org/) / [securityheaders.com](https://securityheaders.com/) で本番 URL を再評価し A 以上を維持
+
+### Workers Builds を後から無効化する
+
+1. **Cloudflare Dashboard > Workers & Pages > 該当 Worker > Settings > Builds > Disconnect**（または Repository を Disconnect）
+2. 以降は手動 `npm run deploy`（= `wrangler deploy`）に戻る。runtime secret はそのまま残るので追加作業は不要
+3. リポジトリ側の権限を完全に剥奪したい場合は GitHub の **Settings > Applications > Cloudflare Workers and Pages** から該当リポジトリの permission を外す or app を uninstall
+
+### 公式ドキュメント
+
+- [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/)
+- [Workers Builds Configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
+- [Git integration setup](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/)
+- [GitHub Integration](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/github-integration/)

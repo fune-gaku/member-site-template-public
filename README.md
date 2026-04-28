@@ -136,6 +136,8 @@ npm run preview
 
 [Astro 公式 Cloudflare アダプター](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)と [Cloudflare Workers Astro guide](https://developers.cloudflare.com/workers/frameworks/framework-guides/astro/) に基づく推奨手順です。
 
+> `git push` / PR ベースの自動デプロイ + PR ごとの preview URL に切り替えたい場合は [.claude/deployment-optional.md「Workers Builds（任意 / GitHub 自動デプロイ）」](.claude/deployment-optional.md#workers-builds任意--github-自動デプロイ) を参照。下記の手動 `wrangler deploy` フローと共存可能です。
+
 ### 1. 依存関係のインストール
 
 ```bash
@@ -256,7 +258,7 @@ npm run deploy
 - [.claude/security.md](.claude/security.md) — セキュリティチェックリスト
 - [.claude/development.md](.claude/development.md) — 開発ルール・命名規則
 - [.claude/deployment.md](.claude/deployment.md) — デプロイ詳細（必須項目のみ）
-- [.claude/deployment-optional.md](.claude/deployment-optional.md) — 任意機能（opt-in）：Turnstile / Google OAuth など
+- [.claude/deployment-optional.md](.claude/deployment-optional.md) — 任意機能（opt-in）：Turnstile / Google OAuth / Workers Builds など
 
 ---
 
