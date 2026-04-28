@@ -301,7 +301,7 @@ wrangler secret put ENABLE_HIBP_CHECK
 
 - [ ] 7 文字以下のパスワードでサインアップ → サーバー側（Zod）で拒否される
 - [ ] 英大文字を含まないパスワード → Zod で拒否される
-- [ ] `password123` など既知漏洩パスワード → Supabase Pro の Leaked Password Protection、または `ENABLE_HIBP_CHECK=true` で拒否される
+- [ ] **Zod スキーマを通過しつつ HIBP 登録済み** のパスワード（例 `Password1`、HIBP 件数 3,451,129）→ Supabase Pro の Leaked Password Protection、または `ENABLE_HIBP_CHECK=true` で拒否される。**`password123` など大文字を含まない値は `src/lib/password-schema.ts` の Zod 段階で先に弾かれ、HIBP 検証経路に到達しないので動作確認に使えない**
 - [ ] 強いパスワード（例: `SecurePass2026`）→ 正常登録できる
 
 ---

@@ -95,7 +95,7 @@ Supabase Dashboard > Database > Advisors > Security に出る警告のうち、*
    npx wrangler secret delete ENABLE_HIBP_CHECK
    ```
 3. ローカル `.dev.vars` でも `ENABLE_HIBP_CHECK` 行を削除 / コメントアウト
-4. 動作確認: 既知漏洩パスワード（例 `password123`）でサインアップ → Supabase 側で reject されることを確認
+4. 動作確認: **Zod スキーマを通過しつつ HIBP 登録済み** のパスワード（例 `Password1`、HIBP 件数 3,451,129）でサインアップ → Supabase Auth まで到達した上で Dashboard 側 Leaked Password Protection によって reject されることを確認。`password123`（小文字のみ）など [`src/lib/password-schema.ts`](../src/lib/password-schema.ts) の大文字要件を満たさない値はサーバ到達前に Zod で弾かれて検証にならないので注意
 5. Advisor を Run しなおし、`Leaked Password Protection Disabled` 警告が消えていることを確認
 
 #### 設計判断
