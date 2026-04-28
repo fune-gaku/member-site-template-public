@@ -1,10 +1,11 @@
 // @ts-check
 
-import cloudflare from '@astrojs/cloudflare';
-import node from '@astrojs/node';
-import vue from '@astrojs/vue';
-import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'astro/config';
+import cloudflare from "@astrojs/cloudflare";
+import node from "@astrojs/node";
+import sitemap from "@astrojs/sitemap";
+import vue from "@astrojs/vue";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "astro/config";
 
 // security.allowedDomains: Host header injection の多層防御。
 // 既定 (空配列) では Astro は X-Forwarded-Host を一切信頼しないため
@@ -12,21 +13,44 @@ import { defineConfig } from 'astro/config';
 // 信頼できるリバースプロキシ配下に置く場合のみ ALLOWED_HOSTS を設定する。
 // 形式: カンマ区切りのホスト名 (例: "app.example.com,staging.example.com")
 const allowedDomains = process.env.ALLOWED_HOSTS
-  ? process.env.ALLOWED_HOSTS.split(',')
+  ? process.env.ALLOWED_HOSTS.split(",")
       .map((h) => h.trim())
       .filter(Boolean)
-      .map((hostname) => ({ hostname, protocol: 'https' }))
+      .map((hostname) => ({ hostname, protocol: "https" }))
   : [];
+
+// site: @astrojs/sitemap が require する公開 URL。
+// PUBLIC_SITE_URL 未設定時は本テンプレ自身のデモ URL に fallback。
+// テンプレ利用者は .env (本番は .env.production / CI 環境変数) で上書きする。
+const siteUrl =
+  process.env.PUBLIC_SITE_URL ??
+  "https://member-site-template.fune-gaku.workers.dev";
 
 // https://astro.build/config
 export default defineConfig({
-  output: 'server',
+  site: siteUrl,
+  output: "server",
   // Vitest実行時はNodeアダプター、本番ビルド時はCloudflareアダプターを使用
   // これにより Astro Issue #15878 (resolve.external エラー) を回避
   adapter: process.env.VITEST
-    ? node({ mode: 'standalone' })
-    : cloudflare({ imageService: 'compile' }),
-  integrations: [vue()],
+    ? node({ mode: "standalone" })
+    : cloudflare({ imageService: "compile" }),
+  integrations: [
+    vue(),
+    // Issue #70: 認証必須エリア (/member/* /admin/* /auth/*) を sitemap から除外。
+    // 多層防御 (robots.txt + sitemap filter + <meta name="robots" noindex>) の 1 層。
+    // filter の引数 page は site を含む完全 URL。
+    sitemap({
+      filter: (page) => {
+        const path = new URL(page).pathname;
+        return (
+          !path.startsWith("/member") &&
+          !path.startsWith("/admin") &&
+          !path.startsWith("/auth")
+        );
+      },
+    }),
+  ],
 
   security: {
     // checkOrigin は Astro 6 の既定値 (true) のまま明示せず維持。
@@ -56,7 +80,7 @@ export default defineConfig({
         "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
         // Cloudflare Turnstile (CAPTCHA): widget は iframe で描画される
         "frame-src https://challenges.cloudflare.com",
-        'upgrade-insecure-requests',
+        "upgrade-insecure-requests",
       ],
       // Turnstile の外部 script (challenges.cloudflare.com/turnstile/v0/api.js) は
       // Astro が自動 hash 化できないため scriptDirective.resources で明示許可する。
@@ -65,12 +89,12 @@ export default defineConfig({
       // 'self' は Astro の既定だが resources を指定すると上書きされてしまうため
       // 明示的に並べて Astro バンドル script (将来 chunk 分割した場合) も許可。
       scriptDirective: {
-        resources: ["'self'", 'https://challenges.cloudflare.com'],
+        resources: ["'self'", "https://challenges.cloudflare.com"],
       },
     },
   },
 
   vite: {
-    plugins: [tailwindcss()]
-  }
+    plugins: [tailwindcss()],
+  },
 });

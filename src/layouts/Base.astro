@@ -4,9 +4,12 @@ import "../styles/global.css";
 interface Props {
   title: string;
   description?: string;
+  // Issue #70: 認証必須エリア / 認証フローページのインデックスを無効化する。
+  // robots.txt と sitemap filter に加えた 3 層目の防御。
+  noIndex?: boolean;
 }
 
-const { title, description = "" } = Astro.props;
+const { title, description = "", noIndex = false } = Astro.props;
 ---
 
 <!doctype html>
@@ -15,6 +18,7 @@ const { title, description = "" } = Astro.props;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    {noIndex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
     <slot name="head" />
