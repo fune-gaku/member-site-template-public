@@ -1,4 +1,6 @@
 ---
+import { actions } from "astro:actions";
+
 import PostList from "../../components/PostList.vue";
 import Member from "../../layouts/Member.astro";
 import { createClient } from "../../lib/supabase";
@@ -8,6 +10,14 @@ interface Post {
   title: string;
   body: string | null;
   created_at: string;
+}
+
+// Issue #34: signOut Action 成功後の redirect は page-level で行う必要がある
+// （Astro 公式: layout / 子コンポーネントからの Astro.redirect は無効）。
+// ここを抜けると cookie が消えた状態で SSR を続けてしまうため frontmatter 冒頭で短絡させる。
+const signOutResult = Astro.getActionResult(actions.auth.signOut);
+if (signOutResult && !signOutResult.error) {
+  return Astro.redirect("/");
 }
 
 const user = Astro.locals.user;

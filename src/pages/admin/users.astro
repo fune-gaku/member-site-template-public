@@ -1,6 +1,15 @@
 ---
+import { actions } from "astro:actions";
+
 import AdminUsersPanel from "../../components/AdminUsersPanel.vue";
 import Admin from "../../layouts/Admin.astro";
+
+// Issue #34: signOut Action 成功後の redirect は page-level で行う必要がある
+// （Astro 公式: layout / 子コンポーネントからの Astro.redirect は無効）。
+const signOutResult = Astro.getActionResult(actions.auth.signOut);
+if (signOutResult && !signOutResult.error) {
+  return Astro.redirect("/");
+}
 
 // middleware で /admin/* は未認証・非 admin をリダイレクト済み
 const user = Astro.locals.user;
