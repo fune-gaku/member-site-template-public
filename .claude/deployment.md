@@ -283,7 +283,7 @@ wrangler secret put ENABLE_HIBP_CHECK
 
 **動作仕様**:
 
-- `auth.signUp` / `admin.createUser` で `ENABLE_HIBP_CHECK=true` のときのみ HIBP API を呼び出す
+- パスワードを **新規設定 / 変更するすべての Action** で `ENABLE_HIBP_CHECK=true` のときのみ HIBP API を呼び出す: `auth.signUp` / `auth.updatePassword`（リセット経由）/ `auth.changePassword`（ログイン中の変更）/ `admin.createUser` の 4 経路（[src/actions/index.ts](../src/actions/index.ts) の `assertNotPwned` 呼び出し箇所）
 - SHA-1 ハッシュの先頭 5 文字だけを送信する k-Anonymity モデル（平文・完全ハッシュは外部に送られない）
 - **API 障害時はフェイルオープン**（登録をブロックしない）。可用性を優先し、Supabase 側の二重防御に委ねる設計
 - Cloudflare Workers の `global_fetch_strictly_public` flag 下でも `api.pwnedpasswords.com` は公開エンドポイントのため動作する
