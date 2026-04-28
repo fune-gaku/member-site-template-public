@@ -223,9 +223,8 @@ update profiles set role = 'admin' where user_id = (
 | やりたいこと                                   | 入口                                                                                                                                           |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | 自分のサイトに合わせてブランド変更（色・名前） | Claude Code に「`src/components/` と `src/styles/global.css` のブランドカラー / サイト名を `<新しい名前>` に置き換えて」と依頼                 |
-| Google ログインを足す                          | [.claude/deployment-optional.md「Google OAuth セットアップ（任意）」](.claude/deployment-optional.md#google-oauth-セットアップ任意)            |
-| bot 対策（Cloudflare Turnstile）               | [.claude/deployment-optional.md「Cloudflare Turnstile（任意 / bot 対策）」](.claude/deployment-optional.md#cloudflare-turnstile任意--bot-対策) |
-| カスタムドメインを当てる                       | [.claude/deployment.md「カスタムドメイン設定」](.claude/deployment.md#カスタムドメイン設定オプション)                                          |
+| Google ログインを足す                          | [.claude/deployment-optional.md「Google OAuth セットアップ（任意）」](.claude/deployment-optional.md#google-oauth-セットアップ任意) |
+| カスタムドメインを当てる                       | [.claude/deployment.md「カスタムドメイン設定」](.claude/deployment.md#カスタムドメイン設定オプション)                               |
 | 機能を追加・変更する                           | Claude Code に [CLAUDE.md](CLAUDE.md) を読ませて指示（自動で読み込まれます）                                                                   |
 | セキュリティ運用（依存更新 / レビュー手順）    | [.claude/security.md](.claude/security.md)                                                                                                     |
 | DB スキーマや RLS を変更する                   | [.claude/database.md](.claude/database.md) + Claude Code に「`/db-check` で検証して」と依頼                                                    |
