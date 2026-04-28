@@ -1,0 +1,22 @@
+---
+import Error from "../layouts/Error.astro";
+
+// Astro が renderable error を prop として渡す。情報漏洩を防ぐため
+// ユーザー画面には出さず、Workers Logs にだけ残す。
+// 公式: https://docs.astro.build/en/basics/astro-pages/#custom-404-and-500-error-pages
+const { error } = Astro.props;
+console.error("500 page rendered:", error);
+---
+
+<Error
+  title="エラーが発生しました"
+  description="サーバーで予期しないエラーが発生しました。"
+>
+  <p class="text-brand-600 mb-2 text-6xl font-bold">500</p>
+  <h1 class="mb-4 text-2xl font-bold text-gray-900">
+    予期しないエラーが発生しました
+  </h1>
+  <p class="text-gray-600">
+    時間をおいて再度お試しください。問題が続く場合は管理者へご連絡ください。
+  </p>
+</Error>

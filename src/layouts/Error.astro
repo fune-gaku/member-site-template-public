@@ -1,0 +1,30 @@
+---
+import Base from "./Base.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<Base title={title} description={description} noIndex>
+  <main
+    class="from-brand-50 to-brand-100 flex min-h-screen items-center justify-center bg-gradient-to-br px-4 py-12"
+  >
+    <div class="w-full max-w-md text-center">
+      <div class="rounded-xl bg-white p-8 shadow-xl">
+        <slot />
+      </div>
+      <div class="mt-6">
+        <a
+          href="/"
+          class="text-brand-600 hover:text-brand-700 text-sm transition-colors"
+        >
+          トップページに戻る
+        </a>
+      </div>
+    </div>
+  </main>
+</Base>

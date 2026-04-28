@@ -39,6 +39,7 @@ export default defineConfig({
     vue(),
     // Issue #70: 認証必須エリア (/member/* /admin/* /auth/*) を sitemap から除外。
     // 多層防御 (robots.txt + sitemap filter + <meta name="robots" noindex>) の 1 層。
+    // Issue #69: 404 / 500 エラーページもインデックス対象外なので除外する。
     // filter の引数 page は site を含む完全 URL。
     sitemap({
       filter: (page) => {
@@ -46,7 +47,9 @@ export default defineConfig({
         return (
           !path.startsWith("/member") &&
           !path.startsWith("/admin") &&
-          !path.startsWith("/auth")
+          !path.startsWith("/auth") &&
+          path !== "/404" &&
+          path !== "/500"
         );
       },
     }),
