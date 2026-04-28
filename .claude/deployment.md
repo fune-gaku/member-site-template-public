@@ -264,7 +264,7 @@ Supabase Dashboard の **Authentication → Policies** 画面:
 - **Enable leaked password protection** を **ON** にする
 - これで Supabase 側で HaveIBeenPwned (HIBP) API 連携による漏洩パスワード拒否が有効化される
 - 漏洩リストに載っているパスワードはサインアップ / パスワード変更時にサーバー側で即時拒否される
-- **Dashboard を ON にしたら、アプリ層の `ENABLE_HIBP_CHECK` は必ず OFF（unset / `false`）にする**。両方有効化すると Supabase 側で reject されたあとにアプリ層が再度 HIBP API を呼んで余計なレイテンシを生む。スイッチング手順は [security-ops.md「Free → Pro へ移行したときのスイッチング手順」](./security-ops.md#free--pro-へ移行したときのスイッチング手順) を参照
+- **Dashboard を ON にしたら、アプリ層の `ENABLE_HIBP_CHECK` は必ず OFF（unset / `false`）にする**。アプリ層 `assertNotPwned` は Supabase Auth 呼び出しの **前** に走る実装（[src/actions/index.ts](../src/actions/index.ts) の `signUp` / `updatePassword` / `changePassword` / admin `createUser` 全経路）。両方 ON だと **アプリ層が先に reject** してしまい、(1) Pro Dashboard 機能が動作観察できなくなる、(2) パスワードが pwned かどうかに関わらず HIBP API 1 往復ぶんのレイテンシが必ず乗る、という不整合が発生する。スイッチング手順は [security-ops.md「Free → Pro へ移行したときのスイッチング手順」](./security-ops.md#free--pro-へ移行したときのスイッチング手順) を参照
 
 #### 3. Free プランの場合: アプリ層で HIBP チェック
 

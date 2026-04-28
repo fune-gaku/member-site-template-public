@@ -87,7 +87,7 @@ Supabase Dashboard > Database > Advisors > Security に出る警告のうち、*
 
 #### Free → Pro へ移行したときのスイッチング手順
 
-二重実行（Dashboard ON + アプリ層 ON）は Supabase 側で reject されたあとにアプリ層が再度 HIBP API を呼ぶ余計なレイテンシを生むため、必ず片方に揃える。
+二重実行（Dashboard ON + アプリ層 ON）は実装上 **アプリ層 `assertNotPwned` が Supabase Auth より前に走る** ため（[src/actions/index.ts](../src/actions/index.ts) の `signUp` / `updatePassword` / `changePassword` / admin `createUser` 全経路）、(1) アプリ層が先に reject して Pro Dashboard の Leaked Password Protection が動作観察できなくなる、(2) パスワードが pwned かどうかに関わらず HIBP API 1 往復ぶんのレイテンシが必ず乗る — の 2 つの不整合が発生する。Pro 化後は必ずアプリ層を OFF にして単一経路に揃える。
 
 1. Supabase Dashboard > Authentication > Attack Protection > **Enable leaked password protection** を **ON**
 2. Cloudflare Workers の Secret から `ENABLE_HIBP_CHECK` を **削除** (または `false`)
