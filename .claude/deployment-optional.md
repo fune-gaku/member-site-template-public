@@ -140,14 +140,14 @@ Cloudflare 公式の **Workers Builds**（GitHub 連携の自動デプロイ + P
 
 Worker > Settings > Builds で以下を設定:
 
-| 項目                 | 推奨値                 | 備考                                                                                                                                     |
-| -------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Branch**           | `main`                 | ここに設定したブランチが「本番」扱い。それ以外のブランチは preview                                                                       |
-| **Build command**    | `npm run build`        | テストを deploy gate にしたい場合は `npm test && npm run build` に変える（テスト失敗で deploy が止まる）                                 |
-| **Deploy command**   | `npx wrangler deploy`  | 本番ブランチ用。Cloudflare のデフォルト                                                                                                  |
-| **Non-production deploy command** | （空のままで OK） | 空だと Cloudflare デフォルトの `npx wrangler versions upload` が使われ、preview URL のみ発行される                                       |
-| **Root directory**   | （空 / `/`）           | このテンプレはモノレポではないので空でよい                                                                                               |
-| **Node.js version**  | `22` 以上              | [.nvmrc](../.nvmrc) と一致させる                                                                                                         |
+| 項目                              | 推奨値                | 備考                                                                                                     |
+| --------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Branch**                        | `main`                | ここに設定したブランチが「本番」扱い。それ以外のブランチは preview                                       |
+| **Build command**                 | `npm run build`       | テストを deploy gate にしたい場合は `npm test && npm run build` に変える（テスト失敗で deploy が止まる） |
+| **Deploy command**                | `npx wrangler deploy` | 本番ブランチ用。Cloudflare のデフォルト                                                                  |
+| **Non-production deploy command** | （空のままで OK）     | 空だと Cloudflare デフォルトの `npx wrangler versions upload` が使われ、preview URL のみ発行される       |
+| **Root directory**                | （空 / `/`）          | このテンプレはモノレポではないので空でよい                                                               |
+| **Node.js version**               | `22` 以上             | [.nvmrc](../.nvmrc) と一致させる                                                                         |
 
 ### 3. Build variables（公開値のみ。秘匿値はここに書かない）
 
@@ -173,19 +173,19 @@ Workers ランタイムが直接読む秘匿値は **Workers Builds とは別系
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name member-site-template
 ```
 
-| 用途                     | 場所                                                                                                                              | 例                                                |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| ビルド時に inline         | Workers Builds の **Build variables**（Dashboard）                                                                                | `PUBLIC_SUPABASE_URL` / `PUBLIC_SITE_URL`         |
-| ランタイム読み取り（秘密）| `wrangler secret put` または Dashboard > Settings > **Variables and Secrets > Add > Secret**（**Bindings > Secrets Store ではない**） | `SUPABASE_SERVICE_ROLE_KEY`                       |
+| 用途                       | 場所                                                                                                                                  | 例                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| ビルド時に inline          | Workers Builds の **Build variables**（Dashboard）                                                                                    | `PUBLIC_SUPABASE_URL` / `PUBLIC_SITE_URL` |
+| ランタイム読み取り（秘密） | `wrangler secret put` または Dashboard > Settings > **Variables and Secrets > Add > Secret**（**Bindings > Secrets Store ではない**） | `SUPABASE_SERVICE_ROLE_KEY`               |
 
 > 詳細は README の `wrangler secret put` セクション（Step 7）と「Secret が登録したはずなのに undefined になる」トラブルシューティングを参照。**per-Worker Secret と Secrets Store は別物**で、本テンプレのコードは前者に同期アクセスする設計。
 
 ### 5. 既存 GitHub Actions との関係
 
-| 層                     | 仕組み                                                                                                                                                                                            | 役割                                                                  |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| GitHub Actions         | [test.yml](../.github/workflows/test.yml) / [npm-audit.yml](../.github/workflows/npm-audit.yml) / [db-test.yml](../.github/workflows/db-test.yml)                                                 | PR / push 時に **GitHub のランナー** で test / lint / audit を回す    |
-| Cloudflare Workers Builds | Dashboard 設定                                                                                                                                                                                  | PR / push 時に **Cloudflare のビルダー** でビルド & デプロイ          |
+| 層                        | 仕組み                                                                                                                                            | 役割                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| GitHub Actions            | [test.yml](../.github/workflows/test.yml) / [npm-audit.yml](../.github/workflows/npm-audit.yml) / [db-test.yml](../.github/workflows/db-test.yml) | PR / push 時に **GitHub のランナー** で test / lint / audit を回す |
+| Cloudflare Workers Builds | Dashboard 設定                                                                                                                                    | PR / push 時に **Cloudflare のビルダー** でビルド & デプロイ       |
 
 両方が並列で走り、両方 green になることが望ましい運用。Workers Builds 側は Cloudflare のインフラに直結しているのでビルド成果物がそのまま preview URL になり、GitHub Actions 側は GitHub 上で test 結果を可視化する。
 
@@ -195,13 +195,13 @@ npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name member-site-template
 
 Cloudflare が build 中に自動注入する環境変数（[Configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)）:
 
-| 変数                       | 内容                            |
-| -------------------------- | ------------------------------- |
-| `CI`                       | `true`                          |
-| `WORKERS_CI`               | `1`                             |
-| `WORKERS_CI_BUILD_UUID`    | 現在のビルド ID                 |
-| `WORKERS_CI_COMMIT_SHA`    | コミットハッシュ                |
-| `WORKERS_CI_BRANCH`        | ブランチ名                      |
+| 変数                    | 内容             |
+| ----------------------- | ---------------- |
+| `CI`                    | `true`           |
+| `WORKERS_CI`            | `1`              |
+| `WORKERS_CI_BUILD_UUID` | 現在のビルド ID  |
+| `WORKERS_CI_COMMIT_SHA` | コミットハッシュ |
+| `WORKERS_CI_BRANCH`     | ブランチ名       |
 
 例えば preview ブランチだけで挙動を変えたい場合は `WORKERS_CI_BRANCH !== 'main'` でビルドスクリプトを分岐できる。本テンプレでは現状利用していない。
 
