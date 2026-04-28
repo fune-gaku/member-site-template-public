@@ -256,13 +256,13 @@ describe("Index page (developer LP, Issue #87)", () => {
     const result = await container.renderToString(IndexPage);
 
     expect(result).toContain(
-      "https://github.com/fune-gaku/member-site-template/generate",
+      "https://github.com/fune-gaku/member-site-template-public/generate",
     );
     expect(result).toContain(
-      "https://github.com/fune-gaku/member-site-template/blob/main/README.md",
+      "https://github.com/fune-gaku/member-site-template-public/blob/main/README.md",
     );
     expect(result).toContain(
-      "https://github.com/fune-gaku/member-site-template",
+      "https://github.com/fune-gaku/member-site-template-public",
     );
   });
 

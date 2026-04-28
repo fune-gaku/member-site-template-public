@@ -264,12 +264,13 @@ Supabase Dashboard の **Authentication → Policies** 画面:
 - **Enable leaked password protection** を **ON** にする
 - これで Supabase 側で HaveIBeenPwned (HIBP) API 連携による漏洩パスワード拒否が有効化される
 - 漏洩リストに載っているパスワードはサインアップ / パスワード変更時にサーバー側で即時拒否される
+- **Dashboard を ON にしたら、アプリ層の `ENABLE_HIBP_CHECK` は必ず OFF（unset / `false`）にする**。アプリ層 `assertNotPwned` は Supabase Auth 呼び出しの **前** に走る実装（[src/actions/index.ts](../src/actions/index.ts) の `signUp` / `updatePassword` / `changePassword` / admin `createUser` 全経路）。両方 ON だと **アプリ層が先に reject** してしまい、(1) Pro Dashboard 機能が動作観察できなくなる、(2) パスワードが pwned かどうかに関わらず HIBP API 1 往復ぶんのレイテンシが必ず乗る、という不整合が発生する。スイッチング手順は [security-ops.md「Free → Pro へ移行したときのスイッチング手順」](./security-ops.md#free--pro-へ移行したときのスイッチング手順) を参照
 
 #### 3. Free プランの場合: アプリ層で HIBP チェック
 
-Supabase Free プランでは Dashboard の Leaked Password Protection が使えないため、アプリ層の `src/lib/pwned-password.ts` （HIBP k-Anonymity API）で代替する。
+Supabase Free プランでは Dashboard の Leaked Password Protection が **使えない**（Advisor で `Leaked Password Protection Disabled` 警告が出続ける）。これは課金プランの仕様であり、本テンプレートはアプリ層 `src/lib/pwned-password.ts` （HIBP k-Anonymity API）で代替する設計。Advisor 警告の取り扱い（残る前提・対応方針）は [security-ops.md「Supabase Advisor で残る想定済み警告と対応」](./security-ops.md#supabase-advisor-で残る想定済み警告と対応) に集約。
 
-**有効化方法**:
+**有効化方法**（Free プラン推奨。Pro プランで Dashboard 側を ON にしているなら **不要**、二重実行を避けるため設定しない）:
 
 ```bash
 # ローカル: .dev.vars に追記
@@ -282,10 +283,12 @@ wrangler secret put ENABLE_HIBP_CHECK
 
 **動作仕様**:
 
-- `auth.signUp` / `admin.createUser` で `ENABLE_HIBP_CHECK=true` のときのみ HIBP API を呼び出す
+- パスワードを **新規設定 / 変更するすべての Action** で `ENABLE_HIBP_CHECK=true` のときのみ HIBP API を呼び出す: `auth.signUp` / `auth.updatePassword`（リセット経由）/ `auth.changePassword`（ログイン中の変更）/ `admin.createUser` の 4 経路（[src/actions/index.ts](../src/actions/index.ts) の `assertNotPwned` 呼び出し箇所）
 - SHA-1 ハッシュの先頭 5 文字だけを送信する k-Anonymity モデル（平文・完全ハッシュは外部に送られない）
 - **API 障害時はフェイルオープン**（登録をブロックしない）。可用性を優先し、Supabase 側の二重防御に委ねる設計
 - Cloudflare Workers の `global_fetch_strictly_public` flag 下でも `api.pwnedpasswords.com` は公開エンドポイントのため動作する
+
+> プラン別の選択結果は **本番デプロイチェックリストに記録** しておくと運用が明確になる（例: 「Free プラン中は `ENABLE_HIBP_CHECK=true` を Worker Secret に設定 / Pro 化したら削除する」）。
 
 > 公式ドキュメント:
 >
@@ -298,7 +301,7 @@ wrangler secret put ENABLE_HIBP_CHECK
 
 - [ ] 7 文字以下のパスワードでサインアップ → サーバー側（Zod）で拒否される
 - [ ] 英大文字を含まないパスワード → Zod で拒否される
-- [ ] `password123` など既知漏洩パスワード → Supabase Pro の Leaked Password Protection、または `ENABLE_HIBP_CHECK=true` で拒否される
+- [ ] **Zod スキーマを通過しつつ HIBP 登録済み** のパスワード（例 `Password1`、HIBP 件数 3,451,129）→ Supabase Pro の Leaked Password Protection、または `ENABLE_HIBP_CHECK=true` で拒否される。**`password123` など大文字を含まない値は `src/lib/password-schema.ts` の Zod 段階で先に弾かれ、HIBP 検証経路に到達しないので動作確認に使えない**
 - [ ] 強いパスワード（例: `SecurePass2026`）→ 正常登録できる
 
 ---

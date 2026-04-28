@@ -15,7 +15,7 @@
 -- INSERT してから平の select is(...) で検証する。
 
 begin;
-select plan(7);
+select plan(10);
 
 -- ----------------------------------------
 -- Test 1+2: raw_user_meta_data に display_name 有り
@@ -125,6 +125,30 @@ select is(
     where user_id = '33333333-3333-3333-3333-333333333333'),
   'member'::text,
   'OAuth signup でも role は default の member（昇格は service_role 経由のみ）'
+);
+
+-- ----------------------------------------
+-- Test 8+9+10: SECURITY DEFINER 関数の REST 公開遮断 (Issue #27, lint 0028/0029)
+--   auth.users INSERT トリガー専用なので anon / authenticated / PUBLIC からは
+--   EXECUTE できないことを保証する。`has_function_privilege` は PUBLIC 経由でも
+--   true を返すため、PUBLIC からも剥奪されていることを併せて検証する。
+-- ----------------------------------------
+select is(
+  has_function_privilege('anon', 'public.handle_new_user()', 'EXECUTE'),
+  false,
+  'anon は public.handle_new_user() を EXECUTE できない (lint 0028)'
+);
+
+select is(
+  has_function_privilege('authenticated', 'public.handle_new_user()', 'EXECUTE'),
+  false,
+  'authenticated は public.handle_new_user() を EXECUTE できない (lint 0029)'
+);
+
+select is(
+  has_function_privilege('public', 'public.handle_new_user()', 'EXECUTE'),
+  false,
+  'PUBLIC からも EXECUTE が剥奪されている (anon/authenticated への有効な剥奪条件)'
 );
 
 select * from finish();
