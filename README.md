@@ -55,7 +55,7 @@ cp .dev.vars.example .dev.vars
 
 Supabase の値の取得元は [Supabase Dashboard > Settings > API](https://supabase.com/dashboard) です。
 
-> **公開ドメインを変えたら 2 か所**: `.env` の `PUBLIC_SITE_URL` と [public/robots.txt](public/robots.txt) の `Sitemap:` 行を自プロジェクトのドメインに書き換えてください（Issue #70）。`PUBLIC_SITE_URL` 未設定時はテンプレ既定の `https://member-site-template.fune-gaku.workers.dev` に fallback します。
+> **公開ドメインを変えたら `PUBLIC_SITE_URL` だけ更新すれば済みます**（Issue #70）。`/sitemap-index.xml` と [/robots.txt](src/pages/robots.txt.ts) は同じ値から派生する単一ソース構成で、`Sitemap:` 行は動的生成されます（Astro 公式パターン）。`PUBLIC_SITE_URL` 未設定時はテンプレ既定の `https://member-site-template.fune-gaku.workers.dev` に fallback します。
 
 > `.env` / `.dev.vars` は `.gitignore` 済み。**絶対にコミットしない**こと。
 

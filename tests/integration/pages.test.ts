@@ -249,6 +249,47 @@ describe("signin / signup pages — Google OAuth opt-in (Issue #49 / PR 3)", () 
   });
 });
 
+describe("/robots.txt endpoint (Issue #70 — dynamic from PUBLIC_SITE_URL)", () => {
+  // 静的 public/robots.txt から src/pages/robots.txt.ts に切替えた経緯は
+  // PR #82 Codex review iteration-1 を参照: PUBLIC_SITE_URL と Sitemap: 行が
+  // ロックステップで更新されないと独自ドメイン運用で壊れるため、Astro 公式の
+  // 動的生成パターンに合わせた。
+  it("Astro.site から /sitemap-index.xml URL を導出して robots.txt を返す", async () => {
+    const { GET } = await import("../../src/pages/robots.txt");
+    const site = new URL("https://example.com/");
+    const response = await GET({ site } as Parameters<typeof GET>[0]);
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("User-agent: *");
+    expect(body).toContain("Disallow: /member/");
+    expect(body).toContain("Disallow: /admin/");
+    expect(body).toContain("Disallow: /auth/");
+    expect(body).toContain("Allow: /");
+    expect(body).toContain("Sitemap: https://example.com/sitemap-index.xml");
+  });
+
+  it("PUBLIC_SITE_URL を変えると Sitemap: 行も追従する (lockstep 整合)", async () => {
+    const { GET } = await import("../../src/pages/robots.txt");
+    const site = new URL("https://app.acme.test/");
+    const response = await GET({ site } as Parameters<typeof GET>[0]);
+
+    const body = await response.text();
+    expect(body).toContain("Sitemap: https://app.acme.test/sitemap-index.xml");
+    expect(body).not.toContain("example.com");
+    expect(body).not.toContain("fune-gaku.workers.dev");
+  });
+
+  it("site が undefined のときは 500 を返す (crawler に壊れた robots を渡さない)", async () => {
+    const { GET } = await import("../../src/pages/robots.txt");
+    const response = await GET({ site: undefined } as Parameters<
+      typeof GET
+    >[0]);
+
+    expect(response.status).toBe(500);
+  });
+});
+
 describe("Index page with Vue component", () => {
   it("Vue renderer を含むコンテナで top page が描画される", async () => {
     const renderers = await loadRenderers([vueContainerRenderer()]);
