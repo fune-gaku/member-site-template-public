@@ -218,16 +218,22 @@ update profiles set role = 'admin' where user_id = (
 
 ---
 
-## 次にやること
+## 次にやること: Claude Code への頼み方の例
 
-| やりたいこと                                   | 入口                                                                                                                                           |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| 自分のサイトに合わせてブランド変更（色・名前） | Claude Code に「`src/components/` と `src/styles/global.css` のブランドカラー / サイト名を `<新しい名前>` に置き換えて」と依頼                 |
-| Google ログインを足す                          | [.claude/deployment-optional.md「Google OAuth セットアップ（任意）」](.claude/deployment-optional.md#google-oauth-セットアップ任意) |
-| カスタムドメインを当てる                       | [.claude/deployment.md「カスタムドメイン設定」](.claude/deployment.md#カスタムドメイン設定オプション)                               |
-| 機能を追加・変更する                           | Claude Code に [CLAUDE.md](CLAUDE.md) を読ませて指示（自動で読み込まれます）                                                                   |
-| セキュリティ運用（依存更新 / レビュー手順）    | [.claude/security.md](.claude/security.md)                                                                                                     |
-| DB スキーマや RLS を変更する                   | [.claude/database.md](.claude/database.md) + Claude Code に「`/db-check` で検証して」と依頼                                                    |
+カスタマイズ・機能追加は **Claude Code に日本語で頼むだけ** で進められます。リポジトリ直下の [CLAUDE.md](CLAUDE.md) が起動時に自動で読み込まれ、Claude Code は規約（コーディング・命名・セキュリティ・DB マイグレーションの 7 ステップ等）に従って作業します。利用者がディレクトリ構造や CLI を覚える必要はありません。
+
+| やりたいこと                  | Claude Code への頼み方の例（コピペして編集）                                                                                                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ブランドカラー・サイト名を変える | 「ブランドカラーを `#2563eb` に、サイト名を "○○ クラブ" に変えて。`src/styles/global.css` の `@theme` と各レイアウトのヘッダ見出しが対象」                                                              |
+| プロフィールに項目を追加      | 「プロフィールに自己紹介 (bio) を 200 文字までで保存できるようにして。CLAUDE.md の DB 変更 7 ステップに沿って migration / RLS / pgTAP テストまで作って、最後に `/db-check` を走らせて」                |
+| 新しい会員ページを作る        | 「`/member/events` ページを作って、admin だけが投稿できて会員全員が読める形にして。RLS と Astro Action の認可チェックも忘れずに」                                                                      |
+| Google ログインを追加         | 「Google OAuth を有効にしたい。`.claude/deployment-optional.md` の Google OAuth セクションを読んで、必要なコード変更とセットアップ手順を教えて」                                                       |
+| カスタムドメインを当てる      | 「`example.com` を Cloudflare Workers に紐付けたい。`.claude/deployment.md` のカスタムドメイン設定に沿って、Cloudflare Dashboard 側で何をすればいいか手順を教えて」                                    |
+| Dependabot PR の確認・マージ  | 「open になっている Dependabot PR を `/pr-triage` で分類して、patch / minor は安全に merge できるか教えて」                                                                                            |
+| 本番デプロイ前のセキュリティレビュー | PR を作ったあとに `/codex-cross-review <PR 番号>` を投げる（Codex × Claude Code の収束ループが LGTM までレビューを反復）                                                                              |
+| 「これってどうなってるの？」  | 「`/member/profile` ページが Supabase の何を読み書きしてるか、関連ファイルを辿って説明して」                                                                                                           |
+
+> 💡 上の例は **そのまま投げても動きます**。具体的に書くほど Claude Code の精度が上がるので、`<200 文字>` `<example.com>` のような部分を自分の数字・名前に置き換えて使ってください。詰まったら「`CLAUDE.md` の規約に従って」「公式ドキュメントを `WebFetch` で確認して」と添えるとさらに精度が上がります。
 
 ---
 
