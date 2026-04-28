@@ -14,12 +14,10 @@ const profile = Astro.locals.profile;
 const isAdmin = profile?.role === "admin";
 const currentPath = Astro.url.pathname;
 
-// Issue #005: サインアウトはフォーム POST のみで副作用を起こす。
-// GET を 405 にするため、ヘッダのフォームも method="POST" + Astro Action に差し替え。
-const signOutResult = Astro.getActionResult(actions.auth.signOut);
-if (signOutResult && !signOutResult.error) {
-  return Astro.redirect("/");
-}
+// Issue #34: signOut Action 成功後の redirect は layout からは効かない（Astro 公式仕様：
+// page-level の return Astro.redirect() のみ Response として作用する）。
+// 本 layout を使う各 page (member/dashboard, member/profile, member/data) で
+// frontmatter 冒頭の早期 return を行う。
 ---
 
 <Base title={title} description={description} noIndex>
