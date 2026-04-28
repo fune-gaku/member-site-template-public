@@ -127,7 +127,9 @@ Supabase Dashboard で以下 2 箇所を設定します。
 
 ### Step 6: Cloudflare Workers にデプロイ（GUI）
 
-Cloudflare 公式の **Workers Builds**（GitHub 連携で自動デプロイ）を使います。
+Cloudflare 公式の **Workers Builds**（GitHub 連携で自動デプロイ）を使います。Cloudflare には **ビルド時の env**（Vite が `astro build` 中に読む）と **ランタイムの env**（Worker が本番リクエストで `env.X` として読む）の 2 系統があり、登録場所が分かれています。Step 6 でビルド時を、Step 7 でランタイムを設定します。
+
+#### 6-1. Worker を作成する
 
 1. <https://dash.cloudflare.com/> にログイン
 2. 左サイドバーの **"Workers & Pages"** をクリック
@@ -135,7 +137,7 @@ Cloudflare 公式の **Workers Builds**（GitHub 連携で自動デプロイ）�
 4. **"Connect GitHub"** をクリック → Cloudflare の GitHub App をインストール
    - **"Only select repositories"** を選び、Step 1 で作ったリポジトリだけを許可（最小権限）
 5. 連携後、リポジトリ一覧から Step 1 のリポジトリを選択
-6. 以下のように設定:
+6. ビルド設定を以下のように入力:
 
    | 項目                | 値                                                                                                                    |
    | ------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -146,21 +148,47 @@ Cloudflare 公式の **Workers Builds**（GitHub 連携で自動デプロイ）�
    | **Root directory**  | （空のまま）                                                                                                          |
    | **Node.js version** | `22`                                                                                                                  |
 
-7. **"Variables and Secrets"** セクションを展開し、以下を登録:
+#### 6-2. Build variables を登録（公開値のみ）
 
-   | 種別         | 変数名                            | 値                                                                                                        |
-   | ------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
-   | **Variable** | `PUBLIC_SUPABASE_URL`             | Step 2 でコピーした Project URL                                                                           |
-   | **Variable** | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Step 2 でコピーした Publishable key                                                                       |
-   | **Variable** | `PUBLIC_SITE_URL`                 | デプロイ後の URL（例: `https://member-site-template.<your-subdomain>.workers.dev`）。後で正しい値に更新可 |
-   | **Secret**   | `SUPABASE_SERVICE_ROLE_KEY`       | Step 2 でコピーした Service Role key（**Secret として登録**、Variable と間違えない）                      |
+同じ画面の **"Build variables and secrets"** セクションを展開し、`PUBLIC_*` の **3 つだけ** を登録します。これらは **ビルド時** に Vite がバンドルへ inline する値です。
 
-   > ⚠️ **Variable と Secret の違い**: 公開値（`PUBLIC_*`）は Variable、秘匿値（Service Role key）は **必ず Secret**。Cloudflare Dashboard では入力欄の右に切り替えタブがあります。
+| 種別         | 変数名                            | 値                                                                                                        |
+| ------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Variable** | `PUBLIC_SUPABASE_URL`             | Step 2 でコピーした Project URL                                                                           |
+| **Variable** | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Step 2 でコピーした Publishable key                                                                       |
+| **Variable** | `PUBLIC_SITE_URL`                 | デプロイ後の URL（例: `https://member-site-template.<your-subdomain>.workers.dev`）。後で正しい値に更新可 |
 
-8. **"Save and Deploy"** をクリック → ビルドログが流れます（2〜4 分）
-9. 完了後、画面上部に `https://member-site-template.<your-subdomain>.workers.dev` の URL が表示されるのでクリック
+> ⚠️ **`SUPABASE_SERVICE_ROLE_KEY` をここに書かない**。Build variables は **ビルド中だけ** 有効で、Workers ランタイムには引き継がれません（[Cloudflare 公式](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)）。誤って書いてもビルドは通りますが、本番リクエストで `env.SUPABASE_SERVICE_ROLE_KEY` が `undefined` になり、admin 機能が全滅します。Service Role key は Step 7 で別の場所に登録します。
 
-### Step 7: 動作確認（GUI）
+#### 6-3. 初回デプロイ
+
+**"Save and Deploy"** をクリック → ビルドログが流れます（2〜4 分）。完了後、画面上部に `https://member-site-template.<your-subdomain>.workers.dev` の URL が表示されます。**この時点ではまだ Service Role key が無いので、admin 機能と一部のサーバ処理は動きません**。次の Step 7 で登録します。
+
+### Step 7: ランタイム Secret を登録（GUI）
+
+Step 6 で作成された Worker の管理画面に移動し、ランタイムの env が読む秘匿値（Service Role key）を **別の場所** に登録します。
+
+1. **Cloudflare Dashboard > Workers & Pages > 該当 Worker（`member-site-template`）** を開く
+2. 上部の **"Settings"** タブ → 左メニューの **"Variables and Secrets"** セクションを開く（**"Bindings > Secrets Store" ではない**）
+3. **"Add"** をクリック → 種別の切り替えで **"Secret"** を選ぶ（"Variable" ではなく "Secret"）
+4. 以下を入力して **"Save"**:
+
+   | 項目        | 値                                                                                  |
+   | ----------- | ----------------------------------------------------------------------------------- |
+   | **Type**    | **Secret**（必ず Secret。Variable に入れると暗号化されず、漏洩リスクが高まる）      |
+   | **Name**    | `SUPABASE_SERVICE_ROLE_KEY`                                                         |
+   | **Value**   | Step 2 でコピーした Service Role key                                                |
+
+> ⚠️ **2 系統の env を混同しないこと**:
+>
+> - **Build variables**（Step 6-2 で登録した場所）: `Settings > Builds > Build variables and secrets`。ビルド時のみ有効。
+> - **Runtime variables/secrets**（Step 7 で登録するこの場所）: `Settings > Variables and Secrets`。Worker のランタイム env が読む。
+>
+> Service Role key を Build variables に書くと本番で `undefined` になります。逆に `PUBLIC_*` を Runtime に書いても、それらはクライアント JS にも inline する設計なのでビルド時に値が必要で、ランタイムだけに置いても意味がありません（Step 6-2 の場所が正解）。
+
+ランタイム Secret は **登録後すぐ反映される**ので、再デプロイは不要です。ブラウザでサイトをリロードすれば admin 機能も動き始めます。
+
+### Step 8: 動作確認（GUI）
 
 本番 URL にアクセスして:
 
@@ -172,9 +200,9 @@ Cloudflare 公式の **Workers Builds**（GitHub 連携で自動デプロイ）�
 
 - Cloudflare Dashboard の該当 Worker → **"Logs"** タブでエラーログを確認
 - Supabase Dashboard の **Authentication → Users** で実際にユーザーが作成されているか確認
-- `/member` で 500 が出るときは Service Role key が **Secret** として登録されているか再確認（Variable に入れると `undefined` になる）
+- `/member` や `/admin` で 500 が出るときは、Service Role key が **Settings > Variables and Secrets** に **Secret** として登録されているかを再確認（Build variables 側に入っていると `undefined` になる）
 
-### Step 8: 初期 admin の設定（GUI / 任意）
+### Step 9: 初期 admin の設定（GUI / 任意）
 
 `/admin` 画面を使うには、自分のアカウントを admin に昇格させます。
 
