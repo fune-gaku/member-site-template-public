@@ -87,6 +87,14 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
 
+-- Supabase Advisor lint 0028 / 0029 対応:
+-- public schema の SECURITY DEFINER 関数は PostgREST の /rest/v1/rpc/<name>
+-- 経由で anon / authenticated から呼べる。本関数は auth.users INSERT トリガー
+-- 専用で外部から呼ぶ用途は無いため、PUBLIC / anon / authenticated の EXECUTE を
+-- 剥奪して REST 公開を遮断する。トリガーは関数オーナー (postgres) 権限で起動するため
+-- 引き続き発火する。
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
 -- ----------------------------------------
 -- member_posts テーブル（サンプル用）
 -- ----------------------------------------
