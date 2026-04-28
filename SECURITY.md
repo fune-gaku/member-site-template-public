@@ -22,7 +22,7 @@ If you discover a security vulnerability in this template, please report it **pr
 
 報告内容は repo メンテナのみが閲覧できます。スレッド内で対話・CVE 取得・修正・公開まで GitHub 上で完結します。
 
-> ⚠️ **公開 Issue / Discussion での報告は避けてください。** 修正パッチが公開される前に exploit が広がる原因になります（responsible disclosure に反します）。GitHub アカウントが無いなど PVR を使えない事情があれば、SNS 経由で repo オーナー（[@michiof](https://github.com/michiof)）に連絡を取ってください。
+> ⚠️ **公開 Issue / Discussion / SNS DM などで脆弱性の詳細を共有しないでください。** 修正パッチが公開される前に exploit が広がる原因になります（responsible disclosure に反します）。これらの経路は PVR と異なり暗号化保管・監査ログ・disclosure 調整の仕組みがなく、脆弱性情報を扱う前提で設計されていません。PVR を利用するには GitHub アカウント（無料）が必要です。
 
 報告に含めると助かる情報:
 
@@ -54,8 +54,8 @@ If you discover a security vulnerability in this template, please report it **pr
 このファイルはあなたのプロジェクトに **そのままでは適切ではありません**。フォーク後は以下を必ず差し替えてください:
 
 1. GitHub Settings > Code security and analysis > **Private Vulnerability Reporting** を有効化（パブリックリポジトリで無料、有効化しないと "Report a vulnerability" ボタンが表示されません）
-2. 「公開 Issue 不可」の連絡先を **あなたの組織の窓口** に変更（PVR を使えないレポーター向け fallback。メールにする場合は spam 対策を準備）
-3. 対応プロセスの SLA を **あなたの運用実態** に合わせて調整
+2. 対応プロセスの SLA を **あなたの運用実態** に合わせて調整
+3. PVR を補完する非公開窓口を追加したい場合は、**専用の security メーリングリスト**（例: `security@your-domain.com` で alias + 暗号化転送）を用意してから記載してください。SNS DM・個人 email・公開 issue は脆弱性情報を扱う前提で設計されていないので fallback として案内しないこと
 4. 必要なら [`/.well-known/security.txt`](https://www.rfc-editor.org/rfc/rfc9116)（RFC 9116）の追加も検討
 
 セキュリティ実装の詳細・運用ハンドブック・脅威モデルは [.claude/security.md](.claude/security.md) と [.claude/security-ops.md](.claude/security-ops.md) を参照してください。
