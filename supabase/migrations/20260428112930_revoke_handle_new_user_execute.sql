@@ -1,0 +1,25 @@
+-- ========================================
+-- Issue #27: handle_new_user() の REST 公開遮断 (Supabase Advisor lint 0028/0029)
+-- ========================================
+--
+-- 背景:
+--   public.handle_new_user() は auth.users INSERT トリガー専用の SECURITY DEFINER
+--   関数だが、public schema 配下のため PostgREST の /rest/v1/rpc/handle_new_user
+--   経由で anon / authenticated から呼び出せる状態になっていた。
+--   実害は NEW 依存で実行時例外になる程度だが、SECURITY DEFINER 関数の REST 公開は
+--   defense-in-depth の原則に反するため遮断する。
+--
+-- 修正方針:
+--   CREATE FUNCTION のデフォルトで PUBLIC に EXECUTE が付き、Supabase の default
+--   privileges が anon / authenticated / service_role にも EXECUTE を grant するため
+--   3 ロールから一括剥奪する。`has_function_privilege` は PUBLIC 経由でも true を
+--   返す仕様のため、PUBLIC からの剥奪は anon/authenticated を効果的に剥奪する前提。
+--   トリガーは関数オーナー (postgres) 権限で発火するため引き続き動作する。
+--
+-- 配布経路ノート (Codex review iteration-1 反映):
+--   .claude/database.md:332 は「既存マイグレーション (20260420205000_init.sql) は
+--   直接編集禁止。スキーマ変更は新しいタイムスタンプのファイルで追加」と規定。
+--   既存 fork や本番デプロイ済み環境には init を再適用しないため、forward
+--   migration として独立配布する。
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
