@@ -230,6 +230,86 @@ describe("performDeleteUser (Issue #14, admin-only)", () => {
     expect(deleteUser).toHaveBeenCalledWith(VALID_INPUT.userId, false);
   });
 
+  it("Codex iter-2 P1: 1001+ files は remove が 1000 件 chunk で順次呼ばれる (公式上限)", async () => {
+    // Supabase Storage remove は 1 call あたり 1000 オブジェクト上限。
+    // 公式: https://supabase.com/docs/guides/storage/management/delete-objects
+    // "When deleting objects, there is a limit of 1000 objects at a time using the `remove` method."
+    // 1500 件持つユーザは 1000 + 500 の 2 batch で全削除する。
+
+    // テスト簡略化のため list は 1 回で 1500 件返す mock にする
+    // (本番では list の page size = 100 だが、本テストは remove の chunk 動作の検証に絞る)。
+    const all1500 = Array.from({ length: 1500 }, (_, i) => ({
+      name: `${i.toString().padStart(4, "0")}.png`,
+    }));
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce({ data: all1500, error: null })
+      // 2 回目: 0 件返して loop を確実に break
+      .mockResolvedValueOnce({ data: [], error: null });
+    const remove = vi.fn().mockResolvedValue({ data: null, error: null });
+    const deleteUser = vi.fn().mockResolvedValue({ data: null, error: null });
+    const from = vi.fn().mockReturnValue({ list, remove });
+    const client: DeleteUserCapableAdminClient = {
+      storage: { from },
+      auth: { admin: { deleteUser } },
+    };
+
+    await performDeleteUser(client, VALID_INPUT);
+
+    // remove は 2 回呼ばれる (1000 + 500)
+    expect(remove).toHaveBeenCalledTimes(2);
+    const batch1 = remove.mock.calls[0]?.[0] as string[];
+    const batch2 = remove.mock.calls[1]?.[0] as string[];
+    expect(batch1).toHaveLength(1000);
+    expect(batch2).toHaveLength(500);
+    expect(batch1[0]).toBe(`${VALID_INPUT.userId}/0000.png`);
+    expect(batch1[999]).toBe(`${VALID_INPUT.userId}/0999.png`);
+    expect(batch2[0]).toBe(`${VALID_INPUT.userId}/1000.png`);
+    expect(batch2[499]).toBe(`${VALID_INPUT.userId}/1499.png`);
+
+    // deleteUser は 全 batch 成功後に呼ばれる
+    expect(deleteUser).toHaveBeenCalledWith(VALID_INPUT.userId, false);
+  });
+
+  it("Codex iter-2 P1: chunk の途中で remove が失敗したら後続 batch / deleteUser を呼ばない", async () => {
+    // 部分削除状態のまま auth delete に進むと owner constraint で失敗するため、
+    // 最初の失敗で即時 throw する (再実行で残りを掃除可能)。
+    const all1500 = Array.from({ length: 1500 }, (_, i) => ({
+      name: `${i}.png`,
+    }));
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce({ data: all1500, error: null })
+      .mockResolvedValueOnce({ data: [], error: null });
+    const remove = vi
+      .fn()
+      // 1 回目失敗
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "rate limited" },
+      });
+    const deleteUser = vi.fn().mockResolvedValue({ data: null, error: null });
+    const from = vi.fn().mockReturnValue({ list, remove });
+    const client: DeleteUserCapableAdminClient = {
+      storage: { from },
+      auth: { admin: { deleteUser } },
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {
+      // suppress
+    });
+
+    await expect(performDeleteUser(client, VALID_INPUT)).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR",
+      message: DELETE_USER_INTERNAL_ERROR_MESSAGE,
+    });
+
+    // 2 回目の remove (= 後続 batch) は呼ばれない
+    expect(remove).toHaveBeenCalledTimes(1);
+    // deleteUser も呼ばれない (Storage 全削除前なので owner constraint で失敗するため)
+    expect(deleteUser).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it("pagination 境界: 1 ページ目がぴったり 100 件 + 2 ページ目が空", async () => {
     // ちょうど 100 件のとき (PAGE_SIZE と一致): 1 ページ目では break せず
     // 2 ページ目で 0 件返ってから break することを固定する。

@@ -52,6 +52,19 @@ const STORAGE_LIST_PAGE_SIZE = 100;
 const STORAGE_LIST_MAX_PAGES = 100;
 
 /**
+ * Supabase Storage `remove` の 1 回あたりの object 数上限。
+ *
+ * 公式（Codex review iteration-2 P1）: "When deleting objects, there is a
+ * limit of 1000 objects at a time using the `remove` method."
+ * https://supabase.com/docs/guides/storage/management/delete-objects
+ *
+ * 1001 件以上のパスを 1 回の remove に渡すと API が拒否し、後続の
+ * `auth.admin.deleteUser` まで到達せず hard delete が失敗する。
+ * 列挙した全パスを 1000 件単位で chunk して順次 remove 呼出する。
+ */
+const STORAGE_REMOVE_BATCH_SIZE = 1000;
+
+/**
  * `performDeleteUser` が必要とする最小 admin client インターフェース。
  *
  * テスト容易性のために `@supabase/supabase-js` の `SupabaseClient` 全体を
@@ -125,16 +138,31 @@ export async function performDeleteUser(
     if (pageFiles.length < STORAGE_LIST_PAGE_SIZE) break;
   }
 
-  // 2. 列挙された object を一括 remove
+  // 2. 列挙された object を **1000 件 chunk で** 順次 remove
+  //    Supabase Storage remove は 1 call あたり 1000 件上限のため、それを超える
+  //    パスを 1 回で渡すと API が拒否する (Codex review iteration-2 P1)。
+  //    公式: https://supabase.com/docs/guides/storage/management/delete-objects
+  //    "When deleting objects, there is a limit of 1000 objects at a time
+  //     using the `remove` method."
   if (allFiles.length > 0) {
-    const paths = allFiles.map((f) => `${input.userId}/${f.name}`);
-    const { error: removeError } = await avatars.remove(paths);
-    if (removeError) {
-      console.error("admin.deleteUser storage.remove failed:", removeError);
-      throw new ActionError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: DELETE_USER_INTERNAL_ERROR_MESSAGE,
-      });
+    const allPaths = allFiles.map((f) => `${input.userId}/${f.name}`);
+    for (
+      let offset = 0;
+      offset < allPaths.length;
+      offset += STORAGE_REMOVE_BATCH_SIZE
+    ) {
+      const batch = allPaths.slice(offset, offset + STORAGE_REMOVE_BATCH_SIZE);
+      const { error: removeError } = await avatars.remove(batch);
+      if (removeError) {
+        // batch の途中で失敗したら後続 batch / auth delete を呼ばずに即時失敗。
+        // 部分削除状態のまま auth delete に進むと owner constraint で失敗するため、
+        // 早期 return で運用診断しやすい状態にする (再実行で残りを掃除可能)。
+        console.error("admin.deleteUser storage.remove failed:", removeError);
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: DELETE_USER_INTERNAL_ERROR_MESSAGE,
+        });
+      }
     }
   }
 
