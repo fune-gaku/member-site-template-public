@@ -130,7 +130,8 @@ RBAC のロール割り当てを別テーブルで管理する canonical pattern
 - `profiles.role` は **Phase 2 まで残置**。アプリ層 (`requireAdmin` 等) は引き続き `profiles.role` を読む。
 - `handle_new_user` は profiles と user_roles の両方に行を作成（同一 transaction）。
 - 既存ユーザの role は migration の data migration ステップで `user_roles` に複製済み。
-- Phase 2 (#43) で `is_admin()` 関数 + アプリ切替 + `profiles.role` drop。
+- **`profiles_role_sync_to_user_roles` trigger** が `profiles.role` の UPDATE を `user_roles` に伝搬する。これにより既存 `admin.updateUserRole` Action（profiles のみ更新）が動作したまま、user_roles と drift しない（pgTAP `080-user-roles-rls.test.sql` Test 11/12 で固定）。Phase 2 で profiles.role drop と同時に trigger / 関数も drop する。
+- Phase 2 (#43) で `is_admin()` 関数 + アプリ切替 + `profiles.role` drop + sync trigger drop。
 - Phase 3 (#44) で Custom Access Token Hook により JWT に `user_role` claim を embed → DB 引き 0 回化。
 
 ---

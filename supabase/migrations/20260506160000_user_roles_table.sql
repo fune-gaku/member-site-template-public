@@ -112,3 +112,62 @@ begin
   return new;
 end;
 $$;
+
+-- ----------------------------------------
+-- 8. profiles.role 変更を user_roles に同期する trigger
+-- ----------------------------------------
+-- Codex review iteration-2 P2 への対応。Phase 1 ではアプリ層
+-- (admin.updateUserRole) は引き続き profiles.role のみを更新するため、
+-- user_roles との間に drift が発生する。Phase 2 (#43) でアプリ層を user_roles
+-- 経由に切替えるタイミングで古い role を読む security 影響が出るのを防ぐため、
+-- profiles.role の UPDATE を user_roles に伝搬する trigger を入れる。
+--
+-- これにより:
+--   - 既存 admin.updateUserRole はコード変更不要で動作 (Phase 1 contract 維持)
+--   - Phase 2 cutover 時の reconciliation step が不要 (drift が累積しない)
+--   - 後続の admin UI や bootstrap SQL からの role 変更も自動同期
+--
+-- Phase 2 cleanup: profiles.role drop と同時に本 trigger / 関数も drop する
+-- (DROP COLUMN role で `update of role` trigger 自体は無効化されるが、
+--  関数は残るため明示的に drop が必要)。Phase 2 migration に手順を含める。
+
+create or replace function public.sync_profiles_role_to_user_roles()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- role が変わっていないなら何もしない (idempotent)
+  if new.role is not distinct from old.role then
+    return new;
+  end if;
+
+  if new.role is null then
+    return new;  -- profiles.role は NOT NULL だが defensive に skip
+  end if;
+
+  -- 古い role の user_roles 行を削除 (Phase 1 invariant: profiles.role と user_roles は完全一致)
+  if old.role is not null then
+    delete from public.user_roles
+     where user_id = new.user_id
+       and role = old.role::public.app_role;
+  end if;
+
+  -- 新しい role を insert (handle_new_user で既に同 role の行があれば do nothing)
+  insert into public.user_roles (user_id, role)
+  values (new.user_id, new.role::public.app_role)
+  on conflict (user_id, role) do nothing;
+
+  return new;
+end;
+$$;
+
+-- 関数は trigger 経由のみで呼ばれる前提のため REST 公開を遮断
+-- (handle_new_user / 既存 SECURITY DEFINER 関数と同じパターン、Issue #27 / lint 0028/0029)
+revoke execute on function public.sync_profiles_role_to_user_roles()
+  from public, anon, authenticated;
+
+create trigger profiles_role_sync_to_user_roles
+after update of role on public.profiles
+for each row execute function public.sync_profiles_role_to_user_roles();

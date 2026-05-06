@@ -23,25 +23,22 @@
 --      ため、profiles ⇄ user_roles の双方向 anti-join で検証する)
 
 begin;
-select plan(10);
+select plan(12);
 
 -- ----------------------------------------
 -- Setup: alice (member) + bob (admin) を作成
 --   tests.create_supabase_user は handle_new_user を発火させるため、
 --   profiles と user_roles の両方に member 行が作られる。
---   bob を admin に昇格させるため service_role 相当 (postgres) で role を上書き。
+--   bob を admin に昇格させるため profiles.role のみを更新する
+--   (Codex review iteration-2: profiles.role → user_roles の sync trigger が
+--    自動で user_roles 行も更新する。本番の admin.updateUserRole 経路と同じ。)
 -- ----------------------------------------
 select tests.create_supabase_user('alice@example.com');
 select tests.create_supabase_user('bob@example.com');
 
--- bob を admin に昇格させる (本来は admin.updateUserRole Action 経由 / service_role)
--- handle_new_user で挿入された 'member' 行を 'admin' に書き換える。
-update public.user_roles
-   set role = 'admin'::public.app_role
- where user_id = tests.get_supabase_uid('bob@example.com');
-
--- profiles.role 側も整合性のため admin に揃える (Phase 1 では profiles.role が
--- 真の情報源として残るため、data migration parity を assert する Test 6/7 で必要)。
+-- bob を admin に昇格 (本来は admin.updateUserRole Action 経由 / service_role)
+-- profiles.role の UPDATE が sync_profiles_role_to_user_roles trigger を発火させ、
+-- user_roles 側も自動的に bob/admin に更新される。
 update public.profiles
    set role = 'admin'
  where user_id = tests.get_supabase_uid('bob@example.com');
@@ -192,6 +189,34 @@ select lives_ok(
     tests.get_supabase_uid('alice@example.com')
   ),
   'service_role: user_roles を DELETE できる (grant all 検証)'
+);
+
+-- ----------------------------------------
+-- Test 11: profiles.role 同期 trigger (Codex review iteration-2 P2)
+--   Phase 1 では admin.updateUserRole が profiles.role のみを更新するため、
+--   sync_profiles_role_to_user_roles trigger が user_roles を自動同期する必要がある。
+--   ここでは alice (現在 user_roles=member) を profiles 経由で admin に昇格させ、
+--   user_roles が trigger によって member → admin に書き換わることを直接固定する。
+--
+--   退行検出: trigger を drop すると user_roles に古い member 行が残り、
+--   admin 行が追加されないため、count != 1 / role != admin で fail する。
+-- ----------------------------------------
+update public.profiles
+   set role = 'admin'
+ where user_id = tests.get_supabase_uid('alice@example.com');
+
+select is(
+  (select count(*)::int from public.user_roles
+    where user_id = tests.get_supabase_uid('alice@example.com')),
+  1,
+  'sync trigger: profiles.role UPDATE 後も user_roles 行は 1 件 (旧 member 削除済)'
+);
+
+select is(
+  (select role::text from public.user_roles
+    where user_id = tests.get_supabase_uid('alice@example.com')),
+  'admin',
+  'sync trigger: profiles.role を admin に変更すると user_roles も admin に同期'
 );
 
 select * from finish();
