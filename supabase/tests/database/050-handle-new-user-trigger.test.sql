@@ -1,9 +1,9 @@
 -- ========================================
 -- handle_new_user() トリガーのテスト
 -- ========================================
--- 検証対象 (20260420205000_init.sql):
+-- 検証対象 (20260420205000_init.sql + 20260506010103_*.sql で `''` に更新):
 --   create or replace function public.handle_new_user()
---     returns trigger language plpgsql security definer set search_path = public
+--     returns trigger language plpgsql security definer set search_path = ''
 --   - auth.users への INSERT で発火
 --   - public.profiles に同 user_id で行を作成
 --   - display_name は raw_user_meta_data->>'display_name' (なければ '')

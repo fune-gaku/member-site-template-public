@@ -27,7 +27,9 @@
 --   - [ ] FK + ポリシー参照カラムに index
 --   - [ ] 権限カラム (role 等) は **table-level revoke + 安全カラムのみ
 --         column-level grant** (column-level revoke 単独は no-op)
---   - [ ] security definer 関数は `set search_path = pg_catalog, public[, extensions]`
+--   - [ ] security definer 関数は `set search_path = ''`（empty）+ 関数本体は
+--         `public.profiles` のように完全修飾（Supabase 公式推奨。
+--         https://supabase.com/docs/guides/database/functions）
 --   - [ ] Storage バケットなら `allowed_mime_types` + `file_size_limit` 明示
 --   - [ ] 対応する pgTAP テストを supabase/tests/database/ に同 PR で追加
 --

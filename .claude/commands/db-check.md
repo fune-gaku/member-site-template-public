@@ -29,7 +29,7 @@ plpgsql_check による静的解析。`security definer` 関数の `search_path`
 
 - 期待: warning / error が 0
 - 失敗パターン:
-  - `function ... has no SET search_path` → security definer 関数に `set search_path = public` が抜けている。SQL injection 経路になり得るので必ず追加
+  - `function ... has no SET search_path` → security definer 関数に `set search_path = ''`（empty）が抜けている。SQL injection 経路になり得るので必ず追加。empty にする代わりに関数本体は `public.profiles` のように完全修飾する（[Supabase 公式推奨](https://supabase.com/docs/guides/database/functions)）
 
 ### 3. `npm run db:test`
 
