@@ -131,12 +131,79 @@ describe("sanitizeError", () => {
     );
   });
 
-  it("非 Error / 非 message オブジェクトは JSON 化してマスクする", () => {
+  it("非 Error / 非 message オブジェクトの string フィールドも再帰サニタイズする", () => {
+    // Codex review iteration-1 P1 を受けた修正:
+    // 旧実装は { message } を持たない object を JSON.stringify していたが、
+    // 新実装は object 構造を保ったまま enumerable field を再帰サニタイズする。
     const odd = { detail: "user@example.com tried something" };
-    const result = sanitizeError(odd);
-    expect(typeof result).toBe("string");
-    expect(result).toContain("u***@example.com");
-    expect(result).not.toContain("user@example.com");
+    const result = sanitizeError(odd) as { detail: string };
+    expect(result).toMatchObject({
+      detail: "u***@example.com tried something",
+    });
+  });
+
+  it("Codex P1: { message } の兄弟フィールド (email / token / details) もマスクする", () => {
+    // 旧実装は { ...error, message: sanitized } で兄弟を素通ししていたため、
+    // Supabase 風エラーの兄弟フィールドに混入した PII / JWT が漏れていた。
+    // 新実装は enumerable field を再帰的にマスクする。
+    const FAKE_JWT = "eyJ_TEST_HEADER.eyJ_TEST_PAYLOAD.test_sig_abc";
+    const supabaseLikeWithSiblings = {
+      message: "auth failed",
+      status: 401,
+      name: "AuthApiError",
+      email: "user@example.com",
+      access_token: FAKE_JWT,
+      details: "session for user@example.com expired",
+    };
+    const result = sanitizeError(supabaseLikeWithSiblings) as Record<
+      string,
+      unknown
+    >;
+    expect(result.message).toBe("auth failed");
+    expect(result.status).toBe(401);
+    expect(result.name).toBe("AuthApiError");
+    // 全 string フィールドが sanitize される
+    expect(result.email).toBe("u***@example.com");
+    expect(result.access_token).toBe("<redacted-jwt>");
+    expect(result.details).toBe("session for u***@example.com expired");
+  });
+
+  it("循環参照は `<circular>` で打ち切り、無限ループしない", () => {
+    interface Node {
+      message: string;
+      child?: Node;
+    }
+    const a: Node = { message: "user@example.com" };
+    const b: Node = { message: "level 2" };
+    a.child = b;
+    b.child = a; // 循環
+
+    const result = sanitizeError(a) as {
+      message: string;
+      child: { child: unknown };
+    };
+    expect(result.message).toBe("u***@example.com");
+    // a → b → a の 2 周目は <circular> で打ち切る
+    expect(result.child.child).toBe("<circular>");
+  });
+
+  it("深さ上限を超えるネストは `<max-depth>` で打ち切る", () => {
+    // 6 段ネスト（MAX_SANITIZE_DEPTH = 5 を超える）
+    const deep = {
+      l1: { l2: { l3: { l4: { l5: { l6: "user@example.com" } } } } },
+    };
+    const result = sanitizeError(deep) as {
+      l1: { l2: { l3: { l4: { l5: unknown } } } };
+    };
+    expect(result.l1.l2.l3.l4.l5).toBe("<max-depth>");
+  });
+
+  it("配列内の文字列も再帰サニタイズする", () => {
+    const arr = ["plain text", "user@example.com", { email: "admin@x.com" }];
+    const result = sanitizeError(arr) as [string, string, { email: string }];
+    expect(result[0]).toBe("plain text");
+    expect(result[1]).toBe("u***@example.com");
+    expect(result[2].email).toBe("a***@x.com");
   });
 });
 

@@ -78,61 +78,95 @@ export function sanitizeString(input: string): string {
 // ----------------------------------------
 
 /**
- * 任意の error 値（Error / Supabase 風 plain object / string / 不明）から
- * 「ログに乗せる安全な表現」を返す。
+ * 再帰的にオブジェクトをサニタイズするときの深さ上限。
  *
- * - `Error` 派生は `{ name, message }` に縮約（stack はマスク後に保持）
- * - `{ message: string }` を持つ plain object はその message をマスクして返す
- * - 文字列はそのままマスク
- * - その他は JSON.stringify を試行し、失敗したら抽象文言にフォールバック
- *
- * 戻り値は `console.error` の第二引数に直接渡せる形（オブジェクト / 文字列）に統一する。
+ * Supabase / Astro / Workers のエラーオブジェクトは通常 2-3 段の入れ子で済む。
+ * 5 で十分かつログ生成コストを抑えられる。これ以上深いツリーは `<max-depth>`
+ * プレースホルダで打ち切る（PII 漏洩よりはログ可読性低下を選ぶ）。
  */
-export function sanitizeError(error: unknown): unknown {
-  if (error == null) return error;
+const MAX_SANITIZE_DEPTH = 5;
 
-  if (typeof error === "string") {
-    return sanitizeString(error);
+/**
+ * 任意の値を「ログに乗せる安全な表現」に変換する内部 helper。
+ *
+ * 設計判断（Codex review iteration-1 P1 を受けた修正）:
+ * - **plain object はすべての enumerable フィールドを再帰的にサニタイズする**
+ *   旧実装は `{ message }` を持つ object の兄弟フィールド（`email` / `token` /
+ *   `details` / `cause` 等）を素通ししていたため、Supabase 風エラーで PII が
+ *   漏れる経路があった。再帰サニタイズで一律マスクする。
+ * - **循環参照は `<circular>` で打ち切り**（`WeakSet` で訪問済みを追跡）
+ * - **深さは {@link MAX_SANITIZE_DEPTH} で上限**（無限再帰防止）
+ * - Array は要素を個別にサニタイズ
+ * - Error 派生は `{ name, message, stack }` に縮約しつつ各文字列値をマスク
+ */
+function sanitizeValue(
+  value: unknown,
+  seen: WeakSet<object>,
+  depth: number,
+): unknown {
+  if (value == null) return value;
+  if (typeof value === "string") return sanitizeString(value);
+  if (typeof value !== "object") return value;
+
+  // 循環参照ガード
+  if (seen.has(value as object)) return "<circular>";
+  // 深さ上限ガード（実装ミスや異常系で無限に深いツリーが来ても安全に打ち切る）
+  if (depth >= MAX_SANITIZE_DEPTH) return "<max-depth>";
+
+  seen.add(value as object);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item, seen, depth + 1));
   }
 
-  if (error instanceof Error) {
+  if (value instanceof Error) {
     return {
-      name: error.name,
-      message: sanitizeString(error.message),
-      ...(typeof error.stack === "string"
-        ? { stack: sanitizeString(error.stack) }
+      name: value.name,
+      message: sanitizeString(value.message),
+      ...(typeof value.stack === "string"
+        ? { stack: sanitizeString(value.stack) }
         : {}),
     };
   }
 
-  if (typeof error === "object" && "message" in error) {
-    const message = (error as { message: unknown }).message;
-    if (typeof message === "string") {
-      // 元オブジェクトの他フィールド（status / code / name 等）は保持し、message だけ差し替え
-      return { ...(error as object), message: sanitizeString(message) };
-    }
+  // plain object: 全 enumerable own property を再帰的にサニタイズ
+  // Date / RegExp / Map / Set 等の特殊型は Object.entries が空 / 限定的になる
+  // が、それらをログに直接渡すケースは想定外なので深追いしない。
+  const out: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = sanitizeValue(v, seen, depth + 1);
   }
-
-  try {
-    return sanitizeString(JSON.stringify(error));
-  } catch {
-    return "<unserializable error>";
-  }
+  return out;
 }
 
-/** ログに添えるフリーフォーム fields のサニタイズ。 */
+/**
+ * 任意の error 値（Error / Supabase 風 plain object / string / array / 不明）から
+ * 「ログに乗せる安全な表現」を返す。
+ *
+ * - `Error` 派生は `{ name, message, stack? }` に縮約（各文字列値はマスク）
+ * - plain object は **全 enumerable field を再帰的にマスク**（兄弟 PII を素通しさせない）
+ * - 文字列はそのままマスク
+ * - 配列は要素ごとに再帰サニタイズ
+ * - 循環参照は `<circular>`、深さ上限超過は `<max-depth>` に置換
+ *
+ * 戻り値は `console.error` の第二引数に直接渡せる形（オブジェクト / 文字列）に統一する。
+ */
+export function sanitizeError(error: unknown): unknown {
+  return sanitizeValue(error, new WeakSet(), 0);
+}
+
+/**
+ * ログに添えるフリーフォーム fields のサニタイズ。
+ *
+ * 各 top-level フィールドは独立して訪問済みセットを持つ（フィールド間で
+ * 同じオブジェクト参照を共有していても誤って `<circular>` 扱いしない）。
+ */
 export function sanitizeFields(
   fields: Record<string, unknown>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (typeof value === "string") {
-      out[key] = sanitizeString(value);
-    } else if (value && typeof value === "object") {
-      out[key] = sanitizeError(value);
-    } else {
-      out[key] = value;
-    }
+    out[key] = sanitizeValue(value, new WeakSet(), 0);
   }
   return out;
 }
