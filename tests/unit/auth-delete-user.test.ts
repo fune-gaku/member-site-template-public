@@ -64,7 +64,13 @@ describe("performDeleteUser (Issue #14, admin-only)", () => {
     expect(result).toEqual({ success: true });
 
     expect(from).toHaveBeenCalledWith("avatars");
-    expect(list).toHaveBeenCalledWith(VALID_INPUT.userId);
+    // pagination 対応: list は (folder, { limit, offset }) で呼ばれる (Codex iter-1 P1)
+    expect(list).toHaveBeenCalledWith(VALID_INPUT.userId, {
+      limit: 100,
+      offset: 0,
+    });
+    // 2 件 (< limit) なので 1 ページで終了 → list は 1 回だけ呼ばれる
+    expect(list).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledWith([
       `${VALID_INPUT.userId}/1234567890_avatar.png`,
       `${VALID_INPUT.userId}/9876543210_old.jpg`,
@@ -168,5 +174,86 @@ describe("performDeleteUser (Issue #14, admin-only)", () => {
     });
 
     errorSpy.mockRestore();
+  });
+
+  it("Codex iter-1 P1: 100+ files を持つユーザは pagination で全件削除する", async () => {
+    // Supabase Storage の list はデフォルト 100 件返す pagination API。
+    // 100 件超のアバター履歴を持つユーザを 1 回の list で処理すると残った
+    // object が owner constraint を引いて hard delete を妨害する。
+    // 全ページを limit + offset で walk して remove を 1 回まとめて呼ぶことを固定する。
+
+    // ページ 1: 100 件 (= STORAGE_LIST_PAGE_SIZE 上限ぴったり)
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      name: `page1-${i.toString().padStart(3, "0")}.png`,
+    }));
+    // ページ 2: 50 件 (< 上限なので最終ページ)
+    const page2 = Array.from({ length: 50 }, (_, i) => ({
+      name: `page2-${i.toString().padStart(3, "0")}.png`,
+    }));
+
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce({ data: page1, error: null })
+      .mockResolvedValueOnce({ data: page2, error: null });
+    const remove = vi.fn().mockResolvedValue({ data: null, error: null });
+    const deleteUser = vi.fn().mockResolvedValue({ data: null, error: null });
+    const from = vi.fn().mockReturnValue({ list, remove });
+    const client: DeleteUserCapableAdminClient = {
+      storage: { from },
+      auth: { admin: { deleteUser } },
+    };
+
+    const result = await performDeleteUser(client, VALID_INPUT);
+    expect(result).toEqual({ success: true });
+
+    // list は 2 回呼ばれる (offset 0, offset 100)
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(list).toHaveBeenNthCalledWith(1, VALID_INPUT.userId, {
+      limit: 100,
+      offset: 0,
+    });
+    expect(list).toHaveBeenNthCalledWith(2, VALID_INPUT.userId, {
+      limit: 100,
+      offset: 100,
+    });
+
+    // remove は **1 回** で 150 件全パスを渡される (バッチ削除)
+    expect(remove).toHaveBeenCalledTimes(1);
+    const removedPaths = remove.mock.calls[0]?.[0] as string[];
+    expect(removedPaths).toHaveLength(150);
+    expect(removedPaths[0]).toBe(`${VALID_INPUT.userId}/page1-000.png`);
+    expect(removedPaths[99]).toBe(`${VALID_INPUT.userId}/page1-099.png`);
+    expect(removedPaths[100]).toBe(`${VALID_INPUT.userId}/page2-000.png`);
+    expect(removedPaths[149]).toBe(`${VALID_INPUT.userId}/page2-049.png`);
+
+    // deleteUser は最後に呼ばれる
+    expect(deleteUser).toHaveBeenCalledWith(VALID_INPUT.userId, false);
+  });
+
+  it("pagination 境界: 1 ページ目がぴったり 100 件 + 2 ページ目が空", async () => {
+    // ちょうど 100 件のとき (PAGE_SIZE と一致): 1 ページ目では break せず
+    // 2 ページ目で 0 件返ってから break することを固定する。
+    const exactly100 = Array.from({ length: 100 }, (_, i) => ({
+      name: `${i}.png`,
+    }));
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce({ data: exactly100, error: null })
+      .mockResolvedValueOnce({ data: [], error: null });
+    const remove = vi.fn().mockResolvedValue({ data: null, error: null });
+    const deleteUser = vi.fn().mockResolvedValue({ data: null, error: null });
+    const from = vi.fn().mockReturnValue({ list, remove });
+    const client: DeleteUserCapableAdminClient = {
+      storage: { from },
+      auth: { admin: { deleteUser } },
+    };
+
+    await performDeleteUser(client, VALID_INPUT);
+
+    // 100 件ぴったりは「最終ページとは判別できない」ため 2 回目を必ず呼ぶ
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledTimes(1);
+    const removedPaths = remove.mock.calls[0]?.[0] as string[];
+    expect(removedPaths).toHaveLength(100);
   });
 });

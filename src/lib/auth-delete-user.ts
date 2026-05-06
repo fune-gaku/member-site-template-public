@@ -34,6 +34,24 @@ interface StorageFileEntry {
 }
 
 /**
+ * Storage `list` の 1 ページあたりの取得数（Supabase Storage のデフォルトと同じ）。
+ *
+ * 100 件超のアバター履歴を持つユーザを完全に削除するため、limit + offset で
+ * 全ページを列挙する（Codex review iteration-1 P1 への対応）。
+ */
+const STORAGE_LIST_PAGE_SIZE = 100;
+
+/**
+ * pagination loop の暴走を防ぐ上限。
+ *
+ * `STORAGE_LIST_PAGE_SIZE` × この値 = 1 ユーザあたり最大 10,000 件のアバター。
+ * 現実的な上限を遥かに超える保険値。これを超える異常時は明示的に MAX_PAGES で
+ * 抜けることで、無限ループを早期検出できる（owner constraint 回避を諦めるよりも、
+ * 失敗で抜ける方が運用診断しやすい）。
+ */
+const STORAGE_LIST_MAX_PAGES = 100;
+
+/**
  * `performDeleteUser` が必要とする最小 admin client インターフェース。
  *
  * テスト容易性のために `@supabase/supabase-js` の `SupabaseClient` 全体を
@@ -43,7 +61,10 @@ interface StorageFileEntry {
 export interface DeleteUserCapableAdminClient {
   storage: {
     from(bucket: string): {
-      list(folder: string): Promise<{
+      list(
+        folder: string,
+        options?: { limit?: number; offset?: number },
+      ): Promise<{
         data: StorageFileEntry[] | null;
         error: { message: string } | null;
       }>;
@@ -76,19 +97,37 @@ export async function performDeleteUser(
 ): Promise<{ success: true }> {
   const avatars = supabaseAdmin.storage.from("avatars");
 
-  // 1. Storage avatars/<userId>/ を列挙（owner constraint 回避のため auth.users 削除前必須）
-  const { data: files, error: listError } = await avatars.list(input.userId);
-  if (listError) {
-    console.error("admin.deleteUser storage.list failed:", listError);
-    throw new ActionError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: DELETE_USER_INTERNAL_ERROR_MESSAGE,
-    });
+  // 1. Storage avatars/<userId>/ を **全ページ** 列挙
+  //    owner constraint 回避には残らず削除する必要がある (Supabase 公式の
+  //    "You cannot delete a user if they are the owner of any objects in
+  //    Supabase Storage")。Storage の list は default 100 件返す pagination API
+  //    のため、100 件超のアバター履歴を持つユーザは limit + offset で全ページ
+  //    走査する (Codex review iteration-1 P1)。
+  const allFiles: StorageFileEntry[] = [];
+  for (let page = 0; page < STORAGE_LIST_MAX_PAGES; page++) {
+    const { data: pageFiles, error: listError } = await avatars.list(
+      input.userId,
+      {
+        limit: STORAGE_LIST_PAGE_SIZE,
+        offset: page * STORAGE_LIST_PAGE_SIZE,
+      },
+    );
+    if (listError) {
+      console.error("admin.deleteUser storage.list failed:", listError);
+      throw new ActionError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: DELETE_USER_INTERNAL_ERROR_MESSAGE,
+      });
+    }
+    if (!pageFiles || pageFiles.length === 0) break;
+    allFiles.push(...pageFiles);
+    // ページが満杯でないなら最終ページなので終了 (1 回追加 list 呼出を節約)
+    if (pageFiles.length < STORAGE_LIST_PAGE_SIZE) break;
   }
 
   // 2. 列挙された object を一括 remove
-  if (files && files.length > 0) {
-    const paths = files.map((f) => `${input.userId}/${f.name}`);
+  if (allFiles.length > 0) {
+    const paths = allFiles.map((f) => `${input.userId}/${f.name}`);
     const { error: removeError } = await avatars.remove(paths);
     if (removeError) {
       console.error("admin.deleteUser storage.remove failed:", removeError);
