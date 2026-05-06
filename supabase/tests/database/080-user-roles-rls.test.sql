@@ -13,10 +13,17 @@
 -- 退行検出:
 --   - SELECT policy 削除 → Test 1 が fail (default-deny で 0 行)
 --   - revoke all 削除 → Test 3/4/5 が fail (INSERT/UPDATE/DELETE が通ってしまう)
---   - data migration 削除 → Test 7 が fail (profiles.role と user_roles の数が一致しない)
+--   - **grant all on user_roles to service_role 削除 → Test 8/9/10 が fail**
+--     (Codex review iteration-1 P1: clear_authentication だけでは postgres 権限で
+--      通ってしまうため、010-profiles-role-revoke.test.sql Test 3 と同じく
+--      `set local role service_role` で実 service_role 権限を行使する)
+--   - data migration 削除 → Test 6 が fail
+--   - data migration の insert に汚れ (余分な行) が入ると → Test 7 が fail
+--     (Codex review iteration-1 P2: 一方向 join では余分な user_roles 行を見逃す
+--      ため、profiles ⇄ user_roles の双方向 anti-join で検証する)
 
 begin;
-select plan(7);
+select plan(10);
 
 -- ----------------------------------------
 -- Setup: alice (member) + bob (admin) を作成
@@ -34,7 +41,7 @@ update public.user_roles
  where user_id = tests.get_supabase_uid('bob@example.com');
 
 -- profiles.role 側も整合性のため admin に揃える (Phase 1 では profiles.role が
--- 真の情報源として残るため、data migration parity を assert する Test 7 で必要)。
+-- 真の情報源として残るため、data migration parity を assert する Test 6/7 で必要)。
 update public.profiles
    set role = 'admin'
  where user_id = tests.get_supabase_uid('bob@example.com');
@@ -98,36 +105,93 @@ select throws_ok(
   'authenticated: user_roles を DELETE すると 42501'
 );
 
--- 認証コンテキストを postgres (= service_role 相当) に戻す
-select tests.clear_authentication();
-
 -- ----------------------------------------
--- Test 6 (positive): service_role (postgres) は INSERT/UPDATE/DELETE できる
---   admin.updateUserRole Action は service_role で書き換えるため、ここが通る
---   ことが必須。lives_ok で全 CRUD を 1 ケースで検証する。
+-- Test 6: data migration parity (forward = profiles → user_roles)
+--   profiles.role がある全行に対応する user_roles 行が存在することを anti-join で検証。
+--   退行検出: data migration の INSERT を消すと該当行が user_roles に無くなり fail。
 -- ----------------------------------------
-select lives_ok(
-  $$ insert into public.user_roles (user_id, role)
-       values (tests.get_supabase_uid('alice@example.com'),
-               'admin'::public.app_role)
-     on conflict (user_id, role) do nothing $$,
-  'service_role: user_roles に INSERT できる (on conflict do nothing で idempotent)'
+select is(
+  (select count(*)::int from public.profiles p
+    where p.role is not null
+      and not exists (
+        select 1 from public.user_roles ur
+         where ur.user_id = p.user_id
+           and ur.role = p.role::public.app_role
+      )),
+  0,
+  'data parity (forward): profiles.role に対応する user_roles 行が漏れていない'
 );
 
 -- ----------------------------------------
--- Test 7: data migration parity
---   profiles.role が ('member', 'admin') で値を持つ行は user_roles にも
---   同じ user_id + 同じ role で存在する。
---   退行検出: data migration の INSERT を消すと user_roles 側が空になり fail。
+-- Test 7: data migration parity (backward = user_roles → profiles)
+--   user_roles に profiles.role と一致しない余分な行が無いことを anti-join で検証。
+--   Phase 1 では user_roles は profiles.role と完全一致する invariant を持つ
+--   (Phase 2 で profiles.role drop までの一時的契約)。
+--   Codex review iteration-1 P2: 一方向 count 比較では余分な user_roles 行を
+--   見逃す bug を防ぐため双方向で検証する。
+--
+--   この Test は service_role CRUD (Test 8-10) の **前** に走らせる。
+--   後続 CRUD で意図的に状態を変えるため、parity 検証は変更前の状態でだけ意味を持つ。
 -- ----------------------------------------
 select is(
-  (select count(*)::int
-     from public.profiles p
-     join public.user_roles ur
-       on p.user_id = ur.user_id
-      and p.role::public.app_role = ur.role),
-  (select count(*)::int from public.profiles where role is not null),
-  'data migration: profiles.role と user_roles の (user_id, role) 組が一致'
+  (select count(*)::int from public.user_roles ur
+    where not exists (
+      select 1 from public.profiles p
+       where p.user_id = ur.user_id
+         and p.role::public.app_role = ur.role
+    )),
+  0,
+  'data parity (backward): user_roles に余分な行が無い (Phase 1 invariant)'
+);
+
+-- ----------------------------------------
+-- Test 8-10: service_role の CRUD 検証 (grant all on user_roles to service_role)
+--   admin.updateUserRole Action は service_role で動くため、ここが通ることが必須。
+--   `set local role service_role` で実 service_role 権限を行使する
+--   (010-profiles-role-revoke.test.sql Test 3 と同じパターン)。
+--   `tests.clear_authentication()` だけでは postgres 権限に戻るだけで
+--   superuser bypass のため grant 検証にならない (Codex review iteration-1 P1)。
+-- ----------------------------------------
+select tests.clear_authentication();
+set local role service_role;
+
+-- Test 8: INSERT
+-- alice に admin 行を追加 (alice/member は既存)。on conflict do nothing で
+-- idempotent。本番の admin.updateUserRole の挙動に近い。
+select lives_ok(
+  format(
+    $$ insert into public.user_roles (user_id, role)
+       values (%L, 'admin'::public.app_role)
+       on conflict (user_id, role) do nothing $$,
+    tests.get_supabase_uid('alice@example.com')
+  ),
+  'service_role: user_roles に INSERT できる (grant all 検証)'
+);
+
+-- Test 9: UPDATE
+-- bob/admin の role を一時的に member に変える。
+-- (bob/admin は setup で既に存在。member への UPDATE は (user_id, role) の
+--  unique constraint に違反しない: bob/member 行が無いため。)
+select lives_ok(
+  format(
+    $$ update public.user_roles
+         set role = 'member'::public.app_role
+       where user_id = %L and role = 'admin'::public.app_role $$,
+    tests.get_supabase_uid('bob@example.com')
+  ),
+  'service_role: user_roles を UPDATE できる (grant all 検証)'
+);
+
+-- Test 10: DELETE
+-- Test 8 で INSERT した alice/admin を削除する。
+-- これで grant all の DML 3 種 (INSERT/UPDATE/DELETE) が網羅される。
+select lives_ok(
+  format(
+    $$ delete from public.user_roles
+       where user_id = %L and role = 'admin'::public.app_role $$,
+    tests.get_supabase_uid('alice@example.com')
+  ),
+  'service_role: user_roles を DELETE できる (grant all 検証)'
 );
 
 select * from finish();
