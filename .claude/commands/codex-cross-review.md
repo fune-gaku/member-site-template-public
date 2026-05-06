@@ -54,10 +54,10 @@ PR 番号が取れなかった場合はその場で停止し、ユーザーに P
 gh pr checkout <N>
 BASE_BRANCH=$(gh pr view <N> --json baseRefName --jq .baseRefName)   # 通常 main
 LAST_KNOWN_MAIN=$(git rev-parse origin/$BASE_BRANCH)
-mkdir -p /tmp/codex-cross-review-<N>
+mkdir -p .codex-review/<N>
 ```
 
-各イテレーションの artifacts は `/tmp/codex-cross-review-<N>/iter-<k>-*` に保存:
+各イテレーションの artifacts は `.codex-review/<N>/iter-<k>-*` に保存。ワークスペース直下なので VSCode の markdown リンク（後述「ユーザーへの報告」）から 1 クリックで開ける（`.gitignore` で除外済み）:
 
 | ファイル | 用途 | 投稿可否 |
 |--|--|--|
@@ -78,8 +78,8 @@ Codex は review 本文を **ファイルに書き** + **stdout には verdict �
 
 ```bash
 set -o pipefail   # codex 失敗が tee の status に隠されないように
-LOG=/tmp/codex-cross-review-<N>/iter-<k>.log
-REVIEW=/tmp/codex-cross-review-<N>/iter-<k>-review.md
+LOG=.codex-review/<N>/iter-<k>.log
+REVIEW=.codex-review/<N>/iter-<k>-review.md
 
 codex exec --sandbox workspace-write \
   "あなたは PR #<N> （https://github.com/<owner>/<repo>/pull/<N>）をレビューします。
@@ -232,7 +232,7 @@ Codex が LGTM を返し、かつ あなたの自発検出も無い iteration �
 ```
 
 ```bash
-gh pr comment <N> --body-file /tmp/codex-cross-review-<N>/iter-<k>-evaluation.md
+gh pr comment <N> --body-file .codex-review/<N>/iter-<k>-evaluation.md
 ```
 
 ### F. コメント 3 投稿: 公式 docs 照合レポート（C-2 トリガ成立時のみ）
@@ -260,7 +260,7 @@ C-2 を実行した findings がある場合のみ `iter-<k>-docs-check.md` を�
 ```
 
 ```bash
-gh pr comment <N> --body-file /tmp/codex-cross-review-<N>/iter-<k>-docs-check.md
+gh pr comment <N> --body-file .codex-review/<N>/iter-<k>-docs-check.md
 ```
 
 ### G. ループ継続判定
@@ -341,17 +341,48 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 
 ## ユーザーへの報告
 
-各イテレーション完了時に 4-5 行で:
+各イテレーション完了時、チャットに以下を **その場で** 出す。GitHub に切り替えなくてもループ全体（指摘・評価・対応）がチャット内で追える状態を保つ。GitHub への 3 段コメント投稿（B / E / F）は監査記録として今まで通り残すが、ループ中の主 UX はチャット側。
 
-```
-イテレーション <k> / 5
-Codex verdict: LGTM / CHANGES REQUESTED (<N> issues)
-投稿コメント: review #<id1> [/ evaluation #<id2>] [/ docs-check #<id3>]
-今回の変更: <1 行サマリ + commit SHA>
-CI status: <現状>
-```
+### 出力テンプレート
 
-最終マージ完了時: PR 番号、merge commit SHA、累計イテレーション数、特筆すべき disagreement があれば併記。
+````markdown
+### イテレーション <k> / 5
+
+**Codex verdict**: LGTM / CHANGES REQUESTED (<N> issues)
+
+**今回の対応**:
+
+- <受け入れた指摘 / Claude 自発検出の 1 行サマリ（複数なら箇条書き）>
+- commit: <SHA>
+- CI: <pending / passing / failing (<job-name>)>
+
+**Claude evaluation** (`iter-<k>-evaluation.md`):
+
+| #   | Finding                | Category       | Action       | Reasoning      |
+| --- | ---------------------- | -------------- | ------------ | -------------- |
+| 1   | <Codex 指摘 1 の要約>  | MUST-FIX       | Fixed in <SHA> | <根拠>         |
+| 2   | <Codex 指摘 2 の要約>  | FALSE-POSITIVE | Rejected     | <論拠>         |
+
+**Artifacts**:
+
+- Codex review 本文: [iter-<k>-review.md](.codex-review/<N>/iter-<k>-review.md)
+- Docs check（C-2 トリガ時のみ）: [iter-<k>-docs-check.md](.codex-review/<N>/iter-<k>-docs-check.md)
+- 生 LOG（audit 用）: [iter-<k>.log](.codex-review/<N>/iter-<k>.log)
+
+**Posted to GitHub**: review #<id1> [/ evaluation #<id2>] [/ docs-check #<id3>]
+````
+
+### ルール
+
+- **Claude evaluation テーブル**は findings 有り時に必ずチャットへ inline 展開する（投稿コメント 2 と同じ内容を verbatim で貼る）。findings ゼロ（Codex LGTM + Claude 自発検出なし）の iteration ではテーブル行を省略し、verdict + CI status だけ出す
+- **Codex review 本文**はリンクのみ（数十〜数百行になりやすく、チャットを埋めると逆に追いにくくなる）。ユーザーが詳細を読みたくなったら 1 クリックで開ける形にする
+- **C-2 docs-check** が短い（accept した findings が 2-3 件以内）なら、公式 URL + verbatim 引用をチャット末尾に展開する。長くなる場合はリンクのみ
+- パスは必ず `.codex-review/<N>/...` のワークスペース相対形式（VSCode native の markdown リンクが効くのは相対パスだけ）。`/tmp/` や `file://` の絶対パスは使わない
+- 過去イテレーションの artifacts も同じ `.codex-review/<N>/` 配下にすべて残るので、`iter-1-review.md` `iter-2-review.md` ... を時系列で読み返せる
+
+### 最終マージ完了時
+
+PR 番号、merge commit SHA、累計イテレーション数、特筆すべき disagreement があれば併記。`.codex-review/<N>/` の配置はそのまま残す（後日の audit 用。手動削除はユーザー判断）。
 
 ---
 
