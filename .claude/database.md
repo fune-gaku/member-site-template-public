@@ -102,7 +102,7 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.profiles (user_id, display_name)
@@ -312,7 +312,7 @@ npm run db:push:dry-run   # → 「Local migrations are up to date」を確認
 ### トリガーのセキュリティ
 
 - `security definer` を使用（トリガー関数は所有者の権限で実行）
-- `set search_path = public` でスキーマインジェクションを防止
+- `set search_path = ''`（empty）でスキーマインジェクションを防止。関数本体は `public.profiles` のように完全修飾し、`public` を含む全スキーマを resolve 対象から外す（[Supabase 公式推奨](https://supabase.com/docs/guides/database/functions)）
 
 ### Storage の RLS
 
@@ -359,7 +359,7 @@ npm run db:push:dry-run   # → 「Local migrations are up to date」を確認
 ### 新規関数・トリガー
 
 - [ ] **`security definer`** を付けた（所有者権限での実行が必要な場合）
-- [ ] **`set search_path = public`**（または明示スキーマ）を付けた（スキーマインジェクション防止）
+- [ ] **`set search_path = ''`**（empty）を付けた（Supabase 公式推奨。empty にする代わりに関数本体は `public.profiles` のように完全修飾する）
 - [ ] 関数は Exposed schemas（`public` など）に配置しない場合 `revoke all` で外部 REST 公開を防いだ
 
 ### Storage バケット
