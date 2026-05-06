@@ -2,6 +2,8 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+import { logger } from "../lib/logger";
+
 import PostForm from "./PostForm.vue";
 
 interface Post {
@@ -80,7 +82,7 @@ async function handleDelete(post: Post) {
       editingPost.value = null;
     }
   } catch (e) {
-    console.error("PostList delete error:", e);
+    logger.error("PostList delete error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     pendingDeleteId.value = null;

@@ -104,10 +104,17 @@ describe("performSignUp (Issue #14)", () => {
       success: true,
       message: SIGNUP_GENERIC_SUCCESS_MESSAGE,
     });
-    expect(errorSpy).toHaveBeenCalledWith(
+    // Issue #7: logger.error が Error インスタンスを { name, message, stack? }
+    // に正規化してから console.error に渡すため、生の cause ではなく正規化後の
+    // 形を assert する（PII マスキング経路を通過することを保証する）。
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0]?.[0]).toBe(
       "auth.signUp unexpected (suppressed):",
-      cause,
     );
+    expect(errorSpy.mock.calls[0]?.[1]).toMatchObject({
+      name: "Error",
+      message: "network down",
+    });
     errorSpy.mockRestore();
   });
 

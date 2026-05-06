@@ -1,5 +1,7 @@
 import { ActionError } from "astro:actions";
 
+import { logger } from "./logger";
+
 /**
  * Issue #49: Google OAuth ログイン (PKCE フロー) の Action 本体を Astro 依存の
  * 薄ラッパから分離し、純関数的にテスト可能な形に切り出した実装。
@@ -43,8 +45,8 @@ export async function performSignInWithGoogle(
     options: { redirectTo: input.redirectTo },
   });
   if (error || !data?.url) {
-    console.error(
-      "auth.signInWithGoogle error:",
+    logger.error(
+      "auth.signInWithGoogle error",
       error ?? new Error("signInWithOAuth returned no url"),
     );
     throw new ActionError({

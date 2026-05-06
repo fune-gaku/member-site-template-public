@@ -1,6 +1,8 @@
 ---
 import { actions } from "astro:actions";
 
+import { logger } from "../../lib/logger";
+
 // GET（およびそれ以外）では絶対に副作用を起こさない。
 // RFC 9110 §9.2.1 の "safe methods" 原則に従い、GET リクエストでは
 // 405 Method Not Allowed を返して CSRF（リンク踏ませ型の強制ログアウト）を防ぐ。
@@ -18,7 +20,7 @@ if (Astro.request.method !== "POST") {
 // `accept: "form"` 化に伴い `callAction` の第2引数は FormData を渡す。
 const { error } = await Astro.callAction(actions.auth.signOut, new FormData());
 if (error) {
-  console.error("Logout failed:", error);
+  logger.error("Logout failed", error);
 }
 return Astro.redirect("/");
 ---

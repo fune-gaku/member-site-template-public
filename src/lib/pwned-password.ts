@@ -17,6 +17,8 @@
  * @see https://supabase.com/docs/guides/auth/password-security
  */
 
+import { logger } from "./logger";
+
 const HIBP_RANGE_ENDPOINT = "https://api.pwnedpasswords.com/range";
 
 /**
@@ -65,7 +67,7 @@ export async function isPasswordPwned(password: string): Promise<boolean> {
     hashHex = await sha1HexUpper(password);
   } catch (err) {
     // crypto.subtle が使えない環境（想定外）。フェイルオープン。
-    console.error("HIBP: SHA-1 ハッシュ生成に失敗", err);
+    logger.error("HIBP: SHA-1 ハッシュ生成に失敗", err);
     return false;
   }
 
@@ -80,13 +82,13 @@ export async function isPasswordPwned(password: string): Promise<boolean> {
     });
   } catch (err) {
     // ネットワーク障害 / DNS 失敗など。フェイルオープン。
-    console.error("HIBP: fetch 失敗", err);
+    logger.error("HIBP: fetch 失敗", err);
     return false;
   }
 
   if (!res.ok) {
     // API 障害時はフェイルオープン（登録をブロックしない）
-    console.error("HIBP: API がエラーレスポンス", res.status);
+    logger.error("HIBP: API がエラーレスポンス", res.status);
     return false;
   }
 
@@ -94,7 +96,7 @@ export async function isPasswordPwned(password: string): Promise<boolean> {
   try {
     body = await res.text();
   } catch (err) {
-    console.error("HIBP: レスポンス読み取り失敗", err);
+    logger.error("HIBP: レスポンス読み取り失敗", err);
     return false;
   }
 
