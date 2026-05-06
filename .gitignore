@@ -49,3 +49,7 @@ supabase/.branches/
 # 実装は src/ にあり、これらは参照用。コミットせずローカル保持のみ。
 mocks/
 mocks.zip
+
+# /codex-cross-review の per-PR artifacts（Codex review / Claude evaluation / docs-check / 生 LOG）
+# ワークスペース直下に置くことで VSCode 上の markdown リンクから 1 クリックで開ける。
+.codex-review/
