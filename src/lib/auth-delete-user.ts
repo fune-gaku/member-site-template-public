@@ -1,5 +1,7 @@
 import { ActionError } from "astro:actions";
 
+import { logger } from "./logger";
+
 /**
  * Issue #14: admin によるユーザーアカウント hard delete の本体実装。
  *
@@ -126,7 +128,7 @@ export async function performDeleteUser(
       },
     );
     if (listError) {
-      console.error("admin.deleteUser storage.list failed:", listError);
+      logger.error("admin.deleteUser storage.list failed", listError);
       throw new ActionError({
         code: "INTERNAL_SERVER_ERROR",
         message: DELETE_USER_INTERNAL_ERROR_MESSAGE,
@@ -157,7 +159,7 @@ export async function performDeleteUser(
         // batch の途中で失敗したら後続 batch / auth delete を呼ばずに即時失敗。
         // 部分削除状態のまま auth delete に進むと owner constraint で失敗するため、
         // 早期 return で運用診断しやすい状態にする (再実行で残りを掃除可能)。
-        console.error("admin.deleteUser storage.remove failed:", removeError);
+        logger.error("admin.deleteUser storage.remove failed", removeError);
         throw new ActionError({
           code: "INTERNAL_SERVER_ERROR",
           message: DELETE_USER_INTERNAL_ERROR_MESSAGE,
@@ -172,8 +174,8 @@ export async function performDeleteUser(
     false,
   );
   if (deleteError) {
-    console.error(
-      "admin.deleteUser auth.admin.deleteUser failed:",
+    logger.error(
+      "admin.deleteUser auth.admin.deleteUser failed",
       deleteError,
     );
     throw new ActionError({
