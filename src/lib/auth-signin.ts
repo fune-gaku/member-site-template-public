@@ -1,6 +1,7 @@
 import { ActionError } from "astro:actions";
 
 import { SIGNIN_GENERIC_ERROR_MESSAGE } from "./auth-errors";
+import { logger } from "./logger";
 
 /**
  * Issue #8 (A3): `auth.signIn` Action の振る舞いを Astro 依存の薄ラッパから
@@ -10,7 +11,8 @@ import { SIGNIN_GENERIC_ERROR_MESSAGE } from "./auth-errors";
  * （存在しないユーザー / 間違ったパスワード / `Email not confirmed` 等）を
  * すべて `UNAUTHORIZED` + 統一メッセージに正規化する。
  *
- * 元エラーは `console.error` に落とし、Workers Logs から運用観察できるようにする。
+ * 元エラーは `logger.error` に落とし、PII（email / JWT）をマスクした上で
+ * Workers Logs から運用観察できるようにする (Issue #7)。
  *
  * @see https://owasp.org/www-community/attacks/Account_Enumeration
  */
@@ -22,10 +24,7 @@ interface SignInInput {
 
 export interface SignInCapableClient {
   auth: {
-    signInWithPassword(input: {
-      email: string;
-      password: string;
-    }): Promise<{
+    signInWithPassword(input: { email: string; password: string }): Promise<{
       error: { message: string; code?: string } | null;
     }>;
   };
@@ -40,7 +39,7 @@ export async function performSignIn(
     password: input.password,
   });
   if (error) {
-    console.error("auth.signIn error:", error);
+    logger.error("auth.signIn error", error);
     throw new ActionError({
       code: "UNAUTHORIZED",
       message: SIGNIN_GENERIC_ERROR_MESSAGE,

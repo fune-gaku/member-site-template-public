@@ -2,6 +2,7 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+import { logger } from "../lib/logger";
 import {
   PASSWORD_POLICY_HINT,
   validatePasswordStrength,
@@ -60,7 +61,7 @@ async function handleSubmit() {
       reset();
     }
   } catch (e) {
-    console.error("Change password error:", e);
+    logger.error("Change password error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isLoading.value = false;

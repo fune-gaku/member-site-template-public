@@ -2,6 +2,7 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+import { logger } from "../lib/logger";
 import {
   PASSWORD_POLICY_HINT,
   validatePasswordStrength,
@@ -47,7 +48,7 @@ async function handleSubmit() {
       successMessage.value = data.message;
     }
   } catch (e) {
-    console.error("Signup error:", e);
+    logger.error("Signup error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isLoading.value = false;

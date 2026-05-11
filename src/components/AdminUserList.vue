@@ -2,6 +2,8 @@
 import { actions } from "astro:actions";
 import { ref, onMounted } from "vue";
 
+import { logger } from "../lib/logger";
+
 interface AdminUser {
   id: string;
   email: string;
@@ -43,7 +45,7 @@ async function loadUsers() {
       users.value = data.users;
     }
   } catch (e) {
-    console.error("AdminUserList load error:", e);
+    logger.error("AdminUserList load error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isLoading.value = false;
@@ -82,7 +84,7 @@ async function toggleRole(target: AdminUser) {
       users.value.splice(idx, 1, { ...users.value[idx], role: nextRole });
     }
   } catch (e) {
-    console.error("AdminUserList updateRole error:", e);
+    logger.error("AdminUserList updateRole error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     pendingRoleId.value = null;

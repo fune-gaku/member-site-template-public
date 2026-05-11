@@ -3,6 +3,8 @@ import { z } from "astro/zod";
 import { actions } from "astro:actions";
 import { ref, watch } from "vue";
 
+import { logger } from "../lib/logger";
+
 interface Post {
   id: string;
   title: string;
@@ -97,7 +99,7 @@ async function handleSubmit() {
       }
     }
   } catch (e) {
-    console.error("PostForm submit error:", e);
+    logger.error("PostForm submit error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isSubmitting.value = false;
