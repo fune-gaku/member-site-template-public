@@ -5,6 +5,7 @@ import { env } from "cloudflare:workers";
 
 import { performChangePassword } from "../lib/auth-change-password";
 import { getAuthUser } from "../lib/auth-claims";
+import { performDeleteUser } from "../lib/auth-delete-user";
 import { performResetPassword } from "../lib/auth-reset-password";
 import { performSignIn } from "../lib/auth-signin";
 import {
@@ -808,6 +809,38 @@ export const server = {
           });
         }
         return { success: true };
+      },
+    }),
+
+    /**
+     * Issue #14: admin による他ユーザーの hard delete。
+     *
+     * GDPR 第 17 条 / 個人情報保護法 第 35 条（消去請求）への defensive 対応。
+     * 多層防御:
+     *   - `requireAdmin` で role を検証
+     *   - 自分自身の userId は FORBIDDEN（誤操作防止 / 唯一の admin が自分を消す事故を抑止）
+     *   - Storage avatars/<userId>/ を先に削除（owner constraint 回避、Supabase 公式）
+     *   - `auth.users` から hard delete → `profiles` / `member_posts` は cascade で連鎖削除
+     *
+     * self-service（ユーザー自身による削除）は別 Issue で追加予定。
+     */
+    deleteUser: defineAction({
+      input: z.object({
+        userId: z.string().uuid(),
+      }),
+      handler: async (input, context) => {
+        const caller = await requireAdmin(context);
+
+        if (caller.id === input.userId) {
+          throw new ActionError({
+            code: "FORBIDDEN",
+            message: "自分自身のアカウントは削除できません",
+          });
+        }
+
+        const supabaseAdmin = createAdminClient();
+        // TODO(Issue #16): 監査ログマージ後に logAudit("admin.user_deleted", ...) を追加
+        return performDeleteUser(supabaseAdmin, { userId: input.userId });
       },
     }),
   },

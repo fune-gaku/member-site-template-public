@@ -421,6 +421,35 @@ describe("Issue #9: 文字列フィールドの .max() 多層防御", () => {
   });
 });
 
+describe("admin.deleteUser schema (Issue #14)", () => {
+  // actions/index.ts の deleteUser input と同じ形を再宣言
+  const schema = z.object({
+    userId: z.string().uuid(),
+  });
+
+  it("有効な UUID を受け入れる", () => {
+    const result = schema.safeParse({
+      userId: "123e4567-e89b-12d3-a456-426614174000",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("UUID ではない userId を拒否する", () => {
+    const result = schema.safeParse({ userId: "not-a-uuid" });
+    expect(result.success).toBe(false);
+  });
+
+  it("空文字を拒否する", () => {
+    const result = schema.safeParse({ userId: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("userId プロパティが欠落していると拒否する", () => {
+    const result = schema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("admin.updateUserRole schema", () => {
   const schema = z.object({
     userId: z.string().uuid(),
