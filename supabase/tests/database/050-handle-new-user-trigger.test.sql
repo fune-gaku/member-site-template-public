@@ -15,7 +15,7 @@
 -- INSERT してから平の select is(...) で検証する。
 
 begin;
-select plan(10);
+select plan(13);
 
 -- ----------------------------------------
 -- Test 1+2: raw_user_meta_data に display_name 有り
@@ -149,6 +149,37 @@ select is(
   has_function_privilege('public', 'public.handle_new_user()', 'EXECUTE'),
   false,
   'PUBLIC からも EXECUTE が剥奪されている (anon/authenticated への有効な剥奪条件)'
+);
+
+-- ----------------------------------------
+-- Test 11+12+13: user_roles への 'member' default insert (Issue #42 Phase 1)
+--   handle_new_user は profiles 行に加えて user_roles 行も同 transaction で
+--   作成する。3 ケース全て (with-name / no-name / OAuth) で member role 行が
+--   1 件ずつ作られていることを固定する。
+--   退行検出: handle_new_user から user_roles INSERT を消すと該当テストが fail。
+-- ----------------------------------------
+select is(
+  (select count(*)::int from public.user_roles
+    where user_id = '11111111-1111-1111-1111-111111111111'
+      and role = 'member'::public.app_role),
+  1,
+  'with-name: handle_new_user で user_roles に member role が自動作成される'
+);
+
+select is(
+  (select count(*)::int from public.user_roles
+    where user_id = '22222222-2222-2222-2222-222222222222'
+      and role = 'member'::public.app_role),
+  1,
+  'no-name: handle_new_user で user_roles に member role が自動作成される'
+);
+
+select is(
+  (select count(*)::int from public.user_roles
+    where user_id = '33333333-3333-3333-3333-333333333333'
+      and role = 'member'::public.app_role),
+  1,
+  'OAuth: handle_new_user で user_roles に member role が自動作成される (Issue #49)'
 );
 
 select * from finish();
