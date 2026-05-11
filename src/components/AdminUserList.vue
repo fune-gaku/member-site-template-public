@@ -2,6 +2,8 @@
 import { actions } from "astro:actions";
 import { ref, onMounted } from "vue";
 
+import { logger } from "../lib/logger";
+
 interface AdminUser {
   id: string;
   email: string;
@@ -19,6 +21,7 @@ const users = ref<AdminUser[]>([]);
 const isLoading = ref(true);
 const error = ref("");
 const pendingRoleId = ref<string | null>(null);
+const pendingDeleteId = ref<string | null>(null);
 
 function formatDate(dateString: string) {
   const date = new Date(dateString);
@@ -42,7 +45,7 @@ async function loadUsers() {
       users.value = data.users;
     }
   } catch (e) {
-    console.error("AdminUserList load error:", e);
+    logger.error("AdminUserList load error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isLoading.value = false;
@@ -81,10 +84,51 @@ async function toggleRole(target: AdminUser) {
       users.value.splice(idx, 1, { ...users.value[idx], role: nextRole });
     }
   } catch (e) {
-    console.error("AdminUserList updateRole error:", e);
+    logger.error("AdminUserList updateRole error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     pendingRoleId.value = null;
+  }
+}
+
+/**
+ * Issue #14: admin による他ユーザーの hard delete。
+ *
+ * 削除は **取り消し不能**（auth.users から hard delete + Storage / profiles /
+ * member_posts は cascade で連鎖削除）のため、`window.confirm` で必ず最終確認を取る。
+ * 自分自身の削除は Action 側で `FORBIDDEN` になるが、UI でも `:disabled` で先回り
+ * 抑止する（updateUserRole の self-demotion ガードと同型）。
+ */
+async function deleteUser(target: AdminUser) {
+  if (target.id === props.currentUserId) {
+    error.value = "自分自身のアカウントは削除できません";
+    return;
+  }
+  const confirmMessage = `${target.email} を削除します。この操作は取り消せません。よろしいですか？`;
+  if (typeof window !== "undefined" && !window.confirm(confirmMessage)) {
+    return;
+  }
+
+  error.value = "";
+  pendingDeleteId.value = target.id;
+  try {
+    const { error: actionError } = await actions.admin.deleteUser({
+      userId: target.id,
+    });
+    if (actionError) {
+      error.value = actionError.message;
+      return;
+    }
+    // ローカル状態からも除去（一覧を再取得せず即時反映）
+    const idx = users.value.findIndex((u) => u.id === target.id);
+    if (idx >= 0) {
+      users.value.splice(idx, 1);
+    }
+  } catch (e) {
+    console.error("AdminUserList deleteUser error:", e);
+    error.value = "予期しないエラーが発生しました";
+  } finally {
+    pendingDeleteId.value = null;
   }
 }
 
@@ -214,21 +258,38 @@ onMounted(loadUsers);
               </div>
             </td>
             <td class="px-6 py-4 text-right whitespace-nowrap">
-              <button
-                type="button"
-                :disabled="u.id === currentUserId || pendingRoleId === u.id"
-                :title="
-                  u.id === currentUserId
-                    ? '自分自身のロールは変更できません'
-                    : ''
-                "
-                class="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                @click="toggleRole(u)"
-              >
-                <template v-if="pendingRoleId === u.id">更新中...</template>
-                <template v-else-if="u.role === 'admin'">管理者を外す</template>
-                <template v-else>管理者にする</template>
-              </button>
+              <div class="inline-flex gap-2">
+                <button
+                  type="button"
+                  :disabled="u.id === currentUserId || pendingRoleId === u.id"
+                  :title="
+                    u.id === currentUserId
+                      ? '自分自身のロールは変更できません'
+                      : ''
+                  "
+                  class="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  @click="toggleRole(u)"
+                >
+                  <template v-if="pendingRoleId === u.id">更新中...</template>
+                  <template v-else-if="u.role === 'admin'"
+                    >管理者を外す</template
+                  >
+                  <template v-else>管理者にする</template>
+                </button>
+                <button
+                  type="button"
+                  :disabled="u.id === currentUserId || pendingDeleteId === u.id"
+                  :title="
+                    u.id === currentUserId
+                      ? '自分自身のアカウントは削除できません'
+                      : ''
+                  "
+                  class="rounded-md border border-red-300 bg-white px-3 py-1 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  @click="deleteUser(u)"
+                >
+                  {{ pendingDeleteId === u.id ? "削除中..." : "削除" }}
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>

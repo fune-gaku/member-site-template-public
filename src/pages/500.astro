@@ -1,11 +1,12 @@
 ---
 import Error from "../layouts/Error.astro";
+import { logger } from "../lib/logger";
 
 // Astro が renderable error を prop として渡す。情報漏洩を防ぐため
-// ユーザー画面には出さず、Workers Logs にだけ残す。
+// ユーザー画面には出さず、PII を logger でマスクして Workers Logs にだけ残す。
 // 公式: https://docs.astro.build/en/basics/astro-pages/#custom-404-and-500-error-pages
 const { error } = Astro.props;
-console.error("500 page rendered:", error);
+logger.error("500 page rendered", error);
 ---
 
 <Error

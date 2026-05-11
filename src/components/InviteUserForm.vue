@@ -3,6 +3,8 @@ import { z } from "astro/zod";
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+import { logger } from "../lib/logger";
+
 const emit = defineEmits<{
   invited: [payload: { email: string; userId: string }];
 }>();
@@ -43,7 +45,7 @@ async function handleSubmit() {
       email.value = "";
     }
   } catch (e) {
-    console.error("InviteUserForm error:", e);
+    logger.error("InviteUserForm error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isSubmitting.value = false;
