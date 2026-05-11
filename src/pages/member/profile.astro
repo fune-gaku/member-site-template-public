@@ -4,6 +4,7 @@ import { actions } from "astro:actions";
 import ChangePasswordForm from "../../components/ChangePasswordForm.vue";
 import ProfileForm from "../../components/ProfileForm.vue";
 import Member from "../../layouts/Member.astro";
+import { logger } from "../../lib/logger";
 import { createClient } from "../../lib/supabase";
 
 // Issue #34: signOut Action 成功後の redirect は page-level で行う必要がある
@@ -42,7 +43,7 @@ if (user) {
     .single();
 
   if (profileError) {
-    console.error("Profile SSR load error:", profileError);
+    logger.error("Profile SSR load error", profileError);
   } else if (profile) {
     initialDisplayName = profile.display_name ?? "";
     if (profile.avatar_url) {
@@ -50,7 +51,7 @@ if (user) {
         .from("avatars")
         .createSignedUrl(profile.avatar_url, 3600);
       if (urlError) {
-        console.error("Signed URL SSR error:", urlError);
+        logger.error("Signed URL SSR error", urlError);
       } else if (urlData) {
         initialAvatarUrl = urlData.signedUrl;
       }
@@ -60,7 +61,7 @@ if (user) {
   // identities を取得して email provider の有無を判定。
   const { data: fullUser, error: userError } = await supabase.auth.getUser();
   if (userError) {
-    console.error("Profile SSR getUser error:", userError);
+    logger.error("Profile SSR getUser error", userError);
   } else if (Array.isArray(fullUser.user?.identities)) {
     hasEmailIdentity = fullUser.user.identities.some(
       (i) => i.provider === "email",

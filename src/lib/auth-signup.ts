@@ -1,6 +1,7 @@
 import { ActionError } from "astro:actions";
 
 import { SIGNUP_GENERIC_SUCCESS_MESSAGE } from "./auth-errors";
+import { logger } from "./logger";
 
 /**
  * Issue #14 (A3 follow-up): `auth.signUp` Action のアカウント列挙対策実装本体。
@@ -14,7 +15,8 @@ import { SIGNUP_GENERIC_SUCCESS_MESSAGE } from "./auth-errors";
  * （HIBP / Zod スキーマ）は Action 側で先に行い、それらの BAD_REQUEST は
  * 通常通りユーザに返す（バリデーション失敗は enumeration vector ではないため）。
  *
- * 元エラーは `console.error` に落とし、Workers Logs から運用観察できるようにする。
+ * 元エラーは `logger.error` に落とし、PII（email / JWT）をマスクした上で
+ * Workers Logs から運用観察できるようにする (Issue #7)。
  *
  * @see https://owasp.org/www-community/attacks/Account_Enumeration
  * @see https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
@@ -61,11 +63,11 @@ export async function performSignUp(
     });
     if (error) {
       // 失敗詳細はログのみ。UI には enumeration を漏らさない統一成功応答を返す。
-      console.error("auth.signUp error (suppressed for enumeration):", error);
+      logger.error("auth.signUp error (suppressed for enumeration)", error);
     }
   } catch (e) {
     if (e instanceof ActionError) throw e;
-    console.error("auth.signUp unexpected (suppressed):", e);
+    logger.error("auth.signUp unexpected (suppressed)", e);
   }
   return {
     success: true,

@@ -20,6 +20,7 @@
 import { actions } from "astro:actions";
 
 import Auth from "../../layouts/Auth.astro";
+import { logger } from "../../lib/logger";
 import { safeNextPath } from "../../lib/safe-redirect";
 
 const url = new URL(Astro.request.url);
@@ -49,7 +50,7 @@ if (Astro.request.method === "POST") {
   );
 
   if (actionError || !data?.success) {
-    if (actionError) console.error("auth/confirm verify failed", actionError);
+    if (actionError) logger.error("auth/confirm verify failed", actionError);
     return Astro.redirect("/auth/signin?error=confirm_failed");
   }
 

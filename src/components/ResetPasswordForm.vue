@@ -2,6 +2,8 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+import { logger } from "../lib/logger";
+
 const email = ref("");
 const isLoading = ref(false);
 const error = ref("");
@@ -28,7 +30,7 @@ async function handleSubmit() {
       successMessage.value = data.message;
     }
   } catch (e) {
-    console.error("Reset password error:", e);
+    logger.error("Reset password error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isLoading.value = false;

@@ -1,6 +1,7 @@
 import { ActionError } from "astro:actions";
 
 import { RESET_PASSWORD_GENERIC_SUCCESS_MESSAGE } from "./auth-errors";
+import { logger } from "./logger";
 
 /**
  * Issue #14 (A3 follow-up): `auth.resetPassword` Action のアカウント列挙対策実装本体。
@@ -13,7 +14,8 @@ import { RESET_PASSWORD_GENERIC_SUCCESS_MESSAGE } from "./auth-errors";
  * 本ヘルパーが受け持つのは Supabase 呼び出し以降の応答正規化。事前検証
  * （Zod スキーマ）は Action 側で先に行う。
  *
- * 元エラーは `console.error` に落とし、Workers Logs から運用観察できるようにする。
+ * 元エラーは `logger.error` に落とし、PII（email / JWT）をマスクした上で
+ * Workers Logs から運用観察できるようにする (Issue #7)。
  *
  * @see https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
  */
@@ -48,14 +50,14 @@ export async function performResetPassword(
       redirectTo: input.options.redirectTo,
     });
     if (error) {
-      console.error(
-        "auth.resetPassword error (suppressed for enumeration):",
+      logger.error(
+        "auth.resetPassword error (suppressed for enumeration)",
         error,
       );
     }
   } catch (e) {
     if (e instanceof ActionError) throw e;
-    console.error("auth.resetPassword unexpected (suppressed):", e);
+    logger.error("auth.resetPassword unexpected (suppressed)", e);
   }
   return {
     success: true,

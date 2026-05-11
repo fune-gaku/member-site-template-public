@@ -3,6 +3,7 @@ import { actions } from "astro:actions";
 
 import PostList from "../../components/PostList.vue";
 import Member from "../../layouts/Member.astro";
+import { logger } from "../../lib/logger";
 import { createClient } from "../../lib/supabase";
 
 interface Post {
@@ -36,7 +37,7 @@ if (user) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("data.astro: failed to load posts", error);
+    logger.error("data.astro: failed to load posts", error);
   } else {
     initialPosts = data ?? [];
   }
