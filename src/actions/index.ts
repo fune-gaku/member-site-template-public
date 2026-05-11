@@ -17,6 +17,7 @@ import {
   MAX_AVATAR_SIZE,
   sanitizeAvatarFileName,
 } from "../lib/avatar-upload";
+import { logger } from "../lib/logger";
 import { passwordSchema } from "../lib/password-schema";
 import { isHibpCheckEnabled, isPasswordPwned } from "../lib/pwned-password";
 import { safeNextPath } from "../lib/safe-redirect";
@@ -85,7 +86,7 @@ async function requireAdmin(context: ActionAPIContext) {
     .eq("user_id", user.id)
     .single();
   if (error) {
-    console.error("requireAdmin: profile load error", error);
+    logger.error("requireAdmin: profile load error", error);
     throw new ActionError({
       code: "INTERNAL_SERVER_ERROR",
       message: "権限情報の取得に失敗しました",
@@ -280,7 +281,7 @@ export const server = {
           type: input.type,
         });
         if (error) {
-          console.error("auth.confirmOtp error", error);
+          logger.error("auth.confirmOtp error", error);
           throw new ActionError({
             code: "BAD_REQUEST",
             message: "リンクが無効または期限切れです",
@@ -335,7 +336,7 @@ export const server = {
           password: input.password,
         });
         if (error) {
-          console.error("auth.updatePassword error", error);
+          logger.error("auth.updatePassword error", error);
           throw new ActionError({
             code: "BAD_REQUEST",
             message: error.message,
@@ -524,7 +525,7 @@ export const server = {
           .single();
 
         if (error) {
-          console.error("posts.create error", error);
+          logger.error("posts.create error", error);
           throw new ActionError({
             code: "INTERNAL_SERVER_ERROR",
             message: "投稿の作成に失敗しました",
@@ -567,7 +568,7 @@ export const server = {
           .single();
 
         if (error) {
-          console.error("posts.update error", error);
+          logger.error("posts.update error", error);
           throw new ActionError({
             code: "INTERNAL_SERVER_ERROR",
             message: "投稿の更新に失敗しました",
@@ -607,7 +608,7 @@ export const server = {
           .eq("user_id", user.id);
 
         if (error) {
-          console.error("posts.delete error", error);
+          logger.error("posts.delete error", error);
           throw new ActionError({
             code: "INTERNAL_SERVER_ERROR",
             message: "投稿の削除に失敗しました",
@@ -650,7 +651,7 @@ export const server = {
           .update({ display_name: input.displayName })
           .eq("user_id", user.id);
         if (error) {
-          console.error("profile.update error", error);
+          logger.error("profile.update error", error);
           throw new ActionError({
             code: "INTERNAL_SERVER_ERROR",
             message: "プロフィールの更新に失敗しました",
@@ -727,7 +728,7 @@ export const server = {
           perPage: input.perPage ?? 100,
         });
         if (error) {
-          console.error("admin.listUsers error", error);
+          logger.error("admin.listUsers error", error);
           throw new ActionError({
             code: "INTERNAL_SERVER_ERROR",
             message: "ユーザー一覧の取得に失敗しました",
@@ -746,7 +747,7 @@ export const server = {
             .select("user_id, role, display_name")
             .in("user_id", ids);
           if (profilesError) {
-            console.error("admin.listUsers profiles error", profilesError);
+            logger.error("admin.listUsers profiles error", profilesError);
             throw new ActionError({
               code: "INTERNAL_SERVER_ERROR",
               message: "プロフィール情報の取得に失敗しました",
@@ -800,7 +801,7 @@ export const server = {
           .eq("user_id", input.userId);
 
         if (error) {
-          console.error("admin.updateUserRole error", error);
+          logger.error("admin.updateUserRole error", error);
           throw new ActionError({
             code: "INTERNAL_SERVER_ERROR",
             message: "ロールの更新に失敗しました",

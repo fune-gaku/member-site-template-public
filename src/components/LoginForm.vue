@@ -2,6 +2,8 @@
 import { actions } from "astro:actions";
 import { ref } from "vue";
 
+import { logger } from "../lib/logger";
+
 // `next` は signin.astro 側で safeNextPath() による検証済みの値を受け取る。
 // クライアント側で window.location.search から直接読むと Open Redirect
 // （CWE-601）を踏むため、必ず props 経由で受け取ること。
@@ -33,7 +35,7 @@ async function handleSubmit() {
       window.location.href = props.next;
     }
   } catch (e) {
-    console.error("Login error:", e);
+    logger.error("Login error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isLoading.value = false;

@@ -7,6 +7,7 @@ import {
   ALLOWED_AVATAR_MIME,
   MAX_AVATAR_SIZE,
 } from "../lib/avatar-upload";
+import { logger } from "../lib/logger";
 
 const props = withDefaults(
   defineProps<{
@@ -84,7 +85,7 @@ async function handleUploadAvatar() {
       }
     }
   } catch (e) {
-    console.error("Avatar upload error:", e);
+    logger.error("Avatar upload error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isUploadingAvatar.value = false;
@@ -108,7 +109,7 @@ async function handleUpdateProfile() {
       success.value = "プロフィールを更新しました";
     }
   } catch (e) {
-    console.error("Profile update error:", e);
+    logger.error("Profile update error", e);
     error.value = "予期しないエラーが発生しました";
   } finally {
     isLoading.value = false;

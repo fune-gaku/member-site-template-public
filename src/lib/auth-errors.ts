@@ -8,8 +8,9 @@
  * 応答はすべて成否非依存の固定文言に正規化する。
  *
  * 真の防衛線は本定数を参照する Astro Action / perform* ヘルパー側の
- * エラーハンドリング。元エラーは call site で `console.error` に落とし、
- * Workers Logs から運用観察できるようにする。
+ * エラーハンドリング。元エラーは call site で `logger.error` に落とし、
+ * PII（email / JWT）をマスクした上で Workers Logs から運用観察できる
+ * ようにする (Issue #7)。
  *
  * @see https://owasp.org/www-community/attacks/Account_Enumeration
  * @see https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html#authentication-and-error-messages

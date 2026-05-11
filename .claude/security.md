@@ -69,6 +69,7 @@
 - [x] デバッグログに機密情報を出力していない
 - [x] APIレスポンスに不要なデータが含まれていない
 - [x] コメントに機密情報が含まれていない
+- [x] Workers Logs の PII マスキング：全 server-side `console.error` を `logger.error` 経由（[src/lib/logger.ts](../src/lib/logger.ts)）に集約し、メールアドレス（`u***@example.com` 形式）と JWT（`<redacted-jwt>`）を機械的にマスクしてから Cloudflare Workers Logs に流す。Supabase が返す `{ message }` の message に email が混入するケース（`User user@example.com not found` など）からのリーク経路を断つ。Vue コンポーネント側（ブラウザ console）も同 logger 経由で統一し、画面共有 / サポート対応中の覗き見経路も一律に遮蔽。UUID（user_id 等）は内部識別子として保持（運用診断のため）— Issue #7
 
 ### ✅ アクセス制御
 

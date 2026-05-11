@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 
 import { getAuthUser } from "./lib/auth-claims";
+import { logger } from "./lib/logger";
 import { checkActionBodySize } from "./lib/request-size-limits";
 import { safeNextPath } from "./lib/safe-redirect";
 import { applySecurityHeaders } from "./lib/security-headers";
@@ -68,7 +69,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (profileError) {
       // 取得失敗時は最も制限の強い扱い（member 扱い）にフォールバック。
       // 内部情報はサーバーログのみに残す。
-      console.error("middleware: failed to load profile role", profileError);
+      logger.error("middleware: failed to load profile role", profileError);
       context.locals.profile = { role: "member" };
     } else {
       const role = profile?.role === "admin" ? "admin" : "member";

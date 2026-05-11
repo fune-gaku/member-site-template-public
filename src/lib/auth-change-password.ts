@@ -1,5 +1,7 @@
 import { ActionError } from "astro:actions";
 
+import { logger } from "./logger";
+
 /**
  * Issue #19: ログイン中ユーザーが自身のパスワードを変更する経路の本体実装。
  *
@@ -61,7 +63,7 @@ export async function performChangePassword(
     password: input.currentPassword,
   });
   if (reauthError) {
-    console.error("auth.changePassword reauth failed:", reauthError);
+    logger.error("auth.changePassword reauth failed", reauthError);
     throw new ActionError({
       code: "BAD_REQUEST",
       message: CURRENT_PASSWORD_MISMATCH_MESSAGE,
@@ -72,7 +74,7 @@ export async function performChangePassword(
     password: input.newPassword,
   });
   if (updateError) {
-    console.error("auth.changePassword updateUser failed:", updateError);
+    logger.error("auth.changePassword updateUser failed", updateError);
     throw new ActionError({
       code: "INTERNAL_SERVER_ERROR",
       message: CHANGE_PASSWORD_INTERNAL_ERROR_MESSAGE,
