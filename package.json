@@ -14,7 +14,7 @@
     "astro": "astro",
     "generate-types": "wrangler types",
     "cf-typegen": "wrangler types",
-    "lint": "eslint . --max-warnings 63",
+    "lint": "eslint . --max-warnings 52",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{astro,ts,tsx,js,jsx,vue,md,json}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{astro,ts,tsx,js,jsx,vue,md,json}\" --ignore-path .gitignore",

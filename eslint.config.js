@@ -249,7 +249,9 @@ export default [
   {
     files: ["tests/**/*.ts", "**/*.test.ts"],
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
+      // テストの mock / spy は型の柔軟性を必要とするため any を許容。
+      // 11/11 が実際に test mock helper (makeAdmin / supabase client stub) で使用。
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
       "@typescript-eslint/require-await": "off",
       "@typescript-eslint/no-unsafe-argument": "off",
