@@ -107,7 +107,7 @@ export const server = {
     signUp: defineAction({
       accept: "form",
       input: z.object({
-        email: z.string().email().max(254),
+        email: z.email().max(254),
         password: passwordSchema,
       }),
       // 本体は `src/lib/auth-signup.ts` の `performSignUp` に分離してある。
@@ -136,7 +136,7 @@ export const server = {
     signIn: defineAction({
       accept: "form",
       input: z.object({
-        email: z.string().email().max(254),
+        email: z.email().max(254),
         password: z.string().max(200),
       }),
       // 本体は `src/lib/auth-signin.ts` の `performSignIn` に分離してある。
@@ -224,7 +224,7 @@ export const server = {
     resetPassword: defineAction({
       accept: "form",
       input: z.object({
-        email: z.string().email().max(254),
+        email: z.email().max(254),
       }),
       // 本体は `src/lib/auth-reset-password.ts` の `performResetPassword` に分離してある。
       // Issue #14 (A3 follow-up): 未登録メール / SMTP 失敗 / レート超過の各失敗ケースを
@@ -538,7 +538,7 @@ export const server = {
 
     update: defineAction({
       input: z.object({
-        id: z.string().uuid(),
+        id: z.uuid(),
         title: z.string().trim().min(1, "タイトルは必須です").max(200),
         body: z.string().max(10_000).optional().default(""),
       }),
@@ -587,7 +587,7 @@ export const server = {
 
     delete: defineAction({
       input: z.object({
-        id: z.string().uuid(),
+        id: z.uuid(),
       }),
       handler: async (input, context) => {
         const supabase = createClient({
@@ -667,7 +667,7 @@ export const server = {
     createUser: defineAction({
       accept: "form",
       input: z.object({
-        email: z.string().email().max(254),
+        email: z.email().max(254),
         password: passwordSchema,
         displayName: z.string().max(100).optional(),
       }),
@@ -696,7 +696,7 @@ export const server = {
 
     inviteUser: defineAction({
       accept: "form",
-      input: z.object({ email: z.string().email().max(254) }),
+      input: z.object({ email: z.email().max(254) }),
       handler: async (input, context) => {
         await requireAdmin(context);
 
@@ -786,7 +786,7 @@ export const server = {
 
     updateUserRole: defineAction({
       input: z.object({
-        userId: z.string().uuid(),
+        userId: z.uuid(),
         role: z.enum(["member", "admin"]),
       }),
       handler: async (input, context) => {
@@ -832,7 +832,7 @@ export const server = {
      */
     deleteUser: defineAction({
       input: z.object({
-        userId: z.string().uuid(),
+        userId: z.uuid(),
       }),
       handler: async (input, context) => {
         const caller = await requireAdmin(context);

@@ -12,7 +12,7 @@ import {
 
 describe("auth.signUp schema", () => {
   const schema = z.object({
-    email: z.string().email(),
+    email: z.email(),
     password: z.string().min(6),
   });
 
@@ -43,7 +43,7 @@ describe("auth.signUp schema", () => {
 
 describe("auth.signIn schema (Issue #8 / A3)", () => {
   const schema = z.object({
-    email: z.string().email(),
+    email: z.email(),
     password: z.string(),
   });
 
@@ -117,7 +117,7 @@ describe("auth.signInWithGoogle schema (Issue #49)", () => {
 
 describe("auth.resetPassword schema", () => {
   const schema = z.object({
-    email: z.string().email(),
+    email: z.email(),
   });
 
   it("有効なメールアドレスを受け入れる", () => {
@@ -227,7 +227,7 @@ describe("auth.changePassword schema (Issue #19)", () => {
 
 describe("admin.createUser schema", () => {
   const schema = z.object({
-    email: z.string().email(),
+    email: z.email(),
     password: z.string().min(6),
     displayName: z.string().optional(),
   });
@@ -287,7 +287,7 @@ describe("posts.create schema", () => {
 
 describe("posts.update schema", () => {
   const schema = z.object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     title: z.string().trim().min(1).max(200),
     body: z.string().max(10_000).optional().default(""),
   });
@@ -312,15 +312,15 @@ describe("posts.update schema", () => {
 describe("Issue #9: 文字列フィールドの .max() 多層防御", () => {
   // actions/index.ts と同じ形を再宣言（Astro context 不要のため）
   const signInSchema = z.object({
-    email: z.string().email().max(254),
+    email: z.email().max(254),
     password: z.string().max(200),
   });
   const signUpSchema = z.object({
-    email: z.string().email().max(254),
+    email: z.email().max(254),
     password: z.string().min(8),
   });
   const resetPasswordSchema = z.object({
-    email: z.string().email().max(254),
+    email: z.email().max(254),
   });
   const confirmOtpSchema = z.object({
     token_hash: z.string().min(1).max(512),
@@ -335,12 +335,12 @@ describe("Issue #9: 文字列フィールドの .max() 多層防御", () => {
   });
   const getSignedUrlSchema = z.object({ path: z.string().max(512) });
   const adminCreateUserSchema = z.object({
-    email: z.string().email().max(254),
+    email: z.email().max(254),
     password: z.string().min(8),
     displayName: z.string().max(100).optional(),
   });
   const adminInviteUserSchema = z.object({
-    email: z.string().email().max(254),
+    email: z.email().max(254),
   });
 
   it("email は 254 文字超で拒否（RFC 5321）", () => {
@@ -424,7 +424,7 @@ describe("Issue #9: 文字列フィールドの .max() 多層防御", () => {
 describe("admin.deleteUser schema (Issue #14)", () => {
   // actions/index.ts の deleteUser input と同じ形を再宣言
   const schema = z.object({
-    userId: z.string().uuid(),
+    userId: z.uuid(),
   });
 
   it("有効な UUID を受け入れる", () => {
@@ -452,7 +452,7 @@ describe("admin.deleteUser schema (Issue #14)", () => {
 
 describe("admin.updateUserRole schema", () => {
   const schema = z.object({
-    userId: z.string().uuid(),
+    userId: z.uuid(),
     role: z.enum(["member", "admin"]),
   });
 
