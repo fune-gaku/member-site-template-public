@@ -93,7 +93,7 @@ async function requireAdmin(context: ActionAPIContext) {
       message: "権限情報の取得に失敗しました",
     });
   }
-  if (profile?.role !== "admin") {
+  if (profile.role !== "admin") {
     throw new ActionError({
       code: "FORBIDDEN",
       message: "管理者権限が必要です",
@@ -436,7 +436,7 @@ export const server = {
         // ファイル名をサニタイズ（Issue #001 / #008）
         // 日本語・絵文字・多言語は保持し、OS / URL で危険な文字と `..` のみ無害化。
         const sanitizedFileName = sanitizeAvatarFileName(input.file.name);
-        const filePath = `${user.id}/${Date.now()}_${sanitizedFileName}`;
+        const filePath = `${user.id}/${Date.now().toString()}_${sanitizedFileName}`;
         const { error } = await supabase.storage
           .from("avatars")
           .upload(filePath, input.file, {
@@ -569,16 +569,18 @@ export const server = {
           .single();
 
         if (error) {
+          // PostgREST PGRST116 = `.single()` で 0 行（= 自分の投稿で id 一致なし）。
+          // 401/403 と区別できる NOT_FOUND を返す。RLS バイパス済み (.eq("user_id", user.id)) の防御層は別途維持。
+          if (error.code === "PGRST116") {
+            throw new ActionError({
+              code: "NOT_FOUND",
+              message: "対象の投稿が見つかりませんでした",
+            });
+          }
           logger.error("posts.update error", error);
           throw new ActionError({
             code: "INTERNAL_SERVER_ERROR",
             message: "投稿の更新に失敗しました",
-          });
-        }
-        if (!data) {
-          throw new ActionError({
-            code: "NOT_FOUND",
-            message: "対象の投稿が見つかりませんでした",
           });
         }
         return { post: data };
@@ -759,7 +761,7 @@ export const server = {
             role: string;
             display_name: string | null;
           }
-          const rows = (profiles ?? []) as ProfileRow[];
+          const rows = profiles as ProfileRow[];
           profilesById = new Map(
             rows.map((p) => [
               p.user_id,
