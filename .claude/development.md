@@ -106,7 +106,7 @@
 
 `npm run lint` は `eslint . --max-warnings <baseline>` で実行する。**新規に warning を増やすと CI が fail** する仕組み。既存 warn は Sub Issue（typed lint クラスごとに分割）で段階解消し、ベースラインを減らしていく。最終的に `--max-warnings 0` まで持っていく。
 
-現在の baseline は [package.json](../package.json) の `lint` スクリプトで管理（Issue #38 リリース時 151 → #56 で 147 → #57 で 123 → #59 一部 (`eslint --fix` 自動修正分) で 84 → typed lint クラスタ解消で 77 → .astro consistent-return off で 69 → prefer-destructuring 解消で 63）。
+現在の baseline は [package.json](../package.json) の `lint` スクリプトで管理（Issue #38 リリース時 151 → #56 で 147 → #57 で 123 → #59 一部 (`eslint --fix` 自動修正分) で 84 → typed lint クラスタ解消で 77 → .astro consistent-return off で 69 → prefer-destructuring 解消で 63 → tests の no-explicit-any off で 52）。
 
 ### `eslint-disable` 運用ルール
 
