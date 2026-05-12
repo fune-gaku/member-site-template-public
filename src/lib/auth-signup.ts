@@ -32,13 +32,13 @@ interface SignUpInput {
 
 export interface SignUpCapableClient {
   auth: {
-    signUp(input: {
+    signUp: (input: {
       email: string;
       password: string;
       options?: {
         emailRedirectTo?: string;
       };
-    }): Promise<{
+    }) => Promise<{
       error: { message: string; code?: string } | null;
     }>;
   };

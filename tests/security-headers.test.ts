@@ -25,9 +25,9 @@ describe("SECURITY_HEADERS", () => {
   });
 
   it("HSTS has production-grade max-age", () => {
-    const hsts = SECURITY_HEADERS["Strict-Transport-Security"]!;
+    const hsts = SECURITY_HEADERS["Strict-Transport-Security"];
     expect(hsts).toMatch(/max-age=(\d+)/);
-    const maxAge = parseInt(hsts.match(/max-age=(\d+)/)![1]!, 10);
+    const maxAge = parseInt(/max-age=(\d+)/.exec(hsts)![1], 10);
     expect(maxAge).toBeGreaterThanOrEqual(31536000); // 1 年以上
   });
 });

@@ -12,7 +12,7 @@ if (signOutResult && !signOutResult.error) {
 }
 
 // middleware で /admin/* は未認証・非 admin をリダイレクト済み
-const user = Astro.locals.user;
+const { user } = Astro.locals;
 ---
 
 <Admin title="ユーザー管理" description="ユーザー一覧・招待・ロール変更">

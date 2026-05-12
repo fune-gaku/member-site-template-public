@@ -30,10 +30,13 @@ interface ChangePasswordInput {
 
 export interface ChangePasswordCapableClient {
   auth: {
-    signInWithPassword(input: { email: string; password: string }): Promise<{
+    signInWithPassword: (input: {
+      email: string;
+      password: string;
+    }) => Promise<{
       error: { message: string } | null;
     }>;
-    updateUser(input: { password: string }): Promise<{
+    updateUser: (input: { password: string }) => Promise<{
       error: { message: string } | null;
     }>;
   };

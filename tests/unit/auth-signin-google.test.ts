@@ -166,6 +166,6 @@ describe("isGoogleAuthEnabled (Issue #49 多層防御フラグ)", () => {
     [" true", false],
     ["true ", false],
   ])("%j → %s（fail-closed）", (input, expected) => {
-    expect(isGoogleAuthEnabled(input as string | undefined)).toBe(expected);
+    expect(isGoogleAuthEnabled(input)).toBe(expected);
   });
 });

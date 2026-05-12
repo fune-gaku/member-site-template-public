@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+import { createClient } from "../../src/lib/supabase";
+import { onRequest } from "../../src/middleware";
+
 // Supabase をモック
 vi.mock("../../src/lib/supabase", () => ({
   createClient: vi.fn(() => ({
@@ -8,9 +11,6 @@ vi.mock("../../src/lib/supabase", () => ({
     },
   })),
 }));
-
-import { createClient } from "../../src/lib/supabase";
-import { onRequest } from "../../src/middleware";
 
 /**
  * createClient のモックを構築するヘルパー。

@@ -3,8 +3,8 @@ import { actions } from "astro:actions";
 
 import Member from "../../layouts/Member.astro";
 
-const user = Astro.locals.user;
-const profile = Astro.locals.profile;
+const { user } = Astro.locals;
+const { profile } = Astro.locals;
 const isAdmin = profile?.role === "admin";
 
 // Issue #005: サインアウトはフォーム POST のみで副作用を起こす。

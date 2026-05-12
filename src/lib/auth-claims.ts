@@ -52,7 +52,7 @@ export async function getAuthUser(
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims) return null;
 
-  const sub = data.claims.sub;
+  const { sub } = data.claims;
   if (typeof sub !== "string" || sub.length === 0) return null;
 
   const emailClaim = (data.claims as Record<string, unknown>).email;

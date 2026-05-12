@@ -21,7 +21,7 @@ if (signOutResult && !signOutResult.error) {
   return Astro.redirect("/");
 }
 
-const user = Astro.locals.user;
+const { user } = Astro.locals;
 
 // SSR で自分の投稿一覧を取得（RLS により自分の投稿のみ返る）
 let initialPosts: Post[] = [];

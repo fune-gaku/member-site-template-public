@@ -110,7 +110,7 @@ describe("auth.signInWithGoogle schema (Issue #49)", () => {
   });
 
   it("next が長すぎる場合は拒否 (DoS 対策)", () => {
-    const result = schema.safeParse({ next: "/" + "a".repeat(1024) });
+    const result = schema.safeParse({ next: `/${"a".repeat(1024)}` });
     expect(result.success).toBe(false);
   });
 });

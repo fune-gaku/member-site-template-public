@@ -44,7 +44,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.user = user;
   context.locals.profile = null;
 
-  const pathname = context.url.pathname;
+  const { pathname } = context.url;
   const isMemberArea = pathname.startsWith("/member");
   const isAdminArea = pathname.startsWith("/admin");
 

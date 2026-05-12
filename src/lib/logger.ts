@@ -110,11 +110,11 @@ function sanitizeValue(
   if (typeof value !== "object") return value;
 
   // 循環参照ガード
-  if (seen.has(value as object)) return "<circular>";
+  if (seen.has(value)) return "<circular>";
   // 深さ上限ガード（実装ミスや異常系で無限に深いツリーが来ても安全に打ち切る）
   if (depth >= MAX_SANITIZE_DEPTH) return "<max-depth>";
 
-  seen.add(value as object);
+  seen.add(value);
 
   if (Array.isArray(value)) {
     return value.map((item) => sanitizeValue(item, seen, depth + 1));

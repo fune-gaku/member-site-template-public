@@ -40,7 +40,7 @@ describe("profile.update input schema", () => {
 
   it("treats length limit as post-trim (101 spaces + 99-char content is fine)", () => {
     // 先頭・末尾の空白は trim で除去されるため、実質 99 文字なら通る
-    const input = "   " + "a".repeat(99) + "   ";
+    const input = `   ${"a".repeat(99)}   `;
     const r = displayNameSchema.safeParse(input);
     expect(r.success).toBe(true);
     if (r.success) expect(r.data.length).toBe(99);
