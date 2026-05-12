@@ -131,11 +131,47 @@ export default [
       "max-depth": ["warn", { max: 4 }],
       "max-params": ["warn", { max: 6 }],
       "id-length": [
-        "warn",
+        "error",
         {
           min: 3,
           properties: "never",
-          exceptions: ["_", "h", "i", "j", "ok", "js", "vm", "fs", "id", "to"],
+          // 業界慣用名のグローバル allowlist:
+          //   - callback parameter / iteratee (e, f, p, u, r, l, b, v, t, m, a)
+          //   - 略語 (pw=password, qs=querystring, eq=equal, ch=character)
+          //   - フィクスチャ慣用 (fs, vm, js, ok, id, to, h, i, j)
+          //   - unused 識別子のプレースホルダ (_)
+          // 注意: id-length は **per-context ではなく per-name** の allowlist。
+          // 例外名は callback 短スコープに限らず、長い関数本体・Vue template の
+          // `v-for="u in users"` 等でも許可される（Codex review PR #68 P1 / P2 で指摘）。
+          // 現状のコードベースでは可読性問題のある利用なし。context-aware 制約が
+          // 必要になったら `@typescript-eslint/naming-convention` 導入を検討する。
+          exceptions: [
+            "_",
+            "a",
+            "b",
+            "ch",
+            "e",
+            "eq",
+            "f",
+            "fs",
+            "h",
+            "i",
+            "id",
+            "j",
+            "js",
+            "l",
+            "m",
+            "ok",
+            "p",
+            "pw",
+            "qs",
+            "r",
+            "t",
+            "to",
+            "u",
+            "v",
+            "vm",
+          ],
         },
       ],
       "sonarjs/cognitive-complexity": "warn",
