@@ -201,7 +201,6 @@ export default [
       "@typescript-eslint/no-unsafe-member-access": "warn",
       "@typescript-eslint/no-unsafe-return": "warn",
       "@typescript-eslint/no-deprecated": "warn",
-      "@typescript-eslint/require-await": "warn",
       "@typescript-eslint/no-unnecessary-condition": "warn",
       "@typescript-eslint/no-unnecessary-type-assertion": "warn",
       "@typescript-eslint/restrict-template-expressions": "warn",
@@ -213,6 +212,7 @@ export default [
       "@typescript-eslint/no-base-to-string": "error",
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/require-await": "error",
     },
   },
 
