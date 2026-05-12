@@ -51,6 +51,7 @@
  * `g` フラグで 1 つの文字列に複数 email が含まれる場合に全て置換する。
  */
 const EMAIL_REGEX =
+  // eslint-disable-next-line sonarjs/slow-regex -- 入力はログメッセージで境界あり、各キャラクタクラスは disjoint かつ非貪欲、catastrophic backtracking のリスクなし
   /([A-Za-z0-9._+-])[A-Za-z0-9._+-]*(@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
 
 export function maskEmail(input: string): string {
