@@ -246,8 +246,13 @@ export default [
   },
 
   // ---- テストファイル緩和 ----
+  // tests/ ディレクトリ専用。`**/*.test.ts` のような catch-all は src/ にコロケート
+  // 配置された test ファイル (src/**/*.test.ts) で no-explicit-any: error policy を
+  // バイパスするため使わない (Codex review iter-1 P1, PR #67)。
+  // 現状テストは vitest.config.ts の include で `tests/**/*.test.ts` のみ拾うため、
+  // この pattern で完全カバーできる。
   {
-    files: ["tests/**/*.ts", "**/*.test.ts"],
+    files: ["tests/**/*.ts"],
     rules: {
       // テストの mock / spy は型の柔軟性を必要とするため any を許容。
       // 11/11 が実際に test mock helper (makeAdmin / supabase client stub) で使用。
