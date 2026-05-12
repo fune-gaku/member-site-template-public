@@ -77,6 +77,7 @@ export function sanitizeAvatarFileName(name: string): string {
 
   // 4. 先頭・末尾の空白やドットを削る
   //    （Windows では trailing dot を持つファイルが解釈事故を起こすため）。
+  // eslint-disable-next-line sonarjs/slow-regex -- 入力はファイル名 basename で長さ上限あり、catastrophic backtracking のリスクなし
   out = out.replace(/^[\s.]+|[\s.]+$/g, "");
 
   // 全部削れて空になったらフォールバック。

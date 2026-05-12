@@ -48,6 +48,7 @@ export function isHibpCheckEnabled(
  */
 async function sha1HexUpper(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
+  // eslint-disable-next-line sonarjs/hashing -- HIBP (Have I Been Pwned) の k-anonymity プロトコル仕様で SHA-1 prefix が必須。パスワード保存ではなく外部 API への問い合わせ用ハッシュ
   const hashBuffer = await crypto.subtle.digest("SHA-1", data);
   return Array.from(new Uint8Array(hashBuffer))
     .map((b) => b.toString(16).padStart(2, "0"))
