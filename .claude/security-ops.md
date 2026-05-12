@@ -80,10 +80,10 @@ Supabase Dashboard > Database > Advisors > Security に出る警告のうち、*
 
 > Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.
 
-| プラン   | 対応                                                                                                                                                                                                            | 結果                                              |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| **Free** | アプリ層 `ENABLE_HIBP_CHECK=true` で代替する（[`src/lib/pwned-password.ts`](../src/lib/pwned-password.ts) が HIBP k-Anonymity API へ照会）                                                                      | Advisor の警告は **出続ける**（プランの仕様）     |
-| **Pro 以上** | Dashboard > Authentication > Attack Protection > **Enable leaked password protection** を ON。アプリ層 `ENABLE_HIBP_CHECK` は **OFF（unset または `false`）** にして二重実行を避ける             | Advisor の警告が消える                            |
+| プラン       | 対応                                                                                                                                                                                 | 結果                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| **Free**     | アプリ層 `ENABLE_HIBP_CHECK=true` で代替する（[`src/lib/pwned-password.ts`](../src/lib/pwned-password.ts) が HIBP k-Anonymity API へ照会）                                           | Advisor の警告は **出続ける**（プランの仕様） |
+| **Pro 以上** | Dashboard > Authentication > Attack Protection > **Enable leaked password protection** を ON。アプリ層 `ENABLE_HIBP_CHECK` は **OFF（unset または `false`）** にして二重実行を避ける | Advisor の警告が消える                        |
 
 #### Free → Pro へ移行したときのスイッチング手順
 

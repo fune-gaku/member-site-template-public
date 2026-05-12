@@ -171,9 +171,9 @@ CLI 代替として `wrangler secret put` でも同じ per-Worker Secret に書�
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name member-site-template
 ```
 
-| 用途                       | 場所                                                                                                                                                          | 例                                        |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| ビルド時に inline          | Workers Builds の **Build variables**（Dashboard）                                                                                                            | `PUBLIC_SUPABASE_URL` / `PUBLIC_SITE_URL` |
+| 用途                       | 場所                                                                                                                                  | 例                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| ビルド時に inline          | Workers Builds の **Build variables**（Dashboard）                                                                                    | `PUBLIC_SUPABASE_URL` / `PUBLIC_SITE_URL` |
 | ランタイム読み取り（秘密） | Dashboard > Settings > **Variables and Secrets > Add > Secret** または `wrangler secret put`（**Bindings > Secrets Store ではない**） | `SUPABASE_SERVICE_ROLE_KEY`               |
 
 > 詳細は README Step 7（Dashboard 経路 + 「Secret が登録したはずなのに undefined になる」トラブルシューティング）を参照。**per-Worker Secret と Secrets Store は別物**で、本テンプレのコードは前者に同期アクセスする設計。

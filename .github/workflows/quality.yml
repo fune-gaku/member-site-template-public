@@ -1,0 +1,74 @@
+name: quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # typed lint (projectService) は worker-configuration.d.ts の型を読む。
+      # ファイル未生成だと CI と local で警告件数が乖離するため、typecheck job と
+      # 同じ前処理を実施して整合させる（.dev.vars seed → wrangler types）。
+      - name: Seed .dev.vars from example
+        run: cp .dev.vars.example .dev.vars
+
+      - name: Generate Cloudflare Workers types
+        run: npx wrangler types
+
+      - name: ESLint
+        run: npm run lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # wrangler types は .dev.vars に書かれたキーも Env 型に含める仕様。
+      # CI には .dev.vars が無い (gitignore) ため .dev.vars.example をプレースホルダ
+      # としてコピーする。値は型生成には使われないので placeholder で安全。
+      - name: Seed .dev.vars from example
+        run: cp .dev.vars.example .dev.vars
+
+      - name: Astro typecheck
+        run: npm run typecheck
+
+  format-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prettier check
+        run: npm run format:check
