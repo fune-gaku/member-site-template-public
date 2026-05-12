@@ -131,11 +131,41 @@ export default [
       "max-depth": ["warn", { max: 4 }],
       "max-params": ["warn", { max: 6 }],
       "id-length": [
-        "warn",
+        "error",
         {
           min: 3,
           properties: "never",
-          exceptions: ["_", "h", "i", "j", "ok", "js", "vm", "fs", "id", "to"],
+          // 慣用的な callback parameter (e, f, p, u, r, l, b, v, t, m, a) +
+          // 業界標準略語 (pw / qs / eq / ch / fs / vm / js / ok / id / to / h / i / j) +
+          // unused 識別子のプレースホルダ (_)。すべて短いスコープ内の callback / map / reduce
+          // で使われるため意味の損失が少ない。
+          exceptions: [
+            "_",
+            "a",
+            "b",
+            "ch",
+            "e",
+            "eq",
+            "f",
+            "fs",
+            "h",
+            "i",
+            "id",
+            "j",
+            "js",
+            "l",
+            "m",
+            "ok",
+            "p",
+            "pw",
+            "qs",
+            "r",
+            "t",
+            "to",
+            "u",
+            "v",
+            "vm",
+          ],
         },
       ],
       "sonarjs/cognitive-complexity": "warn",
