@@ -76,6 +76,45 @@
 
 ---
 
+## ESLint 構成
+
+[eslint.config.js](../eslint.config.js) はハイブリッド構成（Issue #38 で確立）。AI が書いたコードに多発する Promise 誤用・`any` 流入・無意味な条件分岐を機械的に拾うため、構文ベース層に **`.ts` 限定の typed lint** と **横方向の sonarjs / security** を重ねている。
+
+### 構造（読む順）
+
+1. **基本層** — `eslint.configs.recommended` + `tseslint.configs.strict` + `stylistic`（型情報なし、全ファイル適用）
+2. **横方向** — `sonarjs/recommended` + `security/recommended`（複雑度・bad smell・基本的セキュリティ tripwire）
+3. **フレームワーク** — `astro.configs.recommended` + `astro.configs["jsx-a11y-strict"]` + `vue.configs["flat/recommended"]`
+4. **typed lint（`.ts` / `.tsx` / `.mts` / `.cts` 限定）** — `tseslint.configs.strictTypeCheckedOnly` + `stylisticTypeCheckedOnly`（`Only` 版でベースの strict / stylistic と二重スタック回避）。`.vue` / `.astro` は `disableTypeChecked` で除外し、型検査は `astro check` / `vue-tsc` に委ねる
+5. **Prettier** — `eslint-config-prettier` を **必ず最後** に配置
+
+### `.vue` / `.astro` に typed lint を当てない理由
+
+公式 [`typescript-eslint` performance docs](https://typescript-eslint.io/troubleshooting/typed-linting/performance) が `extraFileExtensions` + `projectService` の組合せに対してパフォーマンス劣化を警告している。本リポは `astro check` / `vue-tsc` が型検査を担っているため、ESLint 側で重ねる費用対効果が低い。
+
+### 手動ルール 3 階層
+
+| 階層                           | 意図                                                | 代表例                                                                                                                                                                                                                                                                           |
+| ------------------------------ | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **error**（バグ直結）          | AI 生成バグの早期検出に直結。違反 0 件で error 維持 | `@typescript-eslint/no-floating-promises` / `no-misused-promises` / `no-base-to-string` / `no-explicit-any` / `no-non-null-assertion` / `consistent-type-imports` / `import/order` / `eqeqeq` / `no-shadow` / `no-throw-literal`                                                 |
+| **warn**（段階導入）           | 既存違反 100+ 件のクラス。Sub Issue で段階格上げ    | `@typescript-eslint/no-unsafe-*`（argument / assignment / call / member-access / return）/ `no-deprecated` / `require-await` / `no-unnecessary-condition` / `restrict-template-expressions` / `method-signature-style` / `complexity` / `max-depth` / `id-length` 等のスタイル系 |
+| **off**（FP 多発・重複・重い） | Step 1 試走の個別評価結果                           | `sonarjs/deprecation`（`@typescript-eslint/no-deprecated` と重複）/ `sonarjs/no-hardcoded-passwords`（変数名パターンマッチで FP）/ `security/detect-object-injection`（動的キーアクセスを一律警告）/ `import/no-cycle`（TIMING=1 で全体時間の 85% を消費）                       |
+
+詳細な off 判断の根拠は [eslint.config.js](../eslint.config.js) のコメントを参照（Step 1 試走の実測値を記録）。
+
+### CI ベースライン
+
+`npm run lint` は `eslint . --max-warnings 151` で実行する。**新規に warning を増やすと CI が fail** する仕組み。既存 151 件の warn は Sub Issue（typed lint クラスごとに分割）で段階解消し、ベースラインを減らしていく。最終的に `--max-warnings 0` まで持っていく。
+
+### `eslint-disable` 運用ルール
+
+- `eslint-disable-next-line <rule> -- <理由>` を必ず使う（`--` の後に理由を書く）
+- 理由には「なぜ disable してよいか」を **具体的な事実** で書く（"this is fine" は不可、"入力は basename で長さ上限あり、catastrophic backtracking のリスクなし" のように検証可能な事実）
+- `linterOptions.reportUnusedDisableDirectives: "error"` で **未使用 disable を CI 検出**。disable が不要になったら即座に削除されることを強制
+- ブロック単位の disable（`/* eslint-disable */` ... `/* eslint-enable */`）は緊急時のみ。常用しない
+
+---
+
 ## コメント規約
 
 - **デフォルトはコメントを書かない**。識別子と型で意図が伝わるなら不要
