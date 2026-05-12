@@ -59,12 +59,12 @@ mkdir -p .codex-review/<N>
 
 各イテレーションの artifacts は `.codex-review/<N>/iter-<k>-*` に保存。ワークスペース直下なので VSCode の markdown リンク（後述「ユーザーへの報告」）から 1 クリックで開ける（`.gitignore` で除外済み）:
 
-| ファイル | 用途 | 投稿可否 |
-|--|--|--|
-| `iter-<k>.log` | codex CLI の生 stdout（CLI ノイズ・tool trace 含む） | 投稿しない（audit 用 / fallback 用） |
-| `iter-<k>-review.md` | Codex が書く review 本文 | **コメント 1 として投稿** |
-| `iter-<k>-evaluation.md` | Claude が書く評価テーブル（findings 有り時のみ） | **コメント 2 として投稿** |
-| `iter-<k>-docs-check.md` | 公式 docs 照合レポート（C-2 トリガ成立時のみ） | **コメント 3 として投稿** |
+| ファイル                 | 用途                                                 | 投稿可否                             |
+| ------------------------ | ---------------------------------------------------- | ------------------------------------ |
+| `iter-<k>.log`           | codex CLI の生 stdout（CLI ノイズ・tool trace 含む） | 投稿しない（audit 用 / fallback 用） |
+| `iter-<k>-review.md`     | Codex が書く review 本文                             | **コメント 1 として投稿**            |
+| `iter-<k>-evaluation.md` | Claude が書く評価テーブル（findings 有り時のみ）     | **コメント 2 として投稿**            |
+| `iter-<k>-docs-check.md` | 公式 docs 照合レポート（C-2 トリガ成立時のみ）       | **コメント 3 として投稿**            |
 
 ---
 
@@ -219,15 +219,16 @@ Codex が LGTM を返し、かつ あなたの自発検出も無い iteration �
 ```markdown
 ## Claude's evaluation of iteration <k>
 
-| # | Finding (source) | Category | Action | Reasoning |
-|--|--|--|--|--|
-| 1 | <Codex 指摘 1 の要約> (Codex) | MUST-FIX | Fixed in <SHA> | <根拠 / grep 結果 / 影響範囲> |
-| 2 | <Codex 指摘 2 の要約> (Codex) | VALID-NIT | Fixed in <SHA> | <スタイル改善の根拠> |
-| 3 | <Codex 指摘 3 の要約> (Codex) | FALSE-POSITIVE | Rejected | <論拠（既存実装で対処済み / 公式が別 guidance / 等）> |
-| 4 | <Codex 指摘 4 の要約> (Codex) | DEFER | Issue #<N> | <スコープ外の理由> |
-| 5 | <Claude 独自検出 1> (Claude) | MUST-FIX | Fixed in <SHA> | observed during Claude review, not flagged by Codex; <根拠> |
+| #   | Finding (source)              | Category       | Action         | Reasoning                                                   |
+| --- | ----------------------------- | -------------- | -------------- | ----------------------------------------------------------- |
+| 1   | <Codex 指摘 1 の要約> (Codex) | MUST-FIX       | Fixed in <SHA> | <根拠 / grep 結果 / 影響範囲>                               |
+| 2   | <Codex 指摘 2 の要約> (Codex) | VALID-NIT      | Fixed in <SHA> | <スタイル改善の根拠>                                        |
+| 3   | <Codex 指摘 3 の要約> (Codex) | FALSE-POSITIVE | Rejected       | <論拠（既存実装で対処済み / 公式が別 guidance / 等）>       |
+| 4   | <Codex 指摘 4 の要約> (Codex) | DEFER          | Issue #<N>     | <スコープ外の理由>                                          |
+| 5   | <Claude 独自検出 1> (Claude)  | MUST-FIX       | Fixed in <SHA> | observed during Claude review, not flagged by Codex; <根拠> |
 
 ### Notes
+
 - <iteration 全体の総括 / 次 iteration への申し送り事項があれば>
 ```
 
@@ -246,7 +247,8 @@ C-2 を実行した findings がある場合のみ `iter-<k>-docs-check.md` を�
 
 **Codex assertion**: "<原文>"
 
-**Official source**: [<doc title>](<URL>)
+**Official source**: [<doc title>](URL)
+
 > <verbatim 引用>
 
 **Verdict**: <Accepted / Partial accept / Rejected>
@@ -256,6 +258,7 @@ C-2 を実行した findings がある場合のみ `iter-<k>-docs-check.md` を�
 ---
 
 ### Finding #<m+1>: ...
+
 （同様）
 ```
 
@@ -345,7 +348,7 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 
 ### 出力テンプレート
 
-````markdown
+```markdown
 ### イテレーション <k> / 5
 
 **Codex verdict**: LGTM / CHANGES REQUESTED (<N> issues)
@@ -358,10 +361,10 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 
 **Claude evaluation** (`iter-<k>-evaluation.md`):
 
-| #   | Finding                | Category       | Action       | Reasoning      |
-| --- | ---------------------- | -------------- | ------------ | -------------- |
-| 1   | <Codex 指摘 1 の要約>  | MUST-FIX       | Fixed in <SHA> | <根拠>         |
-| 2   | <Codex 指摘 2 の要約>  | FALSE-POSITIVE | Rejected     | <論拠>         |
+| #   | Finding               | Category       | Action         | Reasoning |
+| --- | --------------------- | -------------- | -------------- | --------- |
+| 1   | <Codex 指摘 1 の要約> | MUST-FIX       | Fixed in <SHA> | <根拠>    |
+| 2   | <Codex 指摘 2 の要約> | FALSE-POSITIVE | Rejected       | <論拠>    |
 
 **Artifacts**:
 
@@ -370,7 +373,7 @@ gh pr merge <N> --merge   # squash 禁止。プロジェクトは --no-ff merge 
 - 生 LOG（audit 用）: [iter-<k>.log](.codex-review/<N>/iter-<k>.log)
 
 **Posted to GitHub**: review #<id1> [/ evaluation #<id2>] [/ docs-check #<id3>]
-````
+```
 
 ### ルール
 

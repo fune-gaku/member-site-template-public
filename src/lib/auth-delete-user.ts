@@ -174,10 +174,7 @@ export async function performDeleteUser(
     false,
   );
   if (deleteError) {
-    logger.error(
-      "admin.deleteUser auth.admin.deleteUser failed",
-      deleteError,
-    );
+    logger.error("admin.deleteUser auth.admin.deleteUser failed", deleteError);
     throw new ActionError({
       code: "INTERNAL_SERVER_ERROR",
       message: DELETE_USER_INTERNAL_ERROR_MESSAGE,
