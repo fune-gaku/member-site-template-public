@@ -754,8 +754,14 @@ export const server = {
               message: "プロフィール情報の取得に失敗しました",
             });
           }
+          interface ProfileRow {
+            user_id: string;
+            role: string;
+            display_name: string | null;
+          }
+          const rows = (profiles ?? []) as ProfileRow[];
           profilesById = new Map(
-            (profiles ?? []).map((p) => [
+            rows.map((p) => [
               p.user_id,
               { role: p.role, display_name: p.display_name },
             ]),
