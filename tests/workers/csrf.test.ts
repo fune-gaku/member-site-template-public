@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/vitest-pool-workers/types" />
-import { SELF } from "cloudflare:test";
+import { exports } from "cloudflare:workers";
 import { describe, it, expect } from "vitest";
 
 // Astro `security.checkOrigin`（既定 true）が `_actions/*` への
@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 describe("CSRF: cross-origin POST guard via Astro security.checkOrigin", () => {
   it("クロスオリジン POST /_actions/auth.signOut は 403 を返す", async () => {
     const body = new URLSearchParams();
-    const response = await SELF.fetch(
+    const response = await exports.default.fetch(
       "https://member-site-template.your-subdomain.workers.dev/_actions/auth.signOut",
       {
         method: "POST",
@@ -33,7 +33,7 @@ describe("CSRF: cross-origin POST guard via Astro security.checkOrigin", () => {
     // cross-origin POST から保護されている（Astro security.checkOrigin 経由）。
     // 攻撃者がリンク踏ませで強制 OAuth リダイレクトを起こせないことの回帰テスト。
     const body = new URLSearchParams();
-    const response = await SELF.fetch(
+    const response = await exports.default.fetch(
       "https://member-site-template.your-subdomain.workers.dev/_actions/auth.signInWithGoogle",
       {
         method: "POST",
@@ -52,7 +52,7 @@ describe("CSRF: cross-origin POST guard via Astro security.checkOrigin", () => {
     const body = new URLSearchParams();
     const url =
       "https://member-site-template.your-subdomain.workers.dev/_actions/auth.signOut";
-    const response = await SELF.fetch(url, {
+    const response = await exports.default.fetch(url, {
       method: "POST",
       headers: {
         Origin: "https://member-site-template.your-subdomain.workers.dev",
