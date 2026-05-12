@@ -25,8 +25,7 @@ async function handleSubmit() {
     formData.append("email", email.value);
     formData.append("password", password.value);
 
-    const { data: _data, error: actionError } =
-      await actions.auth.signIn(formData);
+    const { error: actionError } = await actions.auth.signIn(formData);
 
     if (actionError) {
       error.value = actionError.message;
