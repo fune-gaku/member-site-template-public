@@ -275,7 +275,7 @@ describe("performDeleteUser (Issue #14, admin-only)", () => {
     // 部分削除状態のまま auth delete に進むと owner constraint で失敗するため、
     // 最初の失敗で即時 throw する (再実行で残りを掃除可能)。
     const all1500 = Array.from({ length: 1500 }, (_, i) => ({
-      name: `${i}.png`,
+      name: `${i.toString()}.png`,
     }));
     const list = vi
       .fn()
@@ -314,7 +314,7 @@ describe("performDeleteUser (Issue #14, admin-only)", () => {
     // ちょうど 100 件のとき (PAGE_SIZE と一致): 1 ページ目では break せず
     // 2 ページ目で 0 件返ってから break することを固定する。
     const exactly100 = Array.from({ length: 100 }, (_, i) => ({
-      name: `${i}.png`,
+      name: `${i.toString()}.png`,
     }));
     const list = vi
       .fn()

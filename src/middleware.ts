@@ -72,7 +72,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       logger.error("middleware: failed to load profile role", profileError);
       context.locals.profile = { role: "member" };
     } else {
-      const role = profile?.role === "admin" ? "admin" : "member";
+      const role = profile.role === "admin" ? "admin" : "member";
       context.locals.profile = { role };
     }
 
