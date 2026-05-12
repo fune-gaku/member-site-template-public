@@ -78,9 +78,9 @@ describe("performDeleteUser (Issue #14, admin-only)", () => {
     expect(deleteUser).toHaveBeenCalledWith(VALID_INPUT.userId, false);
 
     // 順序保証: list → remove → deleteUser（owner constraint 回避のため不可逆）
-    const listOrder = list.mock.invocationCallOrder[0];
-    const removeOrder = remove.mock.invocationCallOrder[0];
-    const deleteOrder = deleteUser.mock.invocationCallOrder[0];
+    const [listOrder] = list.mock.invocationCallOrder;
+    const [removeOrder] = remove.mock.invocationCallOrder;
+    const [deleteOrder] = deleteUser.mock.invocationCallOrder;
     expect(listOrder).toBeLessThan(removeOrder);
     expect(removeOrder).toBeLessThan(deleteOrder);
   });

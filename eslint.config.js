@@ -147,7 +147,7 @@ export default [
       "no-unneeded-ternary": "warn",
       "no-else-return": ["warn", { allowElseIf: false }],
       "consistent-return": "warn",
-      "prefer-destructuring": "warn",
+      "prefer-destructuring": "error",
 
       // --- sonarjs: FP 多発ルールを off / @typescript-eslint と重複するものを off ---
       // 個別評価結果（Issue #38 Step 1 試走）:

@@ -32,7 +32,7 @@ describe("page-level signOut redirect (Issue #34)", () => {
         frontmatterMatch,
         `${pagePath} に Astro frontmatter が見つからない`,
       ).not.toBeNull();
-      const frontmatter = frontmatterMatch![1];
+      const [, frontmatter] = frontmatterMatch!;
 
       // 1) actions import がある
       expect(frontmatter).toMatch(
@@ -55,7 +55,7 @@ describe("page-level signOut redirect (Issue #34)", () => {
       const source = readFileSync(resolve(REPO_ROOT, layoutPath), "utf8");
       const frontmatterMatch = /^---\n([\s\S]*?)\n---/.exec(source);
       expect(frontmatterMatch).not.toBeNull();
-      const frontmatter = frontmatterMatch![1];
+      const [, frontmatter] = frontmatterMatch!;
 
       // layout の frontmatter で `return Astro.redirect(...)` を実行している
       // と、Astro 公式仕様で無視されるが「動いているように見える」コードになり
