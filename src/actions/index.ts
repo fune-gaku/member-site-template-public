@@ -374,7 +374,7 @@ export const server = {
           cookies: context.cookies,
         });
         const user = await getAuthUser(supabase);
-        if (!user || !user.email) {
+        if (!user?.email) {
           throw new ActionError({
             code: "UNAUTHORIZED",
             message: "ログインしてください",
@@ -775,7 +775,7 @@ export const server = {
             id: u.id,
             email: u.email ?? "",
             displayName: profile?.display_name ?? "",
-            role: role as "member" | "admin",
+            role,
             createdAt: u.created_at,
           };
         });

@@ -25,7 +25,7 @@ describe("passwordSchema", () => {
   );
 
   it("rejects over-72-char passwords (bcrypt limit)", () => {
-    const pw = "A1" + "a".repeat(71); // 73 chars total
+    const pw = `A1${"a".repeat(71)}`; // 73 chars total
     expect(pw.length).toBe(73);
     expect(passwordSchema.safeParse(pw).success).toBe(false);
   });
@@ -36,7 +36,7 @@ describe("passwordSchema", () => {
   });
 
   it("accepts exactly 72 chars", () => {
-    const pw = "Aa" + "1".repeat(70); // 72 chars, 要件満たす
+    const pw = `Aa${"1".repeat(70)}`; // 72 chars, 要件満たす
     expect(pw.length).toBe(72);
     expect(passwordSchema.safeParse(pw).success).toBe(true);
   });
@@ -62,7 +62,7 @@ describe("validatePasswordStrength (client-side helper)", () => {
   });
 
   it("returns length error for over-72 chars", () => {
-    expect(validatePasswordStrength("A1" + "a".repeat(71))).toMatch(
+    expect(validatePasswordStrength(`A1${"a".repeat(71)}`)).toMatch(
       /72文字以下/,
     );
   });

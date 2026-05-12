@@ -15,7 +15,7 @@ if (signOutResult && !signOutResult.error) {
   return Astro.redirect("/");
 }
 
-const user = Astro.locals.user;
+const { user } = Astro.locals;
 let initialDisplayName = "";
 let initialAvatarUrl = "";
 

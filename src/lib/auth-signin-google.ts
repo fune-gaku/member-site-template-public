@@ -22,10 +22,10 @@ export const GOOGLE_OAUTH_GENERIC_ERROR_MESSAGE =
 
 export interface SignInWithGoogleCapableClient {
   auth: {
-    signInWithOAuth(input: {
+    signInWithOAuth: (input: {
       provider: "google";
       options: { redirectTo: string };
-    }): Promise<{
+    }) => Promise<{
       data: { url: string | null; provider?: string } | null;
       error: { message: string; code?: string } | null;
     }>;

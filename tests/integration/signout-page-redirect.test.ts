@@ -27,7 +27,7 @@ describe("page-level signOut redirect (Issue #34)", () => {
     (pagePath) => {
       const source = readFileSync(resolve(REPO_ROOT, pagePath), "utf8");
 
-      const frontmatterMatch = source.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatterMatch = /^---\n([\s\S]*?)\n---/.exec(source);
       expect(
         frontmatterMatch,
         `${pagePath} に Astro frontmatter が見つからない`,
@@ -53,7 +53,7 @@ describe("page-level signOut redirect (Issue #34)", () => {
     "%s: layout からの dead な Astro.redirect が残っていない",
     (layoutPath) => {
       const source = readFileSync(resolve(REPO_ROOT, layoutPath), "utf8");
-      const frontmatterMatch = source.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatterMatch = /^---\n([\s\S]*?)\n---/.exec(source);
       expect(frontmatterMatch).not.toBeNull();
       const frontmatter = frontmatterMatch![1];
 

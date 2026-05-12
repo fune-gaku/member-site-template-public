@@ -24,7 +24,10 @@ interface SignInInput {
 
 export interface SignInCapableClient {
   auth: {
-    signInWithPassword(input: { email: string; password: string }): Promise<{
+    signInWithPassword: (input: {
+      email: string;
+      password: string;
+    }) => Promise<{
       error: { message: string; code?: string } | null;
     }>;
   };

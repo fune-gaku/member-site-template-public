@@ -29,10 +29,10 @@ interface ResetPasswordInput {
 
 export interface ResetPasswordCapableClient {
   auth: {
-    resetPasswordForEmail(
+    resetPasswordForEmail: (
       email: string,
       options: { redirectTo: string },
-    ): Promise<{ error: { message: string; code?: string } | null }>;
+    ) => Promise<{ error: { message: string; code?: string } | null }>;
   };
 }
 

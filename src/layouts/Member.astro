@@ -9,8 +9,8 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
-const user = Astro.locals.user;
-const profile = Astro.locals.profile;
+const { user } = Astro.locals;
+const { profile } = Astro.locals;
 const isAdmin = profile?.role === "admin";
 const currentPath = Astro.url.pathname;
 

@@ -42,7 +42,7 @@ describe("auth.updatePassword input schema", () => {
   });
 
   it("72 文字超のパスワードを拒否する (bcrypt 限界)", () => {
-    const pw = "A1" + "a".repeat(71); // 73 文字
+    const pw = `A1${"a".repeat(71)}`; // 73 文字
     const result = schema.safeParse({ password: pw });
     expect(result.success).toBe(false);
   });

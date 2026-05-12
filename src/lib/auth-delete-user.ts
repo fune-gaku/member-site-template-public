@@ -75,15 +75,15 @@ const STORAGE_REMOVE_BATCH_SIZE = 1000;
  */
 export interface DeleteUserCapableAdminClient {
   storage: {
-    from(bucket: string): {
-      list(
+    from: (bucket: string) => {
+      list: (
         folder: string,
         options?: { limit?: number; offset?: number },
-      ): Promise<{
+      ) => Promise<{
         data: StorageFileEntry[] | null;
         error: { message: string } | null;
       }>;
-      remove(paths: string[]): Promise<{
+      remove: (paths: string[]) => Promise<{
         data: unknown;
         error: { message: string } | null;
       }>;
@@ -91,10 +91,10 @@ export interface DeleteUserCapableAdminClient {
   };
   auth: {
     admin: {
-      deleteUser(
+      deleteUser: (
         userId: string,
         shouldSoftDelete: boolean,
-      ): Promise<{
+      ) => Promise<{
         data: unknown;
         error: { message: string } | null;
       }>;
