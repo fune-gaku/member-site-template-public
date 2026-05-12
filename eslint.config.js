@@ -234,6 +234,17 @@ export default [
     ...tseslint.configs.disableTypeChecked,
   },
 
+  // ---- Astro ページ専用 override ----
+  // Astro frontmatter は早期 return (Astro.redirect 等) を持ちつつ末尾は HTML
+  // レンダリングへフォールスルーする SSR 慣習で、`consistent-return` の前提
+  // (全分岐で return) と衝突する。Astro 全ページ (8/8) で誤検出のため off。
+  {
+    files: ["**/*.astro"],
+    rules: {
+      "consistent-return": "off",
+    },
+  },
+
   // ---- テストファイル緩和 ----
   {
     files: ["tests/**/*.ts", "**/*.test.ts"],
