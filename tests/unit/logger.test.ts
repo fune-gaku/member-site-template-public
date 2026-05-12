@@ -279,7 +279,7 @@ describe("logger.error", () => {
     });
     const err = new Error("User user@example.com is locked");
     logger.error("auth.signIn", err);
-    const call = errorSpy.mock.calls[0];
+    const [call] = errorSpy.mock.calls;
     const sanitized = call[1] as { message: string };
     expect(sanitized.message).toBe("User u***@example.com is locked");
   });
