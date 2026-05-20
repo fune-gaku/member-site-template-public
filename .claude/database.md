@@ -149,8 +149,8 @@ signup を許可するメールドメインの allowlist。Supabase Before User 
 
 **RLS / 権限**:
 
-- `alter table ... enable row level security;`（policy は一切作らない = 完全 default-deny）
-- `revoke all on public.auth_allowed_email_domains from public, anon, authenticated;` — table-level でも剥奪し列挙攻撃の入口を遮断
+- `alter table ... enable row level security;` + `deny_all_to_authenticated_and_anon` policy (`for all to authenticated, anon using (false) with check (false)`) — Supabase Advisor lint 0011 silence + 設計意図「authenticated / anon は完全遮断」を policy として明示
+- `revoke all on public.auth_allowed_email_domains from public, anon, authenticated;` — table-level でも剥奪し列挙攻撃の入口を遮断（実 runtime では privilege check が RLS より先に評価されるためこちらが先に効く）
 - service_role / postgres は Supabase default privileges で full access を保持
 - Hook 関数（SECURITY DEFINER, owner=postgres）が postgres 権限で読み出す
 
@@ -181,7 +181,7 @@ delete from public.auth_allowed_email_domains where domain = 'partner-fleet.exam
 
 本番でこの hook を実際に有効化するには **Supabase Dashboard > Auth > Hooks > Before User Created** で関数を選択する必要がある（CLI からは本番 Auth 設定を更新できない）。手順は [deployment-optional.md「メールドメイン allowlist（任意）」](./deployment-optional.md#メールドメイン-allowlist任意) を参照。
 
-**回帰検出**: pgTAP `090-before-user-created-domain-allowlist.test.sql` が 24 アサーションで以下を固定:
+**回帰検出**: pgTAP `090-before-user-created-domain-allowlist.test.sql` が 25 アサーションで以下を固定:
 
 - allowlist 空での既定許可（backward-compat）
 - 単一 / 複数ドメインでの一致 / 不一致挙動
@@ -194,6 +194,7 @@ delete from public.auth_allowed_email_domains where domain = 'partner-fleet.exam
 - テーブルの `relrowsecurity = true`（RLS enable）
 - authenticated / anon の `has_table_privilege` が SELECT / INSERT / UPDATE / DELETE 全 false（列挙攻撃の入口を遮断）
 - runtime sanity: authenticated として SELECT すると 42501（privilege check が RLS より先に評価）
+- `deny_all_to_authenticated_and_anon` policy の存在（Advisor lint 0011 silence + 意図明示）
 
 ---
 

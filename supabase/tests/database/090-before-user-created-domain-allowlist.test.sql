@@ -22,9 +22,10 @@
 --   - revoke all on auth_allowed_email_domains from authenticated 削除 → Test 11-14 が fail
 --   - revoke all on auth_allowed_email_domains from anon 削除 → Test 15-18 が fail
 --   - hd 抽出ループで provider='google' ガード削除 (Codex iter-1 P1 修正) → Test 20 が fail
+--   - deny_all_to_authenticated_and_anon policy 削除 (20260520070025_*.sql) → Test 21 が fail
 
 begin;
-select plan(24);
+select plan(25);
 
 -- 関数の許可/拒否の戻り値を共通化 (テスト内では rejection の JSON を毎回手書きしない)
 -- ※ Test setup の前に定義しておく
@@ -322,6 +323,24 @@ select is(
   ),
   pg_temp.expected_rejection(),
   'P1 hardening: non-Google provider の hd claim は無視され email ドメインで判定される (allowlist 迂回防止)'
+);
+
+-- ----------------------------------------
+-- Test 21: deny-all RLS policy が存在する (20260520070025_*.sql)
+-- ----------------------------------------
+-- Supabase Advisor lint 0011 (rls_enabled_no_policy) silence + 設計意図
+-- 「authenticated / anon は完全遮断」の明示化のために置いた policy。
+-- 実 runtime では table-level の revoke all が先に privilege check で 42501
+-- を返すため評価到達しないが、policy が消されると Advisor 警告が復活する
+-- + 意図文書化が失われるため、存在を pgTAP で固定する。
+select is(
+  (select count(*)::int
+     from pg_policies
+    where schemaname = 'public'
+      and tablename = 'auth_allowed_email_domains'
+      and policyname = 'deny_all_to_authenticated_and_anon'),
+  1,
+  'deny_all_to_authenticated_and_anon policy が存在する (Advisor lint 0011 silence + 設計意図明示)'
 );
 
 select * from finish();
