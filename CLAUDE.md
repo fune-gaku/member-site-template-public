@@ -72,7 +72,8 @@ npm run dev
 - マイグレーションファイルは `supabase/migrations/<14桁タイムスタンプ>_<topic>.sql` 形式で配置（Supabase CLI 規約）
 - 本番適用は `supabase db push`（既存 fork は `supabase migration repair --status applied <version>` で同期）
 - ローカルは `npm run db:start` → `npm run db:reset` で全マイグレーション適用済みの DB を立ち上げる
-- `profiles`, `member_posts` テーブルと Storage `avatars` バケットを使用
+- `profiles`, `member_posts`, `user_roles` テーブルと Storage `avatars` バケットを使用
+- `auth_allowed_email_domains` テーブル + Before User Created Hook 関数で signup を特定メールドメインに限定可能（opt-in / 空 = 制限なし、Issue #11、詳細は [.claude/deployment-optional.md](.claude/deployment-optional.md#メールドメイン-allowlist任意)）
 
 ### DB 変更時の 7 ステップ（Issue #34 で確立）
 

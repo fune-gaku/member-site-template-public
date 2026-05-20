@@ -12,11 +12,12 @@
 
 ## テーブル一覧
 
-| テーブル名     | 説明                                                | 主要カラム                        |
-| -------------- | --------------------------------------------------- | --------------------------------- |
-| `profiles`     | ユーザープロフィール                                | `user_id`, `display_name`, `role` |
-| `member_posts` | 会員投稿（サンプル）                                | `id`, `user_id`, `title`, `body`  |
-| `user_roles`   | RBAC: ユーザーのロール割り当て（Issue #42 Phase 1） | `id`, `user_id`, `role`           |
+| テーブル名                   | 説明                                                                            | 主要カラム                        |
+| ---------------------------- | ------------------------------------------------------------------------------- | --------------------------------- |
+| `profiles`                   | ユーザープロフィール                                                            | `user_id`, `display_name`, `role` |
+| `member_posts`               | 会員投稿（サンプル）                                                            | `id`, `user_id`, `title`, `body`  |
+| `user_roles`                 | RBAC: ユーザーのロール割り当て（Issue #42 Phase 1）                             | `id`, `user_id`, `role`           |
+| `auth_allowed_email_domains` | signup を許可するメールドメインの allowlist（Issue #11、空 = 制限なし、opt-in） | `domain`, `note`, `created_at`    |
 
 ## 列挙型 (enum)
 
@@ -133,6 +134,66 @@ RBAC のロール割り当てを別テーブルで管理する canonical pattern
 - **`profiles_role_sync_to_user_roles` trigger** が `profiles.role` の UPDATE を `user_roles` に伝搬する。これにより既存 `admin.updateUserRole` Action（profiles のみ更新）が動作したまま、user_roles と drift しない（pgTAP `080-user-roles-rls.test.sql` Test 11/12 で固定）。Phase 2 で profiles.role drop と同時に trigger / 関数も drop する。
 - Phase 2 (#43) で `is_admin()` 関数 + アプリ切替 + `profiles.role` drop + sync trigger drop。
 - Phase 3 (#44) で Custom Access Token Hook により JWT に `user_role` claim を embed → DB 引き 0 回化。
+
+---
+
+### auth_allowed_email_domains
+
+signup を許可するメールドメインの allowlist。Supabase Before User Created Hook（[公式](https://supabase.com/docs/guides/auth/auth-hooks/before-user-created-hook)）と組で動く（Issue #11）。**空テーブル = 制限なし** がテンプレ既定で、テンプレ利用者が INSERT して初めて制限が効く opt-in 設計。
+
+| カラム名     | 型            | 制約                                                                                  | 説明                                                |
+| ------------ | ------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `domain`     | `text`        | PRIMARY KEY, CHECK (`domain = lower(domain) and domain ~ '^[a-z0-9.-]+\.[a-z]{2,}$'`) | 許可ドメイン（lowercase 強制 + DNS label.tld 形式） |
+| `note`       | `text`        | NULL 可                                                                               | 運用メモ（誰が・なぜ追加したか）                    |
+| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()`                                                             | 登録日時                                            |
+
+**RLS / 権限**:
+
+- `alter table ... enable row level security;`（policy は一切作らない = 完全 default-deny）
+- `revoke all on public.auth_allowed_email_domains from public, anon, authenticated;` — table-level でも剥奪し列挙攻撃の入口を遮断
+- service_role / postgres は Supabase default privileges で full access を保持
+- Hook 関数（SECURITY DEFINER, owner=postgres）が postgres 権限で読み出す
+
+**Before User Created Hook 関数**:
+
+`public.before_user_created_restrict_email_domain(event jsonb) returns jsonb` が Supabase Auth から呼び出される。
+
+- 戻り値: 許可 = `'{}'::jsonb` / 拒否 = `{"error": {"message": "...", "http_code": 403}}`
+- ロジック: (0) allowlist 空 → 許可、(1) `event->'user'->>'email'` からドメイン抽出、(2) `identities[].identity_data.hd`（Google Workspace）があれば優先、(3) lowercase で allowlist 照合
+- SECURITY DEFINER + `set search_path = ''` + `public.*` 完全修飾（search_path ハイジャック対策）
+- `grant execute ... to supabase_auth_admin` / `revoke execute ... from public, anon, authenticated`（REST 公開遮断）
+
+**運用（許可ドメインの追加・削除）**:
+
+当面は SQL 直接編集のみ（admin UI なし）。Supabase Dashboard SQL Editor または `supabase migration new` で実行する。
+
+```sql
+-- 追加
+insert into public.auth_allowed_email_domains (domain, note)
+  values ('asahi-tanker.co.jp', '旭タンカー トライアル参加者 2026-11');
+
+-- 一覧
+select * from public.auth_allowed_email_domains order by created_at;
+
+-- 削除
+delete from public.auth_allowed_email_domains where domain = 'partner-fleet.example';
+```
+
+本番でこの hook を実際に有効化するには **Supabase Dashboard > Auth > Hooks > Before User Created** で関数を選択する必要がある（CLI からは本番 Auth 設定を更新できない）。手順は [deployment-optional.md「メールドメイン allowlist（任意）」](./deployment-optional.md#メールドメイン-allowlist任意) を参照。
+
+**回帰検出**: pgTAP `090-before-user-created-domain-allowlist.test.sql` が 24 アサーションで以下を固定:
+
+- allowlist 空での既定許可（backward-compat）
+- 単一 / 複数ドメインでの一致 / 不一致挙動
+- Google Workspace の hd claim 優先（`provider='google'` ガード付き）
+- 非 Google provider の hd claim が無視される（allowlist 迂回防止）
+- case-insensitive 照合
+- event 構造異常時の safe-deny
+- domain CHECK 制約（uppercase INSERT の拒否）
+- 関数 privileges（anon / authenticated は EXECUTE 不可、supabase_auth_admin は可）
+- テーブルの `relrowsecurity = true`（RLS enable）
+- authenticated / anon の `has_table_privilege` が SELECT / INSERT / UPDATE / DELETE 全 false（列挙攻撃の入口を遮断）
+- runtime sanity: authenticated として SELECT すると 42501（privilege check が RLS より先に評価）
 
 ---
 

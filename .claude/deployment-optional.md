@@ -7,6 +7,7 @@
 ## 収録機能
 
 - [Google OAuth セットアップ（任意）](#google-oauth-セットアップ任意) — email + password に加えて Google ログインを追加
+- [メールドメイン allowlist（任意）](#メールドメイン-allowlist任意) — signup を特定メールドメインに限定（招待制クローズド会員サイト / Google Workspace 限定 用途）
 - [Workers Builds（詳細 / GitHub 自動デプロイ）](#workers-builds詳細--github-自動デプロイ) — `git push` / PR で Cloudflare 側のビルド・デプロイを自動化し、PR ごとに preview URL を発行
 
 将来追加される opt-in 機能（別 IdP / SSO / 外部サービス連携など）も本ファイルに集約する方針。
@@ -102,6 +103,79 @@ PUBLIC_GOOGLE_AUTH_ENABLED=true
 3. **Google Cloud Console（任意）**: 不要になった OAuth client を削除、または「Disabled」に変更
 
 > ⚠️ **やってはいけない順序**: Supabase Dashboard を先に OFF にしてアプリ側 `PUBLIC_GOOGLE_AUTH_ENABLED=true` のままにすると、ボタンは表示されるが押下時に `provider is not enabled` エラーで失敗する。必ずアプリ側を先に切ること。
+
+---
+
+## メールドメイン allowlist（任意）
+
+signup を **特定のメールドメインに限定** する opt-in 機能（Issue #11）。「招待制クローズド会員サイト」「特定企業の社員専用」「Google Workspace ドメイン限定」用途で、招待 URL を共有した瞬間に第三者が紛れ込むのを防ぐ。
+
+実装は **Supabase Before User Created Hook**（Postgres function）で、provider-agnostic に email/password / Google OAuth / 将来追加される他 OAuth provider すべてに同じ allowlist が効く。
+
+> **本テンプレートのデフォルトは制限なし**。`public.auth_allowed_email_domains` テーブルが空のときは Hook が無制限に許可を返す（backward-compat）。テンプレ利用者が許可ドメインを INSERT して、かつ Supabase Dashboard で Hook を有効化したときだけ制限が効く。
+
+### 1. ローカル動作確認（任意）
+
+`supabase/config.toml` の `[auth.hook.before_user_created]` は本テンプレでデフォルト有効になっており、`npm run db:start` するだけで Hook が wire-up される。動作確認するには:
+
+```bash
+# psql で許可ドメインを 1 件追加
+docker exec -i supabase_db_member-site-template psql -U postgres -d postgres -c \
+  "insert into public.auth_allowed_email_domains (domain) values ('example.com');"
+
+# 許可ドメイン以外で signup を試す → reject される
+# 例: /auth/signup に user@other.com で送信 → "このドメインのアカウントではサインインできません"
+```
+
+allowlist を空に戻したい場合:
+
+```bash
+docker exec -i supabase_db_member-site-template psql -U postgres -d postgres -c \
+  "truncate public.auth_allowed_email_domains;"
+```
+
+### 2. 本番セットアップ
+
+`supabase/config.toml` は **本番 Supabase Auth に反映されない**（CLI は本番 Auth 設定を更新しない仕様）。本番で Hook を有効化するには Dashboard で手動登録が必要。
+
+1. **Supabase Dashboard > Authentication > Hooks（Beta）**
+2. **Add a new hook** > **Before User Created**
+3. **Hook type**: `Postgres`
+4. **Schema**: `public`
+5. **Function name**: `before_user_created_restrict_email_domain`
+6. **Enable hook** を ON にして **Create hook**
+
+### 3. 許可ドメインの追加
+
+**Supabase Dashboard > SQL Editor** で実行:
+
+```sql
+-- 追加（複数行）
+insert into public.auth_allowed_email_domains (domain, note) values
+  ('asahi-tanker.co.jp', '旭タンカー トライアル 2026-11'),
+  ('partner-fleet.example', 'パートナー船社');
+
+-- 一覧
+select * from public.auth_allowed_email_domains order by created_at;
+
+-- 削除
+delete from public.auth_allowed_email_domains where domain = 'partner-fleet.example';
+```
+
+`domain` カラムは CHECK 制約で **lowercase 強制** + `^[a-z0-9.-]+\.[a-z]{2,}$` 形式必須。`'EXAMPLE.COM'` のような uppercase は INSERT 時に拒否される。
+
+### 4. 動作確認
+
+- [ ] **許可ドメイン**で signup → 通常通り signup できる（email confirmation メールが届く）
+- [ ] **許可外ドメイン**で signup → エラーメッセージ「このドメインのアカウントではサインインできません」で reject される（403）
+- [ ] Google OAuth でも同じ allowlist が効く（Workspace `hd` claim 一致なら許可）
+- [ ] allowlist を `truncate` で空にすると、任意の email で signup できる状態に戻る（backward-compat）
+
+### 5. allowlist を後から無効化
+
+完全に無効化する場合は **Dashboard > Authentication > Hooks** で hook を Disable する。テーブルにデータが残っていても hook 自体が無効になれば判定が走らない。
+
+部分的に元に戻したいだけなら `truncate public.auth_allowed_email_domains;` で空にすれば、hook は有効のまま「allowlist 空 = 無制限許可」の挙動になる。
 
 ---
 
