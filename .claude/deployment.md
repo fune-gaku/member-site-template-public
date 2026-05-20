@@ -350,9 +350,10 @@ JWT expiry を短く設定するほど失効ラグが縮まるが、refresh ト�
 
 「使うときだけ追加で必要になる」opt-in 機能のセットアップ手順は [.claude/deployment-optional.md](./deployment-optional.md) に集約してある。該当機能を使わない場合は本ファイルの手順だけで本番デプロイまで完結する（`cp .env.example .env && npm install && npm run dev` から本番デプロイまで `deployment.md` だけ読めばよい）。
 
-| 機能                                                                   | 用途                                            | デフォルト |
-| ---------------------------------------------------------------------- | ----------------------------------------------- | ---------- |
-| [Google OAuth](./deployment-optional.md#google-oauth-セットアップ任意) | email + password に加えて Google ログインを追加 | OFF        |
+| 機能                                                                              | 用途                                                        | デフォルト |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------- |
+| [Google OAuth](./deployment-optional.md#google-oauth-セットアップ任意)            | email + password に加えて Google ログインを追加             | OFF        |
+| [メールドメイン allowlist](./deployment-optional.md#メールドメイン-allowlist任意) | signup を特定メールドメインに限定（招待制 / 社員専用 用途） | OFF        |
 
 将来追加される opt-in 機能（別 IdP / SSO / 外部サービス連携など）も `deployment-optional.md` に集約する方針。
 

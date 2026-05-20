@@ -269,9 +269,13 @@ max_frequency = "5s"
 # inactivity_timeout = "8h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
-# [auth.hook.before_user_created]
-# enabled = true
-# uri = "pg-functions://postgres/auth/before-user-created-hook"
+# Issue #11: メールドメイン allowlist を Before User Created Hook で適用 (provider-agnostic)。
+# auth_allowed_email_domains が空ならテンプレ既定の無制限許可 (backward-compat)。
+# 本番では Supabase Dashboard > Auth > Hooks > Before User Created で同関数を選択する必要あり
+# (CLI からは本番 Auth 設定を更新できないため。手順は .claude/deployment.md を参照)。
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/before_user_created_restrict_email_domain"
 
 # This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
 # [auth.hook.custom_access_token]
