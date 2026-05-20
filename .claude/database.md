@@ -181,15 +181,19 @@ delete from public.auth_allowed_email_domains where domain = 'partner-fleet.exam
 
 本番でこの hook を実際に有効化するには **Supabase Dashboard > Auth > Hooks > Before User Created** で関数を選択する必要がある（CLI からは本番 Auth 設定を更新できない）。手順は [deployment-optional.md「メールドメイン allowlist（任意）」](./deployment-optional.md#メールドメイン-allowlist任意) を参照。
 
-**回帰検出**: pgTAP `090-before-user-created-domain-allowlist.test.sql` が 13 アサーションで以下を固定:
+**回帰検出**: pgTAP `090-before-user-created-domain-allowlist.test.sql` が 24 アサーションで以下を固定:
 
 - allowlist 空での既定許可（backward-compat）
 - 単一 / 複数ドメインでの一致 / 不一致挙動
-- hd claim 優先
+- Google Workspace の hd claim 優先（`provider='google'` ガード付き）
+- 非 Google provider の hd claim が無視される（allowlist 迂回防止）
 - case-insensitive 照合
 - event 構造異常時の safe-deny
-- CHECK 制約（uppercase INSERT の拒否）
+- domain CHECK 制約（uppercase INSERT の拒否）
 - 関数 privileges（anon / authenticated は EXECUTE 不可、supabase_auth_admin は可）
+- テーブルの `relrowsecurity = true`（RLS enable）
+- authenticated / anon の `has_table_privilege` が SELECT / INSERT / UPDATE / DELETE 全 false（列挙攻撃の入口を遮断）
+- runtime sanity: authenticated として SELECT すると 42501（privilege check が RLS より先に評価）
 
 ---
 
