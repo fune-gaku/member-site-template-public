@@ -18,9 +18,13 @@
 --   - email 欠損ガード削除 → Test 7 が fail
 --   - CHECK 制約削除 → Test 8 が fail (uppercase INSERT が通ってしまう)
 --   - revoke execute 削除 → Test 9 が fail (anon/authenticated が EXECUTE できてしまう)
+--   - alter table ... enable row level security 削除 → Test 10 が fail
+--   - revoke all on auth_allowed_email_domains from authenticated 削除 → Test 11-14 が fail
+--   - revoke all on auth_allowed_email_domains from anon 削除 → Test 15-18 が fail
+--   - hd 抽出ループで provider='google' ガード削除 (Codex iter-1 P1 修正) → Test 20 が fail
 
 begin;
-select plan(13);
+select plan(24);
 
 -- 関数の許可/拒否の戻り値を共通化 (テスト内では rejection の JSON を毎回手書きしない)
 -- ※ Test setup の前に定義しておく
@@ -198,6 +202,126 @@ select is(
   ),
   true,
   'supabase_auth_admin は EXECUTE できる (Auth サブシステムから hook 呼び出し)'
+);
+
+-- ----------------------------------------
+-- Test 10: auth_allowed_email_domains に RLS が enable されている (Codex iter-1 P2 追加)
+-- ----------------------------------------
+-- 退行検出: alter table ... enable row level security を消すと fail。
+-- 単体では実害が無いが、revoke を緩めたときの最終防衛線として固定する。
+select is(
+  (select relrowsecurity from pg_class
+    where oid = 'public.auth_allowed_email_domains'::regclass),
+  true,
+  'auth_allowed_email_domains: RLS が enable されている (default-deny の前提)'
+);
+
+-- ----------------------------------------
+-- Test 11-14: authenticated は 4 DML 全てに privilege が無い (Codex iter-1 P2 追加)
+-- ----------------------------------------
+-- 退行検出: revoke all on auth_allowed_email_domains from authenticated を消すと
+-- Supabase default privileges 経由で SELECT / INSERT 等が grant されて fail する。
+-- 列挙攻撃 (許可ドメイン一覧の網羅) の入口を遮断する設計を固定。
+select is(
+  has_table_privilege('authenticated', 'public.auth_allowed_email_domains', 'SELECT'),
+  false,
+  'authenticated: SELECT privilege なし (列挙攻撃の入口を遮断)'
+);
+
+select is(
+  has_table_privilege('authenticated', 'public.auth_allowed_email_domains', 'INSERT'),
+  false,
+  'authenticated: INSERT privilege なし'
+);
+
+select is(
+  has_table_privilege('authenticated', 'public.auth_allowed_email_domains', 'UPDATE'),
+  false,
+  'authenticated: UPDATE privilege なし'
+);
+
+select is(
+  has_table_privilege('authenticated', 'public.auth_allowed_email_domains', 'DELETE'),
+  false,
+  'authenticated: DELETE privilege なし'
+);
+
+-- ----------------------------------------
+-- Test 15-18: anon も同じく 4 DML 全てに privilege が無い (Codex iter-1 P2 追加)
+-- ----------------------------------------
+-- 退行検出: revoke all from anon を消すと fail。サインイン前のユーザ
+-- (anon ロール) も allowlist を読めないことを固定する。
+select is(
+  has_table_privilege('anon', 'public.auth_allowed_email_domains', 'SELECT'),
+  false,
+  'anon: SELECT privilege なし'
+);
+
+select is(
+  has_table_privilege('anon', 'public.auth_allowed_email_domains', 'INSERT'),
+  false,
+  'anon: INSERT privilege なし'
+);
+
+select is(
+  has_table_privilege('anon', 'public.auth_allowed_email_domains', 'UPDATE'),
+  false,
+  'anon: UPDATE privilege なし'
+);
+
+select is(
+  has_table_privilege('anon', 'public.auth_allowed_email_domains', 'DELETE'),
+  false,
+  'anon: DELETE privilege なし'
+);
+
+-- ----------------------------------------
+-- Test 19: runtime sanity — authenticated として SELECT すると 42501 (Codex iter-1 P2 追加)
+-- ----------------------------------------
+-- has_table_privilege が静的に false を返すことに加えて、実行時の挙動も固定する。
+-- PostgreSQL は privilege check を RLS より先に評価するため SELECT は 42501 で
+-- 弾かれ、「default-deny で 0 行返却」の挙動には到達しない (revoke と RLS の
+-- 多層防御のうち revoke 層が実効)。
+select tests.create_supabase_user('rls-tester@example.com');
+select tests.authenticate_as('rls-tester@example.com');
+
+select throws_ok(
+  $$ select count(*) from public.auth_allowed_email_domains $$,
+  '42501',
+  null,
+  'authenticated runtime: SELECT は 42501 で阻止される (privilege check が RLS より先に評価)'
+);
+
+-- ----------------------------------------
+-- Test 20: P1 fix — non-Google identity の hd claim は無視される (Codex iter-1 P1 追加)
+-- ----------------------------------------
+-- 設計意図は「Google Workspace の hd claim のみを email より優先」。
+-- provider !== 'google' の identity に hd claim があっても、allowlist 迂回経路に
+-- ならないことを固定。退行検出: 関数の `identity->>'provider' = 'google'` ガード
+-- を消すと、非 Google provider の hd 値で domain が上書きされて fail する。
+-- (allowlist に 'example.com' が入っている前提 — Test 2 で insert 済み、Test 4
+-- でさらに 'asahi-tanker.co.jp' / 'partner-fleet.example' が追加されている)
+select tests.clear_authentication();  -- postgres ロールに戻して関数を直接呼べるように
+
+select is(
+  public.before_user_created_restrict_email_domain(
+    jsonb_build_object(
+      'user', jsonb_build_object(
+        'email', 'user@other.com',
+        'identities', jsonb_build_array(
+          jsonb_build_object(
+            'provider', 'custom-oidc',
+            'identity_data', jsonb_build_object(
+              'email', 'user@other.com',
+              'hd', 'example.com'
+            )
+          )
+        )
+      )
+    )
+  ),
+  pg_temp.expected_rejection(),
+  'P1 hardening: non-Google provider の hd claim は無視され email ドメインで判定される (allowlist 迂回防止)'
 );
 
 select * from finish();

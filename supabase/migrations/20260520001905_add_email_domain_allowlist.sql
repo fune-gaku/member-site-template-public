@@ -124,13 +124,20 @@ begin
 
   -- 2. Google Workspace の hd claim があれば優先
   --    OAuth 経由の signup では event->'user'->'identities' に identity 配列が入る。
-  --    identity_data->>'hd' が存在する identity を見つけたら、その値で domain を上書き。
+  --    `hd` は Google 専用 OIDC claim だが、本ループでは provider が 'google' の
+  --    identity に限定して参照する (Codex review P1 / defense in depth):
+  --      - 設計意図は「Google Workspace の正しいドメイン確認」であり、provider に
+  --        関わらず `identity_data.hd` を信頼すると、将来追加される他 OAuth
+  --        provider (カスタム OIDC 等) が `hd` 風 claim を流したときに allowlist を
+  --        迂回される脅威面ができる。
+  --      - Supabase identity の `provider` フィールドは `'google'` lowercase 固定
+  --        ([Supabase JS Auth docs](https://supabase.com/docs/reference/javascript/auth-getuseridentities))。
   for identity in
     select * from jsonb_array_elements(coalesce(event->'user'->'identities', '[]'::jsonb))
   loop
     identity_data := identity->'identity_data';
     if identity_data is null then continue; end if;
-    if identity_data ? 'hd' then
+    if identity->>'provider' = 'google' and identity_data ? 'hd' then
       hd_value := lower(identity_data->>'hd');
       if hd_value is not null and hd_value <> '' then
         user_domain := hd_value;

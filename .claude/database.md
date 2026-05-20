@@ -179,7 +179,7 @@ select * from public.auth_allowed_email_domains order by created_at;
 delete from public.auth_allowed_email_domains where domain = 'partner-fleet.example';
 ```
 
-本番でこの hook を実際に有効化するには **Supabase Dashboard > Auth > Hooks > Before User Created** で関数を選択する必要がある（CLI からは本番 Auth 設定を更新できない）。手順は [deployment.md「Before User Created Hook」](./deployment.md#supabase-auth-before-user-created-hook任意--テンプレ利用者が-allowlist-を使うときのみ) を参照。
+本番でこの hook を実際に有効化するには **Supabase Dashboard > Auth > Hooks > Before User Created** で関数を選択する必要がある（CLI からは本番 Auth 設定を更新できない）。手順は [deployment-optional.md「メールドメイン allowlist（任意）」](./deployment-optional.md#メールドメイン-allowlist任意) を参照。
 
 **回帰検出**: pgTAP `090-before-user-created-domain-allowlist.test.sql` が 13 アサーションで以下を固定:
 
