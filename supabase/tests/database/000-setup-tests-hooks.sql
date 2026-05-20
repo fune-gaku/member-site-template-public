@@ -140,9 +140,16 @@ as $$
   where email = identifier;
 $$;
 
+-- search_path = pg_catalog, public, extensions: Supabase Advisor lint
+-- (function_search_path_mutable) を silence するため、他 3 ヘルパー
+-- (create_supabase_user / get_supabase_uid / _build_jwt_claims) と同じ
+-- 値を設定する。本関数は SECURITY DEFINER ではないが、search_path 固定
+-- は呼出元 search_path から独立してヘルパー内部 SQL を安定動作させる
+-- 一般的な hardening として推奨される。
 create or replace function tests.authenticate_as(identifier text)
 returns void
 language plpgsql
+set search_path = pg_catalog, public, extensions
 as $$
 declare
   user_data jsonb;
@@ -164,9 +171,15 @@ $$;
 -- ロールと JWT claims を初期状態に戻す (postgres スーパーユーザー)。
 -- 別ユーザーに切り替える前に呼ぶ必要は無い (authenticate_as が上書きする) が、
 -- RLS を無視して setup したいときに使う。
+--
+-- search_path = pg_catalog, public, extensions: Supabase Advisor lint
+-- (function_search_path_mutable) を silence するため、他 3 ヘルパーと同値を設定。
+-- 本関数は set_config(pg_catalog) しか呼ばないため search_path = '' でも動くが、
+-- ファイル全体の一貫性を優先する。
 create or replace function tests.clear_authentication()
 returns void
 language plpgsql
+set search_path = pg_catalog, public, extensions
 as $$
 begin
   perform set_config('role', 'postgres', true);
