@@ -116,23 +116,23 @@ signup を **特定のメールドメインに限定** する opt-in 機能（Is
 
 ### 1. ローカル動作確認（任意）
 
-`supabase/config.toml` の `[auth.hook.before_user_created]` は本テンプレでデフォルト有効になっており、`npm run db:start` するだけで Hook が wire-up される。動作確認するには:
+`supabase/config.toml` の `[auth.hook.before_user_created]` は本テンプレでデフォルト有効になっており、`npm run db:start` するだけで Hook が wire-up される。動作確認は **本番と同じ操作**で行える:
 
-```bash
-# psql で許可ドメインを 1 件追加
-docker exec -i supabase_db_member-site-template psql -U postgres -d postgres -c \
-  "insert into public.auth_allowed_email_domains (domain) values ('example.com');"
+1. ローカル Studio を開く: <http://127.0.0.1:54323> (`npm run db:start` で起動済の場合)
+2. **SQL Editor** で許可ドメインを 1 件追加:
 
-# 許可ドメイン以外で signup を試す → reject される
-# 例: /auth/signup に user@other.com で送信 → "このドメインのアカウントではサインインできません"
-```
+   ```sql
+   insert into public.auth_allowed_email_domains (domain) values ('example.com');
+   ```
 
-allowlist を空に戻したい場合:
+3. `/auth/signup` に `user@other.com` で送信 → 「このドメインのアカウントではサインインできません」で reject される
+4. allowlist を空に戻すには Studio SQL Editor で:
 
-```bash
-docker exec -i supabase_db_member-site-template psql -U postgres -d postgres -c \
-  "truncate public.auth_allowed_email_domains;"
-```
+   ```sql
+   truncate public.auth_allowed_email_domains;
+   ```
+
+> 本番 Supabase Dashboard とローカル Studio は **同じ UI / 同じ SQL Editor**。後述の本番手順 (Step 3) と完全に同型の操作で動作確認できる。
 
 ### 2. 本番セットアップ
 
