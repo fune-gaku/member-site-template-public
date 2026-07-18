@@ -369,9 +369,76 @@ describe("middleware: /_actions/* ボディサイズガード (Issue #9)", () =>
     // 代表的なヘッダをサンプリング検査（applySecurityHeaders の網羅は別テスト）
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(response.headers.get("X-Frame-Options")).toBe("DENY");
-    // CSP は middleware ではなく Astro の <meta> 経由で注入されるため
-    // 411/413 のような middleware 直接生成レスポンスでは付与されない。
-    // これらは plain text なので CSP 不要 (HTML レンダリングがない)。
-    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+    // frame-ancestors だけを載せた CSP header は applySecurityHeaders 経由で
+    // middleware 直接生成レスポンスにも付く（header 限定ディレクティブのため）。
+    // script-src/style-src を含まないので meta 側との二重評価 footgun は起きない。
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "frame-ancestors 'none'",
+    );
+  });
+});
+
+describe("middleware: 認可リダイレクトのヘッダ強化", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // ログイン状態 / ロールに依存する 302 は、中間 CDN が別ユーザーへ配信しないよう
+  // no-store で返し、通常応答と同じセキュリティヘッダを載せる必要がある。
+  function buildRedirectContext(pathname: string) {
+    return {
+      url: new URL(`https://example.com${pathname}`),
+      request: new Request(`https://example.com${pathname}`),
+      cookies: {},
+      locals: { user: null, profile: null },
+      redirect: vi.fn(
+        (path: string) =>
+          new Response(null, { status: 302, headers: { Location: path } }),
+      ),
+      // biome-ignore lint/suspicious/noExplicitAny: モック簡略化のため
+    } as any;
+  }
+
+  it("未認証リダイレクト（/member→signin）に no-store + セキュリティヘッダが付く", async () => {
+    vi.mocked(createClient).mockReturnValue(
+      buildSupabaseMock({ user: null }) as unknown as ReturnType<
+        typeof createClient
+      >,
+    );
+    const context = buildRedirectContext("/member/dashboard");
+    const next = vi.fn(async () => new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "frame-ancestors 'none'",
+    );
+    expect(response.headers.get("Strict-Transport-Security")).toContain(
+      "max-age",
+    );
+  });
+
+  it("role 不一致リダイレクト（member→/admin→dashboard）に no-store + セキュリティヘッダが付く", async () => {
+    vi.mocked(createClient).mockReturnValue(
+      buildSupabaseMock({
+        user: { id: "user-abc", email: "member@example.com" },
+        role: "member",
+      }) as unknown as ReturnType<typeof createClient>,
+    );
+    const context = buildRedirectContext("/admin/users");
+    const next = vi.fn(async () => new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("/member/dashboard");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "frame-ancestors 'none'",
+    );
   });
 });

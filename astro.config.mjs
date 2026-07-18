@@ -69,7 +69,9 @@ export default defineConfig({
       directives: [
         "default-src 'self'",
         "base-uri 'self'",
-        "frame-ancestors 'none'",
+        // frame-ancestors は <meta> では無視される（HTTP header 限定ディレクティブ）。
+        // クリックジャッキング対策は src/lib/security-headers.ts の CSP header +
+        // X-Frame-Options で行う。ここに書いても死に設定になるため置かない。
         "object-src 'none'",
         // form-action は CSP3 仕様上 **送信中の全リダイレクトターゲット** に適用
         // されるため、Google OAuth (Issue #49) のフローで通過する Supabase Auth と
