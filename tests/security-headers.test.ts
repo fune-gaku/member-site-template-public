@@ -17,11 +17,16 @@ describe("SECURITY_HEADERS", () => {
     });
   });
 
-  it("does not emit Content-Security-Policy header (CSP is injected via Astro <meta>)", () => {
-    // CSP を header と <meta> の両方から出すと両者が独立評価され、
-    // ハッシュ無しの header 側で bundle script が拒否される。
-    // CSP は astro.config.mjs の security.csp にのみ集約する。
-    expect(SECURITY_HEADERS["Content-Security-Policy"]).toBeUndefined();
+  it("header CSP は frame-ancestors のみ（script-src/style-src は <meta> に集約）", () => {
+    // frame-ancestors は <meta> では無視される header 限定ディレクティブなので header で出す。
+    // 一方 script-src/style-src/default-src を header に含めると meta 側のハッシュ付き
+    // ポリシーと二重評価され bundle script が拒否されるため、header CSP は frame-ancestors
+    // だけに限定する。
+    const csp = SECURITY_HEADERS["Content-Security-Policy"];
+    expect(csp).toBe("frame-ancestors 'none'");
+    expect(csp).not.toContain("script-src");
+    expect(csp).not.toContain("style-src");
+    expect(csp).not.toContain("default-src");
   });
 
   it("HSTS has production-grade max-age", () => {

@@ -7,6 +7,19 @@ import { safeNextPath } from "./lib/safe-redirect";
 import { applySecurityHeaders } from "./lib/security-headers";
 import { createClient } from "./lib/supabase";
 
+/**
+ * 認証必須エリアの認可リダイレクト（未認証→signin / role 不一致→dashboard）を、
+ * 通常応答と同じく `Cache-Control: private, no-store` + 共通セキュリティヘッダ付きで返す。
+ * これらの 302 は「ログイン状態 / ロール」に依存する応答なので、ヘッダを付けずに
+ * early-return すると (1) 中間 CDN が認証状態依存の 302 を別ユーザーへ配信し得る、
+ * (2) HSTS / X-Frame-Options / CSP 等が欠落する。サイズ検査の early-return と同じ扱いに揃える。
+ */
+function hardenRedirect(response: Response): Response {
+  response.headers.set("Cache-Control", "private, no-store");
+  applySecurityHeaders(response);
+  return response;
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   // Issue #9: Astro Actions（/_actions/*）への入口で Content-Length を検査し、
   // 用途別の上限を超えるリクエストは Supabase クライアント生成より前に弾く。
@@ -53,8 +66,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // 多層防御: 将来 pathname 以外の値が載っても Open Redirect を防ぐため
     // safeNextPath を経由する（CWE-601）。
     const nextParam = safeNextPath(pathname);
-    return context.redirect(
-      `/auth/signin?next=${encodeURIComponent(nextParam)}`,
+    return hardenRedirect(
+      context.redirect(`/auth/signin?next=${encodeURIComponent(nextParam)}`),
     );
   }
 
@@ -78,7 +91,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
     // /admin/* は admin ロールのみ許可
     if (isAdminArea && context.locals.profile.role !== "admin") {
-      return context.redirect("/member/dashboard");
+      return hardenRedirect(context.redirect("/member/dashboard"));
     }
   }
 
