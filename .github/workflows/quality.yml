@@ -21,14 +21,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # typed lint (projectService) は worker-configuration.d.ts の型を読む。
-      # ファイル未生成だと CI と local で警告件数が乖離するため、typecheck job と
-      # 同じ前処理を実施して整合させる（.dev.vars seed → wrangler types）。
+      # typed lint (projectService) は worker-configuration.d.ts と .astro/ の生成型を読む。
+      # ファイル未生成だと CI と local で結果が乖離するため、typecheck job と同じ前処理を実施して
+      # 整合させる（.dev.vars seed → wrangler types → astro sync）。astro sync は astro:actions /
+      # astro:content 等の仮想モジュール型を .astro/ に生成する。これが無いと actions が any 化し、
+      # 参照側で no-unsafe-* が誤検知される（local は astro check 済みで通るため乖離）。
       - name: Seed .dev.vars from example
         run: cp .dev.vars.example .dev.vars
 
       - name: Generate Cloudflare Workers types
         run: npx wrangler types
+
+      - name: Generate Astro types
+        run: npx astro sync
 
       - name: ESLint
         run: npm run lint

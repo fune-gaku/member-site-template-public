@@ -19,4 +19,17 @@ if [ $status -ne 0 ]; then
   exit 1
 fi
 
+# Prettier フォーマットゲート（CI quality.yml の format-check と同一コマンド）。
+# 単一ファイルの prettier では CI の glob 形式と結果が一致しないことがあるため（実例: CJK
+# テーブル整列が glob 実行時のみ適用され、単一ファイル --check は素通りした）、必ず
+# `npm run format:check`（= prettier --check "**/*.{...}" --ignore-path .gitignore）で判定し、
+# CI と同じ基準でローカルブロックする（未フォーマットのコミットを CI 到達前に止める）。
+if ! npm run format:check --silent; then
+  echo ""
+  echo "❌ 未フォーマットのファイルがあります。コミットを中止します。"
+  echo "   npm run format で整形し、git add して再コミットしてください。"
+  echo "   （緊急時に限り git commit --no-verify で回避可能ですが非推奨）"
+  exit 1
+fi
+
 exit 0
